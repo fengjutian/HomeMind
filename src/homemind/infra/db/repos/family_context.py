@@ -28,12 +28,19 @@ class FamilyEventRow:
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyEventRow:
         return cls(
-            id=str(row["event_id"]), pk=int(row["id"]), family_id=str(row["family_id"]),
-            event_type=str(row["event_type"]), title=str(row["title"]),
-            start_at=int(row["start_at"]), end_at=int(row["end_at"]),
-            location=row["location"], description=str(row["description"]),
-            metadata_json=str(row["metadata_json"]), created_by=int(row["created_by"]),
-            created_at=int(row["created_at"]), updated_at=int(row["updated_at"]),
+            id=str(row["event_id"]),
+            pk=int(row["id"]),
+            family_id=str(row["family_id"]),
+            event_type=str(row["event_type"]),
+            title=str(row["title"]),
+            start_at=int(row["start_at"]),
+            end_at=int(row["end_at"]),
+            location=row["location"],
+            description=str(row["description"]),
+            metadata_json=str(row["metadata_json"]),
+            created_by=int(row["created_by"]),
+            created_at=int(row["created_at"]),
+            updated_at=int(row["updated_at"]),
         )
 
 
@@ -60,13 +67,21 @@ class FamilyMemoryRow:
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyMemoryRow:
         return cls(
-            id=str(row["memory_id"]), pk=int(row["id"]), family_id=str(row["family_id"]),
-            subject_type=str(row["subject_type"]), subject_id=row["subject_id"],
-            content=str(row["content"]), memory_type=str(row["memory_type"]),
-            importance=float(row["importance"]), confidence=float(row["confidence"]),
-            visibility=str(row["visibility"]), source_type=str(row["source_type"]),
-            source_id=row["source_id"], created_by=int(row["created_by"]),
-            created_at=int(row["created_at"]), updated_at=int(row["updated_at"]),
+            id=str(row["memory_id"]),
+            pk=int(row["id"]),
+            family_id=str(row["family_id"]),
+            subject_type=str(row["subject_type"]),
+            subject_id=row["subject_id"],
+            content=str(row["content"]),
+            memory_type=str(row["memory_type"]),
+            importance=float(row["importance"]),
+            confidence=float(row["confidence"]),
+            visibility=str(row["visibility"]),
+            source_type=str(row["source_type"]),
+            source_id=row["source_id"],
+            created_by=int(row["created_by"]),
+            created_at=int(row["created_at"]),
+            updated_at=int(row["updated_at"]),
             expires_at=int(row["expires_at"]) if row["expires_at"] is not None else None,
             status=str(row["status"]),
         )
@@ -83,34 +98,71 @@ class FamilyContextRepo:
                 "INSERT INTO homemind_family_events(event_id, family_id, event_type, title, "
                 "start_at, end_at, location, description, metadata_json, created_by, created_at, "
                 "updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (event_id, family_id, values["event_type"], values["title"], values["start_at"],
-                 values["end_at"], values.get("location"), values.get("description", ""),
-                 values.get("metadata_json", "{}"), values["created_by"], ts, ts),
+                (
+                    event_id,
+                    family_id,
+                    values["event_type"],
+                    values["title"],
+                    values["start_at"],
+                    values["end_at"],
+                    values.get("location"),
+                    values.get("description", ""),
+                    values.get("metadata_json", "{}"),
+                    values["created_by"],
+                    ts,
+                    ts,
+                ),
             )
         return self.get_event(event_id)  # type: ignore[return-value]
 
     def get_event(self, event_id: str) -> FamilyEventRow | None:
         with self._db.connect() as conn:
-            row = conn.execute("SELECT * FROM homemind_family_events WHERE event_id = ?", (event_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM homemind_family_events WHERE event_id = ?", (event_id,)
+            ).fetchone()
         return FamilyEventRow.from_row(row) if row else None
 
-    def list_events(self, family_id: str, *, start_at: int | None = None, end_at: int | None = None) -> list[FamilyEventRow]:
-        clauses, params = ["family_id = ?", "status = 'ACTIVE'"], [family_id]
+    def list_events(
+        self,
+        family_id: str,
+        *,
+        start_at: int | None = None,
+        end_at: int | None = None,
+    ) -> list[FamilyEventRow]:
+        clauses = ["family_id = ?", "status = 'ACTIVE'"]
+        params: list[object] = [family_id]
         if start_at is not None:
-            clauses.append("end_at >= ?"); params.append(start_at)
+            clauses.append("end_at >= ?")
+            params.append(start_at)
         if end_at is not None:
-            clauses.append("start_at <= ?"); params.append(end_at)
+            clauses.append("start_at <= ?")
+            params.append(end_at)
         with self._db.connect() as conn:
-            rows = conn.execute("SELECT * FROM homemind_family_events WHERE " + " AND ".join(clauses) + " ORDER BY start_at DESC", params).fetchall()
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_events WHERE "
+                + " AND ".join(clauses)
+                + " ORDER BY start_at DESC",
+                params,
+            ).fetchall()
         return map_rows(rows, FamilyEventRow)
 
     def update_event(self, event_id: str, **values: object) -> FamilyEventRow | None:
-        allowed = {"event_type", "title", "start_at", "end_at", "location", "description", "metadata_json"}
-        fields, params = optional_updates([(key, value) for key, value in values.items() if key in allowed])
+        allowed = {
+            "event_type", "title", "start_at", "end_at", "location",
+            "description", "metadata_json",
+        }
+        fields, params = optional_updates(
+            [(key, value) for key, value in values.items() if key in allowed]
+        )
         if fields:
-            fields.append("updated_at = ?"); params.extend((now_ts(), event_id))
+            fields.append("updated_at = ?")
+            params.extend((now_ts(), event_id))
             with self._db.transaction() as conn:
-                conn.execute(f"UPDATE homemind_family_events SET {', '.join(fields)} WHERE event_id = ?", params)
+                conn.execute(
+                    f"UPDATE homemind_family_events SET {', '.join(fields)} "
+                    "WHERE event_id = ?",
+                    params,
+                )
         return self.get_event(event_id)
 
     def delete_event(self, event_id: str) -> None:
@@ -123,34 +175,64 @@ class FamilyContextRepo:
             conn.execute(
                 "INSERT INTO homemind_family_memories(memory_id, family_id, subject_type, subject_id, "
                 "content, memory_type, importance, confidence, visibility, source_type, source_id, "
-                "created_by, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (memory_id, family_id, values["subject_type"], values.get("subject_id"), values["content"],
-                 values["memory_type"], values.get("importance", 0.5), values.get("confidence", 0.5),
-                 values.get("visibility", "FAMILY"), values["source_type"], values.get("source_id"),
-                 values["created_by"], ts, ts, values.get("expires_at")),
+                "created_by, created_at, updated_at, expires_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    memory_id, family_id, values["subject_type"],
+                    values.get("subject_id"), values["content"], values["memory_type"],
+                    values.get("importance", 0.5), values.get("confidence", 0.5),
+                    values.get("visibility", "FAMILY"), values["source_type"],
+                    values.get("source_id"), values["created_by"], ts, ts,
+                    values.get("expires_at"),
+                ),
             )
         return self.get_memory(memory_id)  # type: ignore[return-value]
 
     def get_memory(self, memory_id: str) -> FamilyMemoryRow | None:
         with self._db.connect() as conn:
-            row = conn.execute("SELECT * FROM homemind_family_memories WHERE memory_id = ?", (memory_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM homemind_family_memories WHERE memory_id = ?", (memory_id,)
+            ).fetchone()
         return FamilyMemoryRow.from_row(row) if row else None
 
-    def search_memories(self, family_id: str, *, query: str | None = None, now: int | None = None) -> list[FamilyMemoryRow]:
-        clauses, params = ["family_id = ?", "status = 'ACTIVE'", "(expires_at IS NULL OR expires_at > ?)"], [family_id, now or now_ts()]
+    def search_memories(
+        self, family_id: str, *, query: str | None = None, now: int | None = None
+    ) -> list[FamilyMemoryRow]:
+        clauses = [
+            "family_id = ?",
+            "status = 'ACTIVE'",
+            "(expires_at IS NULL OR expires_at > ?)",
+        ]
+        params: list[object] = [family_id, now if now is not None else now_ts()]
         if query:
-            clauses.append("LOWER(content) LIKE ?"); params.append(f"%{query.lower()}%")
+            clauses.append("LOWER(content) LIKE ?")
+            params.append(f"%{query.lower()}%")
         with self._db.connect() as conn:
-            rows = conn.execute("SELECT * FROM homemind_family_memories WHERE " + " AND ".join(clauses) + " ORDER BY importance DESC, updated_at DESC", params).fetchall()
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_memories WHERE "
+                + " AND ".join(clauses)
+                + " ORDER BY importance DESC, updated_at DESC",
+                params,
+            ).fetchall()
         return map_rows(rows, FamilyMemoryRow)
 
     def update_memory(self, memory_id: str, **values: object) -> FamilyMemoryRow | None:
-        allowed = {"subject_type", "subject_id", "content", "memory_type", "importance", "confidence", "visibility", "source_type", "source_id", "expires_at", "status"}
-        fields, params = optional_updates([(key, value) for key, value in values.items() if key in allowed])
+        allowed = {
+            "subject_type", "subject_id", "content", "memory_type", "importance",
+            "confidence", "visibility", "source_type", "source_id", "expires_at", "status",
+        }
+        fields, params = optional_updates(
+            [(key, value) for key, value in values.items() if key in allowed]
+        )
         if fields:
-            fields.append("updated_at = ?"); params.extend((now_ts(), memory_id))
+            fields.append("updated_at = ?")
+            params.extend((now_ts(), memory_id))
             with self._db.transaction() as conn:
-                conn.execute(f"UPDATE homemind_family_memories SET {', '.join(fields)} WHERE memory_id = ?", params)
+                conn.execute(
+                    f"UPDATE homemind_family_memories SET {', '.join(fields)} "
+                    "WHERE memory_id = ?",
+                    params,
+                )
         return self.get_memory(memory_id)
 
     def delete_memory(self, memory_id: str) -> None:

@@ -56,14 +56,24 @@ class FamilyContextManager:
             )
         values["title"] = str(values["title"]).strip()
         values["created_by"] = user.id
-        values["metadata_json"] = json.dumps(values.pop("metadata", {}), ensure_ascii=False, sort_keys=True)
+        values["metadata_json"] = json.dumps(
+            values.pop("metadata", {}), ensure_ascii=False, sort_keys=True
+        )
         return self.repo.create_event(family_id, **values)
 
-    def list_events(self, family_id: str, user: User, **filters: int | None) -> list[FamilyEventRow]:
+    def list_events(
+        self, family_id: str, user: User, **filters: int | None
+    ) -> list[FamilyEventRow]:
         self.family.require_access(family_id, user)
         return self.repo.list_events(family_id, **filters)
 
-    def update_event(self, family_id: str, event_id: str, user: User, changes: dict[str, object]) -> FamilyEventRow:
+    def update_event(
+        self,
+        family_id: str,
+        event_id: str,
+        user: User,
+        changes: dict[str, object],
+    ) -> FamilyEventRow:
         self.family.require_manager(family_id, user)
         event = self._event(family_id, event_id)
         start_at = int(changes.get("start_at", event.start_at))
@@ -74,11 +84,14 @@ class FamilyContextManager:
                 "event end_at must not precede start_at",
             )
         if "metadata" in changes:
-            changes["metadata_json"] = json.dumps(changes.pop("metadata"), ensure_ascii=False, sort_keys=True)
+            changes["metadata_json"] = json.dumps(
+                changes.pop("metadata"), ensure_ascii=False, sort_keys=True
+            )
         return self.repo.update_event(event_id, **changes)  # type: ignore[return-value]
 
     def delete_event(self, family_id: str, event_id: str, user: User) -> None:
-        self.family.require_manager(family_id, user); self._event(family_id, event_id)
+        self.family.require_manager(family_id, user)
+        self._event(family_id, event_id)
         self.repo.delete_event(event_id)
 
     def create_memory(self, family_id: str, user: User, **values: object) -> FamilyMemoryRow:
@@ -92,18 +105,28 @@ class FamilyContextManager:
         values["created_by"] = user.id
         return self.repo.create_memory(family_id, **values)
 
-    def search_memories(self, family_id: str, user: User, query: str | None = None) -> list[FamilyMemoryRow]:
+    def search_memories(
+        self, family_id: str, user: User, query: str | None = None
+    ) -> list[FamilyMemoryRow]:
         self.family.require_access(family_id, user)
         return self.repo.search_memories(family_id, query=query)
 
-    def update_memory(self, family_id: str, memory_id: str, user: User, changes: dict[str, object]) -> FamilyMemoryRow:
-        self.family.require_manager(family_id, user); self._memory(family_id, memory_id)
+    def update_memory(
+        self,
+        family_id: str,
+        memory_id: str,
+        user: User,
+        changes: dict[str, object],
+    ) -> FamilyMemoryRow:
+        self.family.require_manager(family_id, user)
+        self._memory(family_id, memory_id)
         if "content" in changes:
             changes["content"] = str(changes["content"]).strip()
         return self.repo.update_memory(memory_id, **changes)  # type: ignore[return-value]
 
     def delete_memory(self, family_id: str, memory_id: str, user: User) -> None:
-        self.family.require_manager(family_id, user); self._memory(family_id, memory_id)
+        self.family.require_manager(family_id, user)
+        self._memory(family_id, memory_id)
         self.repo.delete_memory(memory_id)
 
     def resolve(self, family_id: str, user: User, query: str) -> ResolvedFamilyContext:
@@ -118,26 +141,57 @@ class FamilyContextManager:
         if not matched_members:
             matched_members = members
         matched_member_ids = {m.id for m in matched_members}
-        matched_relationships = [r for r in relationships if r.from_member_id in matched_member_ids or r.to_member_id in matched_member_ids or r.relationship_type.casefold() in normalized]
+        matched_relationships = [
+            relationship
+            for relationship in relationships
+            if relationship.from_member_id in matched_member_ids
+            or relationship.to_member_id in matched_member_ids
+            or relationship.relationship_type.casefold() in normalized
+        ]
         start_at = end_at = None
         if "去年" in query or "last year" in normalized:
             current_year = datetime.now(ZoneInfo(family.timezone)).year
-            start_at = int(datetime(current_year - 1, 1, 1, tzinfo=ZoneInfo(family.timezone)).timestamp())
-            end_at = int(datetime(current_year - 1, 12, 31, 23, 59, 59, tzinfo=ZoneInfo(family.timezone)).timestamp())
+            zone = ZoneInfo(family.timezone)
+            start_at = int(datetime(current_year - 1, 1, 1, tzinfo=zone).timestamp())
+            end_at = int(
+                datetime(current_year - 1, 12, 31, 23, 59, 59, tzinfo=zone).timestamp()
+            )
         events = self.repo.list_events(family_id, start_at=start_at, end_at=end_at)
         if start_at is None:
-            event_matches = [e for e in events if any(term and term.casefold() in normalized for term in (e.title, e.location or "", e.event_type))]
+            event_matches = [
+                event
+                for event in events
+                if any(
+                    term and term.casefold() in normalized
+                    for term in (event.title, event.location or "", event.event_type)
+                )
+            ]
             events = event_matches or events
         memories = self.repo.search_memories(family_id)
-        memory_matches = [m for m in memories if m.content.casefold() in normalized or any(token in m.content.casefold() for token in normalized.split() if len(token) > 1)]
+        memory_matches = [
+            memory
+            for memory in memories
+            if memory.content.casefold() in normalized
+            or any(
+                token in memory.content.casefold()
+                for token in normalized.split()
+                if len(token) > 1
+            )
+        ]
         permissions = self.family.repo.list_permissions(family_id)
         return ResolvedFamilyContext(
             family_id=family_id,
             current_member_id=str(membership["member_id"]) if membership is not None else "",
             member_ids=[m.id for m in matched_members],
             relationship_ids=[r.id for r in matched_relationships],
-            event_ids=[e.id for e in events], memory_ids=[m.id for m in (memory_matches or memories)],
-            permissions=[p.action for p in permissions if p.expires_at is None or p.expires_at > int(time.time())],
+            event_ids=[event.id for event in events],
+            memory_ids=[memory.id for memory in (memory_matches or memories)],
+            permissions=[
+                permission.action
+                for permission in permissions
+                if permission.expires_at is None
+                or permission.expires_at > int(time.time())
+            ],
         )
 
     def _event(self, family_id: str, event_id: str) -> FamilyEventRow:
