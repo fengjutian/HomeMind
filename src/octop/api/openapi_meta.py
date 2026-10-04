@@ -63,6 +63,10 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     {"name": "health", "description": "Liveness probe for load balancers and monitoring."},
     {"name": "users", "description": "Admin user management (create, disable, reset passwords)."},
     {
+        "name": "families",
+        "description": "HomeMind families, members, relationships, spaces, and permission rules.",
+    },
+    {
         "name": "agents",
         "description": "Create and configure AI agents; start, stop, and inspect runtime status.",
     },
