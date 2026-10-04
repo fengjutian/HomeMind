@@ -150,4 +150,22 @@ CREATE TABLE IF NOT EXISTS homemind_family_organization_plans (
 CREATE INDEX IF NOT EXISTS idx_homemind_family_organization_plans_family
   ON homemind_family_organization_plans(family_id, status, created_at);
 
+CREATE TABLE IF NOT EXISTS homemind_family_photo_intelligence (
+  asset_id        TEXT PRIMARY KEY REFERENCES homemind_family_assets(asset_id) ON DELETE CASCADE,
+  family_id       TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
+  description     TEXT NOT NULL DEFAULT '',
+  objects_json    TEXT NOT NULL DEFAULT '[]',
+  scenes_json     TEXT NOT NULL DEFAULT '[]',
+  faces_json      TEXT NOT NULL DEFAULT '[]',
+  location_name   TEXT,
+  perceptual_hash TEXT,
+  embedding_json  TEXT,
+  vision_provider TEXT,
+  embedding_provider TEXT,
+  analyzed_at     INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_family_photo_intelligence_family
+  ON homemind_family_photo_intelligence(family_id, analyzed_at);
+
 UPDATE _homemind_schema_version SET version = 2;

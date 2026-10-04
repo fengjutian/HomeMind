@@ -9,6 +9,11 @@ from enum import StrEnum
 from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.photo_intelligence import (
+    EmbeddingProvider,
+    PhotoIntelligenceManager,
+    PhotoReranker,
+)
 from octop.infra.users.identity import User
 
 
@@ -35,10 +40,12 @@ class FamilySearchManager:
         family: FamilyManager,
         context: FamilyContextManager,
         assets: FamilyAssetManager,
+        photos: PhotoIntelligenceManager | None = None,
     ) -> None:
         self.family = family
         self.context = context
         self.assets = assets
+        self.photos = photos
 
     def search(
         self,
@@ -49,6 +56,8 @@ class FamilySearchManager:
         kinds: set[SearchKind] | None = None,
         asset_type: str | None = None,
         limit: int = 50,
+        embedding: EmbeddingProvider | None = None,
+        reranker: PhotoReranker | None = None,
     ) -> list[FamilySearchResult]:
         self.family.require_access(family_id, user)
         selected = kinds or set(SearchKind)
@@ -147,8 +156,41 @@ class FamilySearchManager:
                         )
                     )
 
-        results.sort(key=lambda item: (-item.score, item.kind.value, item.title))
-        return results[:limit]
+            if self.photos is not None and embedding is not None and normalized:
+                for semantic in self.photos.search(
+                    family_id,
+                    user,
+                    query=query,
+                    embedding=embedding,
+                    reranker=reranker,
+                    limit=max(limit * 2, 20),
+                ):
+                    asset = self.assets.get(family_id, semantic.asset_id, user)
+                    results.append(
+                        FamilySearchResult(
+                            SearchKind.ASSET,
+                            asset.id,
+                            asset.name,
+                            semantic.description or semantic.location_name or asset.name,
+                            (semantic.score + 1.0) * 50.0,
+                            {
+                                "asset_type": asset.asset_type,
+                                "captured_at": asset.captured_at,
+                                "uri": asset.uri,
+                                "semantic_score": semantic.score,
+                                "location_name": semantic.location_name,
+                            },
+                        )
+                    )
+
+        best: dict[tuple[SearchKind, str], FamilySearchResult] = {}
+        for result in results:
+            key = (result.kind, result.id)
+            if key not in best or result.score > best[key].score:
+                best[key] = result
+        ranked = list(best.values())
+        ranked.sort(key=lambda item: (-item.score, item.kind.value, item.title))
+        return ranked[:limit]
 
     @staticmethod
     def _score(query: str, *fields: str) -> float:

@@ -169,6 +169,23 @@ class FamilyContextRepo:
         with self._db.transaction() as conn:
             conn.execute("DELETE FROM homemind_family_events WHERE event_id = ?", (event_id,))
 
+    def link_event_asset(self, event_id: str, asset_id: str) -> None:
+        with self._db.transaction() as conn:
+            conn.execute(
+                "INSERT INTO homemind_family_event_assets(event_id, asset_id) VALUES (?, ?) "
+                "ON CONFLICT(event_id, asset_id) DO NOTHING",
+                (event_id, asset_id),
+            )
+
+    def list_event_ids_for_asset(self, asset_id: str) -> list[str]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT event_id FROM homemind_family_event_assets WHERE asset_id = ? "
+                "ORDER BY event_id",
+                (asset_id,),
+            ).fetchall()
+        return [str(row["event_id"]) for row in rows]
+
     def create_memory(self, family_id: str, **values: object) -> FamilyMemoryRow:
         memory_id, ts = new_ulid(), now_ts()
         with self._db.transaction() as conn:

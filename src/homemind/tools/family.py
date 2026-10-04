@@ -18,10 +18,17 @@ from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.filesystem import FamilyFilesystemManager
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.photo_intelligence import PhotoIntelligenceManager
+from homemind.infra.family.photo_providers import (
+    OpenAICompatibleEmbeddingProvider,
+    OpenAICompatibleVisionProvider,
+    require_provider,
+)
 from homemind.infra.family.search import FamilySearchManager, SearchKind
 from homemind.infra.family.tasks import FamilyTaskManager, TaskStatus
 from homemind.infra.family.transactions import FamilyTransactionManager
 from octop.infra.db.pool import DatabasePool
+from octop.infra.db.repos.providers import ProviderRepo
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.users.identity import User
 
@@ -64,7 +71,14 @@ def build_family_tools(
     context = FamilyContextManager(families, services.family_context_repo)
     assets = FamilyAssetManager(services.family_repo, services.family_asset_repo)
     albums = FamilyAlbumManager(families, assets, services.family_album_repo)
-    search = FamilySearchManager(families, context, assets)
+    photos = PhotoIntelligenceManager(
+        families,
+        assets,
+        services.family_context_repo,
+        services.photo_intelligence_repo,
+    )
+    search = FamilySearchManager(families, context, assets, photos)
+    providers = ProviderRepo(db)
     tasks = FamilyTaskManager(families, services.family_task_repo)
     filesystem = FamilyFilesystemManager(
         families, services.family_asset_repo, services.family_transaction_repo
@@ -265,9 +279,21 @@ def build_family_tools(
         kinds: list[str] | None = None,
         asset_type: str | None = None,
         limit: int = 50,
+        embedding_provider_id: int | None = None,
+        embedding_model: str | None = None,
     ) -> str:
         try:
             selected = {SearchKind(value) for value in kinds} if kinds else None
+            embedding = None
+            if embedding_provider_id is not None:
+                if not embedding_model:
+                    raise ValueError(
+                        "embedding_model is required with embedding_provider_id"
+                    )
+                provider = require_provider(providers.get(embedding_provider_id))
+                embedding = OpenAICompatibleEmbeddingProvider(
+                    provider, embedding_model
+                )
             rows = search.search(
                 family_id,
                 _current_user(user_repo),
@@ -275,6 +301,7 @@ def build_family_tools(
                 kinds=selected,
                 asset_type=asset_type,
                 limit=limit,
+                embedding=embedding,
             )
             return _ok([asdict(row) for row in rows])
         except Exception as exc:
@@ -424,6 +451,68 @@ def build_family_tools(
         except Exception as exc:
             return _error(exc)
 
+    def family_analyze_photo_local(family_id: str, asset_id: str) -> str:
+        try:
+            row = photos.analyze(
+                family_id, asset_id, _current_user(user_repo)
+            )
+            return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
+    def family_analyze_photo(
+        family_id: str,
+        asset_id: str,
+        vision_provider_id: int,
+        vision_model: str,
+        embedding_provider_id: int | None = None,
+        embedding_model: str | None = None,
+    ) -> str:
+        try:
+            vision_row = require_provider(providers.get(vision_provider_id))
+            vision = OpenAICompatibleVisionProvider(vision_row, vision_model)
+            embedding = None
+            if embedding_provider_id is not None:
+                if not embedding_model:
+                    raise ValueError(
+                        "embedding_model is required with embedding_provider_id"
+                    )
+                embedding_row = require_provider(
+                    providers.get(embedding_provider_id)
+                )
+                embedding = OpenAICompatibleEmbeddingProvider(
+                    embedding_row, embedding_model
+                )
+            row = photos.analyze(
+                family_id,
+                asset_id,
+                _current_user(user_repo),
+                vision=vision,
+                embedding=embedding,
+            )
+            return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
+    def family_find_similar_photos(
+        family_id: str, asset_id: str, max_distance: int = 8
+    ) -> str:
+        try:
+            rows = photos.similar(
+                family_id,
+                asset_id,
+                _current_user(user_repo),
+                max_distance=max_distance,
+            )
+            return _ok(
+                [
+                    {"asset_id": item_id, "hamming_distance": distance}
+                    for item_id, distance in rows
+                ]
+            )
+        except Exception as exc:
+            return _error(exc)
+
     specs: list[tuple[str, Callable[..., str], str]] = [
         ("family.list_members", family_list_members, "List members of a family."),
         ("family.get_member", family_get_member, "Get one family member."),
@@ -461,6 +550,21 @@ def build_family_tools(
             "family.apply_photo_organization",
             family_apply_photo_organization,
             "Apply a saved organization plan as non-destructive album links.",
+        ),
+        (
+            "family.analyze_photo_local",
+            family_analyze_photo_local,
+            "Compute local perceptual similarity metadata for a photo.",
+        ),
+        (
+            "family.analyze_photo",
+            family_analyze_photo,
+            "Describe and embed a photo with configured Octop providers.",
+        ),
+        (
+            "family.find_similar_photos",
+            family_find_similar_photos,
+            "Find photos with a nearby perceptual hash.",
         ),
     ]
     return [
