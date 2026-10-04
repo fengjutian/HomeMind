@@ -1949,3 +1949,17 @@ def run_migrations(db: DatabasePool) -> None:
     _ensure_sso_provider_kind_schema(db)
     _ensure_user_role_schema(db)
     _ensure_bridge_connections_schema(db)
+    _ensure_family_foundation_schema(db)
+
+
+def _ensure_family_foundation_schema(db: DatabasePool) -> None:
+    """Create v20 family tables when a restored schema skipped the migration file."""
+    suffix = ".pg.sql" if db.dialect == "postgresql" else ".sql"
+    path = _MIGRATIONS_DIR / f"020_family_foundation{suffix}"
+    sql = path.read_text(encoding="utf-8")
+    sql = re.sub(r"UPDATE _schema_version SET version = 20;\s*$", "", sql)
+    sql = sql.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ")
+    sql = sql.replace("CREATE UNIQUE INDEX ", "CREATE UNIQUE INDEX IF NOT EXISTS ")
+    sql = sql.replace("CREATE INDEX ", "CREATE INDEX IF NOT EXISTS ")
+    with db.connect() as conn:
+        conn.executescript(sql)

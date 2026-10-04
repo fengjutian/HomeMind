@@ -120,7 +120,7 @@ class FamilyManager:
     ) -> FamilyRelationshipRow:
         self.require_manager(family_id, user)
         if from_member_id == to_member_id:
-            raise OctopError(ErrorCode.TEAM_MEMBER_INVALID, "relationship members must differ")
+            raise OctopError(ErrorCode.FAMILY_INVALID, "relationship members must differ")
         self._require_member(family_id, from_member_id)
         self._require_member(family_id, to_member_id)
         return self.repo.create_relationship(
@@ -143,7 +143,7 @@ class FamilyManager:
         if owner_member_id is not None:
             self._require_member(family_id, owner_member_id)
         if space_type is SpaceType.PRIVATE and owner_member_id is None:
-            raise OctopError(ErrorCode.TEAM_MEMBER_INVALID, "private space requires an owner")
+            raise OctopError(ErrorCode.FAMILY_INVALID, "private space requires an owner")
         return self.repo.create_space(
             family_id,
             name=name.strip(),
