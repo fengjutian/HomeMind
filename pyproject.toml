@@ -3,13 +3,13 @@ requires = ["hatchling>=1.18"]
 build-backend = "hatchling.build"
 
 [project]
-name = "octop"
+name = "homemind"
 version = "1.0.2b5"
-description = "Smarter self-hosted AI assistant for multiple users and agents, built on octop-harness"
+description = "Self-hosted family AI assistant built on the Octop runtime"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
-authors = [{name = "octop contributors"}]
+authors = [{name = "HomeMind contributors"}]
 dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
