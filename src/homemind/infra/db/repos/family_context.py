@@ -105,7 +105,8 @@ class FamilyContextRepo:
         return map_rows(rows, FamilyEventRow)
 
     def update_event(self, event_id: str, **values: object) -> FamilyEventRow | None:
-        fields, params = optional_updates(values, {"event_type", "title", "start_at", "end_at", "location", "description", "metadata_json"})
+        allowed = {"event_type", "title", "start_at", "end_at", "location", "description", "metadata_json"}
+        fields, params = optional_updates([(key, value) for key, value in values.items() if key in allowed])
         if fields:
             fields.append("updated_at = ?"); params.extend((now_ts(), event_id))
             with self._db.transaction() as conn:
@@ -145,7 +146,7 @@ class FamilyContextRepo:
 
     def update_memory(self, memory_id: str, **values: object) -> FamilyMemoryRow | None:
         allowed = {"subject_type", "subject_id", "content", "memory_type", "importance", "confidence", "visibility", "source_type", "source_id", "expires_at", "status"}
-        fields, params = optional_updates(values, allowed)
+        fields, params = optional_updates([(key, value) for key, value in values.items() if key in allowed])
         if fields:
             fields.append("updated_at = ?"); params.extend((now_ts(), memory_id))
             with self._db.transaction() as conn:

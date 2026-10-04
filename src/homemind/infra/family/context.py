@@ -1,0 +1,153 @@
+"""Family events, durable memories, and deterministic context resolution."""
+
+from __future__ import annotations
+
+import json
+import time
+from dataclasses import dataclass
+from datetime import datetime
+from enum import StrEnum
+from zoneinfo import ZoneInfo
+
+from homemind.infra.db.repos.family_context import (
+    FamilyContextRepo,
+    FamilyEventRow,
+    FamilyMemoryRow,
+)
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
+from homemind.infra.family.manager import FamilyManager
+from octop.infra.errors import ErrorCode, OctopError
+from octop.infra.users.identity import User
+
+
+class MemoryType(StrEnum):
+    FACT = "FACT"
+    PREFERENCE = "PREFERENCE"
+    EVENT = "EVENT"
+    RELATIONSHIP = "RELATIONSHIP"
+    HABIT = "HABIT"
+    DECISION = "DECISION"
+    EXPERIENCE = "EXPERIENCE"
+
+
+@dataclass(frozen=True)
+class ResolvedFamilyContext:
+    family_id: str
+    current_member_id: str
+    member_ids: list[str]
+    relationship_ids: list[str]
+    event_ids: list[str]
+    memory_ids: list[str]
+    permissions: list[str]
+
+
+class FamilyContextManager:
+    def __init__(self, family: FamilyManager, repo: FamilyContextRepo) -> None:
+        self.family = family
+        self.repo = repo
+
+    def create_event(self, family_id: str, user: User, **values: object) -> FamilyEventRow:
+        self.family.require_manager(family_id, user)
+        start_at, end_at = int(values["start_at"]), int(values["end_at"])
+        if end_at < start_at:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "event end_at must not precede start_at",
+            )
+        values["title"] = str(values["title"]).strip()
+        values["created_by"] = user.id
+        values["metadata_json"] = json.dumps(values.pop("metadata", {}), ensure_ascii=False, sort_keys=True)
+        return self.repo.create_event(family_id, **values)
+
+    def list_events(self, family_id: str, user: User, **filters: int | None) -> list[FamilyEventRow]:
+        self.family.require_access(family_id, user)
+        return self.repo.list_events(family_id, **filters)
+
+    def update_event(self, family_id: str, event_id: str, user: User, changes: dict[str, object]) -> FamilyEventRow:
+        self.family.require_manager(family_id, user)
+        event = self._event(family_id, event_id)
+        start_at = int(changes.get("start_at", event.start_at))
+        end_at = int(changes.get("end_at", event.end_at))
+        if end_at < start_at:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "event end_at must not precede start_at",
+            )
+        if "metadata" in changes:
+            changes["metadata_json"] = json.dumps(changes.pop("metadata"), ensure_ascii=False, sort_keys=True)
+        return self.repo.update_event(event_id, **changes)  # type: ignore[return-value]
+
+    def delete_event(self, family_id: str, event_id: str, user: User) -> None:
+        self.family.require_manager(family_id, user); self._event(family_id, event_id)
+        self.repo.delete_event(event_id)
+
+    def create_memory(self, family_id: str, user: User, **values: object) -> FamilyMemoryRow:
+        self.family.require_access(family_id, user)
+        subject_type, subject_id = str(values["subject_type"]), values.get("subject_id")
+        if subject_type == "MEMBER" and subject_id is not None:
+            member = self.family.repo.get_member(str(subject_id))
+            if member is None or member.family_id != family_id:
+                raise OctopError(ErrorCode.NOT_FOUND, "family member not found")
+        values["content"] = str(values["content"]).strip()
+        values["created_by"] = user.id
+        return self.repo.create_memory(family_id, **values)
+
+    def search_memories(self, family_id: str, user: User, query: str | None = None) -> list[FamilyMemoryRow]:
+        self.family.require_access(family_id, user)
+        return self.repo.search_memories(family_id, query=query)
+
+    def update_memory(self, family_id: str, memory_id: str, user: User, changes: dict[str, object]) -> FamilyMemoryRow:
+        self.family.require_manager(family_id, user); self._memory(family_id, memory_id)
+        if "content" in changes:
+            changes["content"] = str(changes["content"]).strip()
+        return self.repo.update_memory(memory_id, **changes)  # type: ignore[return-value]
+
+    def delete_memory(self, family_id: str, memory_id: str, user: User) -> None:
+        self.family.require_manager(family_id, user); self._memory(family_id, memory_id)
+        self.repo.delete_memory(memory_id)
+
+    def resolve(self, family_id: str, user: User, query: str) -> ResolvedFamilyContext:
+        family = self.family.require_access(family_id, user)
+        membership = self.family.repo.get_membership(family_id, user.id)
+        if membership is None and not user.is_admin:
+            raise OctopError(ErrorCode.FORBIDDEN, "family membership required")
+        members = self.family.repo.list_members(family_id)
+        relationships = self.family.repo.list_relationships(family_id)
+        normalized = query.casefold()
+        matched_members = [m for m in members if m.display_name.casefold() in normalized]
+        if not matched_members:
+            matched_members = members
+        matched_member_ids = {m.id for m in matched_members}
+        matched_relationships = [r for r in relationships if r.from_member_id in matched_member_ids or r.to_member_id in matched_member_ids or r.relationship_type.casefold() in normalized]
+        start_at = end_at = None
+        if "去年" in query or "last year" in normalized:
+            current_year = datetime.now(ZoneInfo(family.timezone)).year
+            start_at = int(datetime(current_year - 1, 1, 1, tzinfo=ZoneInfo(family.timezone)).timestamp())
+            end_at = int(datetime(current_year - 1, 12, 31, 23, 59, 59, tzinfo=ZoneInfo(family.timezone)).timestamp())
+        events = self.repo.list_events(family_id, start_at=start_at, end_at=end_at)
+        if start_at is None:
+            event_matches = [e for e in events if any(term and term.casefold() in normalized for term in (e.title, e.location or "", e.event_type))]
+            events = event_matches or events
+        memories = self.repo.search_memories(family_id)
+        memory_matches = [m for m in memories if m.content.casefold() in normalized or any(token in m.content.casefold() for token in normalized.split() if len(token) > 1)]
+        permissions = self.family.repo.list_permissions(family_id)
+        return ResolvedFamilyContext(
+            family_id=family_id,
+            current_member_id=str(membership["member_id"]) if membership is not None else "",
+            member_ids=[m.id for m in matched_members],
+            relationship_ids=[r.id for r in matched_relationships],
+            event_ids=[e.id for e in events], memory_ids=[m.id for m in (memory_matches or memories)],
+            permissions=[p.action for p in permissions if p.expires_at is None or p.expires_at > int(time.time())],
+        )
+
+    def _event(self, family_id: str, event_id: str) -> FamilyEventRow:
+        event = self.repo.get_event(event_id)
+        if event is None or event.family_id != family_id:
+            raise OctopError(ErrorCode.NOT_FOUND, "family event not found")
+        return event
+
+    def _memory(self, family_id: str, memory_id: str) -> FamilyMemoryRow:
+        memory = self.repo.get_memory(memory_id)
+        if memory is None or memory.family_id != family_id:
+            raise OctopError(ErrorCode.NOT_FOUND, "family memory not found")
+        return memory

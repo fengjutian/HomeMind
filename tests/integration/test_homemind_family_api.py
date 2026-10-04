@@ -173,3 +173,60 @@ async def test_family_foundation_api(
     assert response.status_code == 204
     response = await client.get(f"/api/homemind/families/{family_id}", headers=auth)
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_family_context_api(
+    homemind_env: tuple[httpx.AsyncClient, OctopServer, dict[str, str]],
+) -> None:
+    client, _, auth = homemind_env
+    response = await client.post(
+        "/api/homemind/families",
+        headers=auth,
+        json={"name": "Context Family", "timezone": "Asia/Shanghai", "locale": "zh"},
+    )
+    family_id = response.json()["id"]
+
+    response = await client.post(
+        f"/api/homemind/families/{family_id}/events",
+        headers=auth,
+        json={
+            "event_type": "TRIP",
+            "title": "日本旅行",
+            "start_at": 1,
+            "end_at": 2,
+            "location": "京都",
+        },
+    )
+    assert response.status_code == 201
+    event_id = response.json()["id"]
+
+    response = await client.post(
+        f"/api/homemind/families/{family_id}/memories",
+        headers=auth,
+        json={
+            "subject_type": "EVENT",
+            "subject_id": event_id,
+            "content": "我们去过京都",
+            "memory_type": "EXPERIENCE",
+            "source_type": "USER",
+        },
+    )
+    assert response.status_code == 201
+    memory_id = response.json()["id"]
+
+    response = await client.get(
+        f"/api/homemind/families/{family_id}/memories",
+        headers=auth,
+        params={"query": "京都"},
+    )
+    assert [row["id"] for row in response.json()] == [memory_id]
+
+    response = await client.post(
+        f"/api/homemind/families/{family_id}/context/resolve",
+        headers=auth,
+        json={"query": "日本旅行去了哪里？"},
+    )
+    assert response.status_code == 200
+    assert response.json()["event_ids"] == [event_id]
+    assert response.json()["memory_ids"] == [memory_id]
