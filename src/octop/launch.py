@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
-from contextlib import suppress
 from collections.abc import Callable
+from contextlib import suppress
 from typing import Any
 
 from fastapi import FastAPI

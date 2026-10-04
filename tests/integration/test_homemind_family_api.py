@@ -30,7 +30,7 @@ async def test_family_foundation_api(
     client, _, auth = homemind_env
 
     response = await client.post(
-        "/api/families",
+        "/api/homemind/families",
         headers=auth,
         json={"name": "My Family", "timezone": "Asia/Shanghai", "locale": "zh"},
     )
@@ -38,17 +38,17 @@ async def test_family_foundation_api(
     family = response.json()
     family_id = family["id"]
 
-    response = await client.get("/api/families", headers=auth)
+    response = await client.get("/api/homemind/families", headers=auth)
     assert response.status_code == 200
     assert [row["id"] for row in response.json()] == [family_id]
 
-    response = await client.get(f"/api/families/{family_id}/members", headers=auth)
+    response = await client.get(f"/api/homemind/families/{family_id}/members", headers=auth)
     assert response.status_code == 200
     owner = response.json()[0]
     assert owner["role"] == "OWNER"
 
     response = await client.post(
-        f"/api/families/{family_id}/members",
+        f"/api/homemind/families/{family_id}/members",
         headers=auth,
         json={"display_name": "Child", "role": "CHILD"},
     )
@@ -56,7 +56,7 @@ async def test_family_foundation_api(
     child = response.json()
 
     response = await client.post(
-        f"/api/families/{family_id}/relationships",
+        f"/api/homemind/families/{family_id}/relationships",
         headers=auth,
         json={
             "from_member_id": owner["id"],
@@ -68,7 +68,7 @@ async def test_family_foundation_api(
     assert response.json()["relationship_type"] == "PARENT"
 
     response = await client.post(
-        f"/api/families/{family_id}/spaces",
+        f"/api/homemind/families/{family_id}/spaces",
         headers=auth,
         json={
             "name": "Child private",
@@ -86,7 +86,7 @@ async def test_family_foundation_api(
         "effect": "REQUIRE_CONFIRMATION",
     }
     response = await client.post(
-        f"/api/families/{family_id}/permissions",
+        f"/api/homemind/families/{family_id}/permissions",
         headers=auth,
         json=permission,
     )
@@ -94,7 +94,7 @@ async def test_family_foundation_api(
     assert response.json()["effect"] == "REQUIRE_CONFIRMATION"
 
     response = await client.post(
-        f"/api/families/{family_id}/permissions/evaluate",
+        f"/api/homemind/families/{family_id}/permissions/evaluate",
         headers=auth,
         json={
             "subject_member_id": child["id"],
@@ -106,7 +106,7 @@ async def test_family_foundation_api(
     assert response.json() == {"effect": "REQUIRE_CONFIRMATION"}
 
     response = await client.patch(
-        f"/api/families/{family_id}/members/{child['id']}",
+        f"/api/homemind/families/{family_id}/members/{child['id']}",
         headers=auth,
         json={"display_name": "Teen", "role": "MEMBER"},
     )
@@ -114,7 +114,7 @@ async def test_family_foundation_api(
     assert response.json()["display_name"] == "Teen"
 
     response = await client.patch(
-        f"/api/families/{family_id}",
+        f"/api/homemind/families/{family_id}",
         headers=auth,
         json={"name": "Our Family"},
     )
@@ -122,7 +122,7 @@ async def test_family_foundation_api(
     assert response.json()["name"] == "Our Family"
 
     response = await client.post(
-        f"/api/families/{family_id}/spaces",
+        f"/api/homemind/families/{family_id}/spaces",
         headers=auth,
         json={"name": "Shared", "space_type": "SHARED"},
     )
@@ -135,41 +135,41 @@ async def test_family_foundation_api(
     first_file.write_text("duplicate", encoding="utf-8")
     (assets_dir / "second.txt").write_text("duplicate", encoding="utf-8")
     response = await client.post(
-        f"/api/families/{family_id}/assets/scan",
+        f"/api/homemind/families/{family_id}/assets/scan",
         headers=auth,
         json={"directory": str(assets_dir)},
     )
     assert response.status_code == 200
     scan_result = response.json()
     assert scan_result["indexed"] == 2
-    response = await client.get(f"/api/families/{family_id}/assets", headers=auth)
+    response = await client.get(f"/api/homemind/families/{family_id}/assets", headers=auth)
     assert response.status_code == 200
     assets = response.json()
     assert len(assets) == 2
     response = await client.get(
-        f"/api/families/{family_id}/assets/duplicates", headers=auth
+        f"/api/homemind/families/{family_id}/assets/duplicates", headers=auth
     )
     assert response.status_code == 200
     assert len(response.json()) == 1
     (assets_dir / "second.txt").unlink()
     response = await client.post(
-        f"/api/families/{family_id}/asset-sources/{scan_result['source_id']}/scan",
+        f"/api/homemind/families/{family_id}/asset-sources/{scan_result['source_id']}/scan",
         headers=auth,
     )
     assert response.status_code == 200
     assert response.json()["missing"] == 1
     response = await client.get(
-        f"/api/families/{family_id}/assets", headers=auth, params={"status": "MISSING"}
+        f"/api/homemind/families/{family_id}/assets", headers=auth, params={"status": "MISSING"}
     )
     assert response.status_code == 200
     assert len(response.json()) == 1
     response = await client.delete(
-        f"/api/families/{family_id}/assets/{assets[0]['id']}", headers=auth
+        f"/api/homemind/families/{family_id}/assets/{assets[0]['id']}", headers=auth
     )
     assert response.status_code == 204
     assert first_file.exists()
 
-    response = await client.delete(f"/api/families/{family_id}", headers=auth)
+    response = await client.delete(f"/api/homemind/families/{family_id}", headers=auth)
     assert response.status_code == 204
-    response = await client.get(f"/api/families/{family_id}", headers=auth)
+    response = await client.get(f"/api/homemind/families/{family_id}", headers=auth)
     assert response.status_code == 404

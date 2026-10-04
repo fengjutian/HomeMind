@@ -94,6 +94,7 @@ dev = [
 
 [project.scripts]
 octop = "octop.cli.main:cli"
+homemind = "homemind.cli:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/octop", "src/homemind"]

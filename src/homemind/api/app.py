@@ -22,5 +22,9 @@ def build_app(server: OctopServer) -> FastAPI:
     async def _homemind_error(_request: Request, exc: HomeMindError) -> JSONResponse:
         return JSONResponse(status_code=exc.status, content=exc.to_envelope())
 
-    app.include_router(families.router, prefix="/api/families", tags=["families"])
+    app.include_router(
+        families.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-families"],
+    )
     return app

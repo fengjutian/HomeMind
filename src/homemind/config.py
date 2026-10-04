@@ -12,4 +12,4 @@ class HomeMindConfig:
     """Product configuration without duplicating Octop's runtime settings."""
 
     octop: OctopConfig
-    api_prefix: str = "/api/families"
+    api_prefix: str = "/api/homemind/families"

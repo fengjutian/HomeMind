@@ -1442,58 +1442,21 @@ Change Visibility
 建议结构：
 
 ```text
-src/octop/
-│
-├── infra/
-│   │
-│   ├── agents/
-│   ├── memory/
-│   ├── users/
-│   ├── db/
-│   │
-│   └── family/
-│       │
-│       ├── __init__.py
-│       │
-│       ├── models/
-│       │   ├── family.py
-│       │   ├── member.py
-│       │   ├── relationship.py
-│       │   ├── space.py
-│       │   ├── asset.py
-│       │   ├── event.py
-│       │   ├── memory.py
-│       │   ├── task.py
-│       │   └── device.py
-│       │
-│       ├── repos/
-│       │   ├── family_repo.py
-│       │   ├── member_repo.py
-│       │   ├── asset_repo.py
-│       │   ├── event_repo.py
-│       │   ├── memory_repo.py
-│       │   └── task_repo.py
-│       │
-│       ├── services/
-│       │   ├── family_service.py
-│       │   ├── member_service.py
-│       │   ├── asset_service.py
-│       │   ├── event_service.py
-│       │   ├── memory_service.py
-│       │   ├── context_service.py
-│       │   └── permission_service.py
-│       │
-│       ├── tools/
-│       │   ├── family_tools.py
-│       │   ├── asset_tools.py
-│       │   ├── photo_tools.py
-│       │   ├── memory_tools.py
-│       │   └── task_tools.py
-│       │
-│       └── context/
-│           ├── family_context.py
-│           ├── context_builder.py
-│           └── context_resolver.py
+src/
+├── octop/                  # 上游代码，尽量保持原样
+└── homemind/               # 下游产品扩展，只允许依赖 octop
+    ├── api/
+    │   ├── app.py          # 在 Octop App 上组合 HomeMind 路由
+    │   └── routers/
+    ├── infra/
+    │   ├── db/
+    │   │   ├── migrate.py  # 独立 _homemind_schema_version
+    │   │   ├── migrations/
+    │   │   └── repos/
+    │   └── family/
+    ├── tools/
+    ├── config.py
+    └── launch.py
 ```
 
 ---
@@ -1501,7 +1464,7 @@ src/octop/
 # 43. API Router
 
 ```text
-src/octop/api/routers/family/
+src/homemind/api/routers/
 │
 ├── __init__.py
 ├── families.py
@@ -1536,81 +1499,85 @@ Router 不直接操作数据库。
 ## Family
 
 ```http
-POST   /api/families
-GET    /api/families
-GET    /api/families/{family_id}
-PUT    /api/families/{family_id}
-DELETE /api/families/{family_id}
+POST   /api/homemind/families
+GET    /api/homemind/families
+GET    /api/homemind/families/{family_id}
+PUT    /api/homemind/families/{family_id}
+DELETE /api/homemind/families/{family_id}
 ```
 
 ## Members
 
 ```http
-GET    /api/families/{id}/members
-POST   /api/families/{id}/members
-PUT    /api/families/{id}/members/{member_id}
-DELETE /api/families/{id}/members/{member_id}
+GET    /api/homemind/families/{id}/members
+POST   /api/homemind/families/{id}/members
+PUT    /api/homemind/families/{id}/members/{member_id}
+DELETE /api/homemind/families/{id}/members/{member_id}
 ```
 
 ## Relationships
 
 ```http
-GET    /api/families/{id}/relationships
-POST   /api/families/{id}/relationships
-DELETE /api/families/{id}/relationships/{relationship_id}
+GET    /api/homemind/families/{id}/relationships
+POST   /api/homemind/families/{id}/relationships
+DELETE /api/homemind/families/{id}/relationships/{relationship_id}
 ```
 
 ## Assets
 
 ```http
-GET  /api/families/{id}/assets
-POST /api/families/{id}/assets/index
-GET  /api/families/{id}/assets/{asset_id}
+GET  /api/homemind/families/{id}/assets
+POST /api/homemind/families/{id}/assets/index
+GET  /api/homemind/families/{id}/assets/{asset_id}
 ```
 
 ## Events
 
 ```http
-GET  /api/families/{id}/events
-POST /api/families/{id}/events
-GET  /api/families/{id}/events/{event_id}
+GET  /api/homemind/families/{id}/events
+POST /api/homemind/families/{id}/events
+GET  /api/homemind/families/{id}/events/{event_id}
 ```
 
 ## Memories
 
 ```http
-GET    /api/families/{id}/memories
-POST   /api/families/{id}/memories
-PUT    /api/families/{id}/memories/{memory_id}
-DELETE /api/families/{id}/memories/{memory_id}
+GET    /api/homemind/families/{id}/memories
+POST   /api/homemind/families/{id}/memories
+PUT    /api/homemind/families/{id}/memories/{memory_id}
+DELETE /api/homemind/families/{id}/memories/{memory_id}
 ```
 
 ## Tasks
 
 ```http
-GET  /api/families/{id}/tasks
-POST /api/families/{id}/tasks
-PUT  /api/families/{id}/tasks/{task_id}
+GET  /api/homemind/families/{id}/tasks
+POST /api/homemind/families/{id}/tasks
+PUT  /api/homemind/families/{id}/tasks/{task_id}
 ```
 
 ---
 
 # 45. Database
 
+HomeMind 使用独立迁移水位表 `_homemind_schema_version`，不占用 Octop 的
+`_schema_version`。物理表统一使用 `homemind_` 前缀，避免与上游未来新增的
+Family 能力发生表名冲突。
+
 核心表：
 
 ```text
-families
-family_members
-family_memberships
-family_relationships
-family_spaces
-family_assets
-family_events
-family_memories
-family_tasks
-family_devices
-family_permissions
+homemind_families
+homemind_family_members
+homemind_family_memberships
+homemind_family_relationships
+homemind_family_spaces
+homemind_family_assets
+homemind_family_events
+homemind_family_memories
+homemind_family_tasks
+homemind_family_devices
+homemind_family_permissions
 ```
 
 ---
@@ -1618,7 +1585,7 @@ family_permissions
 # 46. Family SQL
 
 ```sql
-CREATE TABLE families (
+CREATE TABLE homemind_families (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     owner_user_id TEXT NOT NULL,
@@ -1635,7 +1602,7 @@ CREATE TABLE families (
 # 47. Member SQL
 
 ```sql
-CREATE TABLE family_members (
+CREATE TABLE homemind_family_members (
     id TEXT PRIMARY KEY,
     family_id TEXT NOT NULL,
     user_id TEXT NULL,
@@ -1654,7 +1621,7 @@ CREATE TABLE family_members (
 # 48. Relationship SQL
 
 ```sql
-CREATE TABLE family_relationships (
+CREATE TABLE homemind_family_relationships (
     id TEXT PRIMARY KEY,
     family_id TEXT NOT NULL,
     from_member_id TEXT NOT NULL,
@@ -1668,7 +1635,7 @@ CREATE TABLE family_relationships (
 # 49. Asset SQL
 
 ```sql
-CREATE TABLE family_assets (
+CREATE TABLE homemind_family_assets (
     id TEXT PRIMARY KEY,
     family_id TEXT NOT NULL,
     space_id TEXT NOT NULL,
@@ -1692,7 +1659,7 @@ CREATE TABLE family_assets (
 # 50. Event SQL
 
 ```sql
-CREATE TABLE family_events (
+CREATE TABLE homemind_family_events (
     id TEXT PRIMARY KEY,
     family_id TEXT NOT NULL,
     event_type TEXT NOT NULL,
@@ -2049,13 +2016,13 @@ main
 └── feature/family-runtime
 ```
 
-HomeMind 修改尽量集中：
+HomeMind 修改集中在独立命名空间：
 
 ```text
-infra/family
-api/routers/family
-dashboard/pages/family
-tests/family
+src/homemind/infra/family
+src/homemind/api/routers
+dashboard/src/pages/homemind
+tests/unit/homemind
 ```
 
 ---
@@ -2427,7 +2394,7 @@ Memory
 新增：
 
 ```text
-tests/family/
+tests/unit/homemind/
 │
 ├── test_family.py
 ├── test_members.py
@@ -2769,7 +2736,7 @@ HomeMind V0.1 的技术闭环就完成了。
 
 # 78. 开发原则
 
-最后确定 10 条原则：
+最后确定 11 条原则：
 
 ```text
 1. Fork，不复制代码重新建项目
@@ -2778,19 +2745,21 @@ HomeMind V0.1 的技术闭环就完成了。
 
 3. 尽量不修改 Octop Core
 
-4. Family 是 HomeMind 的核心 Domain
+4. HomeMind 使用独立 `homemind` Python 命名空间、迁移水位、物理表前缀和 API 前缀；依赖方向只能是 `homemind → octop`
 
-5. FamilyMember 不强制绑定 Octop User
+5. Family 是 HomeMind 的核心 Domain
 
-6. Memory 与 Knowledge 分离
+6. FamilyMember 不强制绑定 Octop User
 
-7. 数据与 AI 模型解耦
+7. Memory 与 Knowledge 分离
 
-8. AI 与 Runtime 解耦
+8. 数据与 AI 模型解耦
 
-9. 所有高风险操作必须 Permission + Approval
+9. AI 与 Runtime 解耦
 
-10. 每次执行都必须 Verify，并记录 Audit
+10. 所有高风险操作必须 Permission + Approval
+
+11. 每次执行都必须 Verify，并记录 Audit
 ```
 
 **HomeMind 的技术路线最终确定为：**
