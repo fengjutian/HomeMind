@@ -273,7 +273,15 @@ class FamilyRepo:
                 "INSERT INTO family_relationships(relationship_id, family_id, from_member_id, "
                 "to_member_id, relationship_type, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (relationship_id, family_id, from_member_id, to_member_id, relationship_type, ts, ts),
+                (
+                    relationship_id,
+                    family_id,
+                    from_member_id,
+                    to_member_id,
+                    relationship_type,
+                    ts,
+                    ts,
+                ),
             )
         return self._required_relationship(relationship_id)
 
@@ -307,7 +315,9 @@ class FamilyRepo:
                 (space_id, family_id, name, space_type, owner_member_id, ts, ts),
             )
         with self._db.connect() as conn:
-            row = conn.execute("SELECT * FROM family_spaces WHERE space_id = ?", (space_id,)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM family_spaces WHERE space_id = ?", (space_id,)
+            ).fetchone()
         if row is None:
             raise RuntimeError("family space insert failed")
         return FamilySpaceRow.from_row(row)
@@ -338,7 +348,18 @@ class FamilyRepo:
                 "INSERT INTO family_permissions(permission_id, family_id, subject_member_id, "
                 "space_id, action, effect, expires_at, created_by, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (permission_id, family_id, subject_member_id, space_id, action, effect, expires_at, created_by, ts, ts),
+                (
+                    permission_id,
+                    family_id,
+                    subject_member_id,
+                    space_id,
+                    action,
+                    effect,
+                    expires_at,
+                    created_by,
+                    ts,
+                    ts,
+                ),
             )
         with self._db.connect() as conn:
             row = conn.execute(

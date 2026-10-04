@@ -42,9 +42,7 @@ def test_create_family_creates_owner_membership_and_shared_space(
 ) -> None:
     manager = FamilyManager(repo)
 
-    family = manager.create_family(
-        owner, name="My Family", timezone="Asia/Shanghai", locale="zh"
-    )
+    family = manager.create_family(owner, name="My Family", timezone="Asia/Shanghai", locale="zh")
 
     assert manager.list_families(owner) == [family]
     members = repo.list_members(family.id)
@@ -57,9 +55,7 @@ def test_create_family_creates_owner_membership_and_shared_space(
 
 def test_manager_builds_family_structure(repo: FamilyRepo, owner: User) -> None:
     manager = FamilyManager(repo)
-    family = manager.create_family(
-        owner, name="My Family", timezone="Asia/Shanghai", locale="zh"
-    )
+    family = manager.create_family(owner, name="My Family", timezone="Asia/Shanghai", locale="zh")
     owner_member = repo.list_members(family.id)[0]
     child = manager.create_member(
         family.id,
@@ -101,9 +97,7 @@ def test_manager_builds_family_structure(repo: FamilyRepo, owner: User) -> None:
 
 def test_non_member_cannot_read_family(repo: FamilyRepo, owner: User) -> None:
     manager = FamilyManager(repo)
-    family = manager.create_family(
-        owner, name="My Family", timezone="Asia/Shanghai", locale="zh"
-    )
+    family = manager.create_family(owner, name="My Family", timezone="Asia/Shanghai", locale="zh")
     outsider = User(id=3, username="outsider", role=Role.USER, display_name=None)
 
     with pytest.raises(OctopError) as exc_info:
@@ -114,9 +108,7 @@ def test_non_member_cannot_read_family(repo: FamilyRepo, owner: User) -> None:
 
 def test_related_members_must_belong_to_same_family(repo: FamilyRepo, owner: User) -> None:
     manager = FamilyManager(repo)
-    first = manager.create_family(
-        owner, name="First", timezone="Asia/Shanghai", locale="zh"
-    )
+    first = manager.create_family(owner, name="First", timezone="Asia/Shanghai", locale="zh")
     other_owner = User(id=3, username="outsider", role=Role.USER, display_name=None)
     second = manager.create_family(
         other_owner, name="Second", timezone="Asia/Shanghai", locale="zh"
