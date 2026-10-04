@@ -113,32 +113,32 @@ does not set these headers itself.
 | `POST`   | `/users/{id}/unlock-login` | admin | `204` (clears the lockout) |
 | `DELETE` | `/users/{id}` | admin | `204` |
 
-## Families
+## HomeMind Families
 
-Family routes are scoped to active family memberships. Structural changes require the
+These routes are mounted only by the HomeMind application. Family routes are scoped to active family memberships. Structural changes require the
 family `OWNER` or `ADMIN` role; a server administrator may also manage any family.
 
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| `GET` / `POST` | `/families` | user | List memberships or create a family; creation also creates the owner member and shared space |
-| `GET` / `PATCH` / `DELETE` | `/families/{id}` | member / manager / owner | Read, update, or delete a family |
-| `GET` / `POST` | `/families/{id}/members` | member / manager | List or add members; `user_id` is optional |
-| `PATCH` / `DELETE` | `/families/{id}/members/{member_id}` | manager | Update or remove a non-owner member |
-| `GET` / `POST` | `/families/{id}/relationships` | member / manager | Directed member relationships such as `PARENT` or `SPOUSE` |
-| `DELETE` | `/families/{id}/relationships/{relationship_id}` | manager | Remove a relationship |
-| `GET` / `POST` | `/families/{id}/spaces` | member / manager | Shared, private, and archive spaces |
-| `PATCH` / `DELETE` | `/families/{id}/spaces/{space_id}` | manager | Update or remove a space |
-| `GET` / `POST` | `/families/{id}/permissions` | member / manager | Family permission rules (`ALLOW`, `DENY`, `REQUIRE_CONFIRMATION`) |
-| `PATCH` / `DELETE` | `/families/{id}/permissions/{permission_id}` | manager | Update or remove a permission rule |
-| `POST` | `/families/{id}/permissions/evaluate` | member | Resolve a member/action/space tuple; unmatched requests default to `DENY` |
-| `POST` | `/families/{id}/assets/scan` | manager | Register and incrementally scan a local directory without modifying source files |
-| `GET` | `/families/{id}/asset-sources` | manager | List registered scan roots and last-scan timestamps |
-| `POST` | `/families/{id}/asset-sources/{source_id}/scan` | manager | Rescan a source; unchanged files skip hashing and missing files are marked `MISSING` |
-| `GET` | `/families/{id}/assets` | member | Filter by name, type, space, SHA-256 hash, or index status |
-| `GET` | `/families/{id}/assets/duplicates` | member | Exact duplicate groups based on SHA-256 |
-| `GET` | `/families/{id}/assets/{asset_id}` | member | Indexed file metadata and source URI |
-| `GET` | `/families/{id}/assets/{asset_id}/photo-metadata` | member | Dimensions, EXIF camera/time, and GPS when available |
-| `DELETE` | `/families/{id}/assets/{asset_id}` | manager | Remove metadata from the index; never deletes the source file |
+| `GET` / `POST` | `/homemind/families` | user | List memberships or create a family; creation also creates the owner member and shared space |
+| `GET` / `PATCH` / `DELETE` | `/homemind/families/{id}` | member / manager / owner | Read, update, or delete a family |
+| `GET` / `POST` | `/homemind/families/{id}/members` | member / manager | List or add members; `user_id` is optional |
+| `PATCH` / `DELETE` | `/homemind/families/{id}/members/{member_id}` | manager | Update or remove a non-owner member |
+| `GET` / `POST` | `/homemind/families/{id}/relationships` | member / manager | Directed member relationships such as `PARENT` or `SPOUSE` |
+| `DELETE` | `/homemind/families/{id}/relationships/{relationship_id}` | manager | Remove a relationship |
+| `GET` / `POST` | `/homemind/families/{id}/spaces` | member / manager | Shared, private, and archive spaces |
+| `PATCH` / `DELETE` | `/homemind/families/{id}/spaces/{space_id}` | manager | Update or remove a space |
+| `GET` / `POST` | `/homemind/families/{id}/permissions` | member / manager | Family permission rules (`ALLOW`, `DENY`, `REQUIRE_CONFIRMATION`) |
+| `PATCH` / `DELETE` | `/homemind/families/{id}/permissions/{permission_id}` | manager | Update or remove a permission rule |
+| `POST` | `/homemind/families/{id}/permissions/evaluate` | member | Resolve a member/action/space tuple; unmatched requests default to `DENY` |
+| `POST` | `/homemind/families/{id}/assets/scan` | manager | Register and incrementally scan a local directory without modifying source files |
+| `GET` | `/homemind/families/{id}/asset-sources` | manager | List registered scan roots and last-scan timestamps |
+| `POST` | `/homemind/families/{id}/asset-sources/{source_id}/scan` | manager | Rescan a source; unchanged files skip hashing and missing files are marked `MISSING` |
+| `GET` | `/homemind/families/{id}/assets` | member | Filter by name, type, space, SHA-256 hash, or index status |
+| `GET` | `/homemind/families/{id}/assets/duplicates` | member | Exact duplicate groups based on SHA-256 |
+| `GET` | `/homemind/families/{id}/assets/{asset_id}` | member | Indexed file metadata and source URI |
+| `GET` | `/homemind/families/{id}/assets/{asset_id}/photo-metadata` | member | Dimensions, EXIF camera/time, and GPS when available |
+| `DELETE` | `/homemind/families/{id}/assets/{asset_id}` | manager | Remove metadata from the index; never deletes the source file |
 
 ## Agents
 
