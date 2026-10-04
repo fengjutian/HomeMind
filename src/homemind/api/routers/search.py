@@ -6,7 +6,7 @@ import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
@@ -71,7 +71,7 @@ async def search_family(
     server: Server,
     user: CurrentUser,
     query: str = Query(default="", max_length=500),
-    kinds: list[SearchKind] | None = Query(default=None),
+    kinds: Annotated[list[SearchKind] | None, Query()] = None,
     asset_type: str | None = Query(default=None, max_length=50),
     limit: int = Query(default=50, ge=1, le=200),
     embedding_provider_id: int | None = Query(default=None),

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, Sequence
+from typing import Protocol, cast
 from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 
@@ -240,7 +241,10 @@ class PhotoIntelligenceManager:
     @staticmethod
     def _difference_hash(path: Path) -> str:
         with Image.open(path) as image:
-            pixels = list(image.convert("L").resize((9, 8)).getdata())
+            pixels = cast(
+                list[int],
+                list(image.convert("L").resize((9, 8)).get_flattened_data()),
+            )
         bits = 0
         for row in range(8):
             offset = row * 9

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import json
 from dataclasses import dataclass
 from datetime import datetime
@@ -68,7 +69,9 @@ class FamilyAlbumManager:
         self._album(family_id, album_id, user)
         return self.repo.remove_asset(album_id, asset_id)
 
-    def asset_ids(self, family_id: str, album_id: str, user: User) -> list[str]:
+    def asset_ids(
+        self, family_id: str, album_id: str, user: User
+    ) -> builtins.list[str]:
         self._album(family_id, album_id, user)
         return self.repo.list_asset_ids(album_id)
 

@@ -5,8 +5,9 @@ from __future__ import annotations
 import base64
 import json
 import mimetypes
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 import httpx
 

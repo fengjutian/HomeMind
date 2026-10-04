@@ -168,6 +168,7 @@ class FamilyTransactionManager:
         requester = self._user(transaction.requested_by)
         payload = json.loads(transaction.payload_json)
         try:
+            result: Any
             if transaction.action == "task.create":
                 result = self.tasks.create(transaction.family_id, requester, **payload)
             elif transaction.action == "event.create":

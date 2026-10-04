@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import fnmatch
 import hashlib
 import json
@@ -59,7 +60,7 @@ class FamilyFilesystemManager:
 
     def list(
         self, family_id: str, user: User, *, source_id: str, path: str = "."
-    ) -> list[FilesystemEntry]:
+    ) -> builtins.list[FilesystemEntry]:
         root = self._root(family_id, user, source_id)
         target = self._resolve(root, path, must_exist=True)
         if not target.is_dir():
@@ -85,7 +86,7 @@ class FamilyFilesystemManager:
         if not target.is_dir():
             raise self._invalid("filesystem path is not a directory")
         pattern = query.casefold()
-        rows: list[FilesystemEntry] = []
+        rows: builtins.list[FilesystemEntry] = []
         for item in target.rglob("*"):
             if item.is_symlink() or ".homemind-trash" in item.parts:
                 continue
@@ -221,7 +222,7 @@ class FamilyFilesystemManager:
         return candidate
 
     @staticmethod
-    def _parents(root: Path, target: Path) -> list[Path]:
+    def _parents(root: Path, target: Path) -> builtins.list[Path]:
         relative = target.relative_to(root)
         current = root
         paths = [root]
