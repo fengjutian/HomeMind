@@ -165,6 +165,7 @@ class FamilyPermissionDecision(BaseModel):
 class FamilyAssetResponse(BaseModel):
     id: str
     family_id: str
+    source_id: str | None
     space_id: str | None
     asset_type: str
     name: str
@@ -198,11 +199,28 @@ class FamilyAssetScanBody(BaseModel):
 
 
 class FamilyAssetScanResponse(BaseModel):
+    source_id: str
     indexed: int
+    unchanged: int
     skipped: int
     failed: int
+    missing: int
     asset_ids: list[str]
     errors: list[str]
+
+
+class FamilyAssetSourceResponse(_RowModel):
+    id: str
+    family_id: str
+    space_id: str | None
+    directory_uri: str
+    recursive: bool
+    visibility: str
+    status: str
+    last_scanned_at: int | None
+    created_by: int
+    created_at: int
+    updated_at: int
 
 
 def _manager(server: OctopServer) -> FamilyManager:
@@ -219,6 +237,7 @@ def _asset_response(row: Any) -> FamilyAssetResponse:
     return FamilyAssetResponse(
         id=row.id,
         family_id=row.family_id,
+        source_id=row.source_id,
         space_id=row.space_id,
         asset_type=row.asset_type,
         name=row.name,
@@ -498,6 +517,7 @@ async def search_assets(
     asset_type: str | None = Query(default=None),
     space_id: str | None = Query(default=None),
     content_hash: str | None = Query(default=None, min_length=64, max_length=64),
+    status: Literal["INDEXED", "MISSING"] | None = Query(default="INDEXED"),
     limit: int = Query(default=100, ge=1, le=500),
 ) -> list[FamilyAssetResponse]:
     rows = _asset_manager(server).search(
@@ -507,9 +527,36 @@ async def search_assets(
         asset_type=asset_type,
         space_id=space_id,
         content_hash=content_hash,
+        status=status,
         limit=limit,
     )
     return [_asset_response(row) for row in rows]
+
+
+@router.get(
+    "/{family_id}/asset-sources",
+    response_model=list[FamilyAssetSourceResponse],
+    summary="List configured family asset sources",
+)
+async def list_asset_sources(
+    family_id: str, server: Server, user: CurrentUser
+) -> object:
+    manager = _asset_manager(server)
+    manager.family.require_manager(family_id, user)
+    return manager.repo.list_sources(family_id)
+
+
+@router.post(
+    "/{family_id}/asset-sources/{source_id}/scan",
+    response_model=FamilyAssetScanResponse,
+    summary="Rescan a configured family asset source",
+)
+async def rescan_asset_source(
+    family_id: str, source_id: str, server: Server, user: CurrentUser
+) -> object:
+    manager = _asset_manager(server)
+    scan = partial(manager.scan_source, family_id, source_id, user)
+    return await asyncio.get_running_loop().run_in_executor(None, scan)
 
 
 @router.get(

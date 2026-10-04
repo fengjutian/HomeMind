@@ -75,6 +75,7 @@ def test_run_migrations_creates_tables(db: SqlitePool):
         "family_spaces",
         "family_permissions",
         "family_assets",
+        "family_asset_sources",
         "family_photo_metadata",
     }
     assert expected.issubset(names)

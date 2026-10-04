@@ -5,12 +5,22 @@ from __future__ import annotations
 import hashlib
 import json
 import mimetypes
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
+from zoneinfo import ZoneInfo
 
-from octop.infra.db.repos.family_assets import FamilyAssetRepo, FamilyAssetRow, PhotoMetadataRow
+from octop.infra.db.repos._base import now_ts
+from octop.infra.db.repos.family_assets import (
+    FamilyAssetRepo,
+    FamilyAssetRow,
+    FamilyAssetSourceRow,
+    PhotoMetadataRow,
+)
 from octop.infra.db.repos.families import FamilyRepo
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.family.manager import FamilyManager, PermissionEffect
@@ -30,9 +40,12 @@ class PhotoMetadata:
 
 @dataclass(frozen=True)
 class AssetScanResult:
+    source_id: str
     indexed: int
+    unchanged: int
     skipped: int
     failed: int
+    missing: int
     asset_ids: list[str]
     errors: list[str]
 
@@ -76,7 +89,7 @@ def _gps_coordinate(values: Any, reference: Any) -> float | None:
     return -coordinate if ref.upper() in {"S", "W"} else coordinate
 
 
-def _photo_metadata(path: Path) -> PhotoMetadata:
+def _photo_metadata(path: Path, timezone: ZoneInfo) -> PhotoMetadata:
     try:
         from PIL import ExifTags, Image
 
@@ -91,7 +104,8 @@ def _photo_metadata(path: Path) -> PhotoMetadata:
             taken_at = None
             if isinstance(date_text, str):
                 try:
-                    taken_at = int(datetime.strptime(date_text, "%Y:%m:%d %H:%M:%S").timestamp())
+                    captured = datetime.strptime(date_text, "%Y:%m:%d %H:%M:%S")
+                    taken_at = int(captured.replace(tzinfo=timezone).timestamp())
                 except ValueError:
                     taken_at = None
             latitude = longitude = None
@@ -131,7 +145,7 @@ class FamilyAssetManager:
         recursive: bool = True,
         visibility: str = "FAMILY",
     ) -> AssetScanResult:
-        self.family.require_manager(family_id, user)
+        family = self.family.require_manager(family_id, user)
         if space_id is not None:
             space = self.family.repo.get_space(space_id)
             if space is None or space.family_id != family_id:
@@ -149,8 +163,18 @@ class FamilyAssetManager:
         root = Path(directory).expanduser().resolve()
         if not root.is_dir():
             raise OctopError(ErrorCode.FAMILY_INVALID, "asset scan path must be a directory")
+        source = self.repo.upsert_source(
+            family_id=family_id,
+            space_id=space_id,
+            directory_uri=root.as_uri(),
+            recursive=recursive,
+            visibility=visibility,
+            created_by=user.id,
+        )
         candidates = root.rglob("*") if recursive else root.glob("*")
         indexed: list[str] = []
+        seen: list[str] = []
+        unchanged = 0
         skipped = 0
         errors: list[str] = []
         for path in candidates:
@@ -158,21 +182,41 @@ class FamilyAssetManager:
                 skipped += 1
                 continue
             try:
+                uri = path.resolve().as_uri()
+                existing = self.repo.get_by_uri(family_id, uri)
+                stat = path.stat()
+                if existing is not None:
+                    seen.append(existing.id)
+                if existing is not None and self._is_unchanged(existing, stat.st_size, stat.st_mtime):
+                    self.repo.touch_asset(existing.id, now_ts())
+                    unchanged += 1
+                    continue
                 asset = self._index_file(
                     family_id,
                     user,
+                    source_id=source.id,
                     root=root,
                     path=path,
+                    stat=stat,
                     space_id=space_id,
                     visibility=visibility,
+                    timezone=ZoneInfo(family.timezone),
                 )
+                if existing is None:
+                    seen.append(asset.id)
                 indexed.append(asset.id)
             except (OSError, ValueError) as exc:
                 errors.append(f"{path.name}: {exc}")
+        timestamp = now_ts()
+        missing = self.repo.mark_missing(source.id, seen, timestamp)
+        self.repo.finish_source_scan(source.id, timestamp)
         return AssetScanResult(
+            source_id=source.id,
             indexed=len(indexed),
+            unchanged=unchanged,
             skipped=skipped,
             failed=len(errors),
+            missing=missing,
             asset_ids=indexed,
             errors=errors,
         )
@@ -182,15 +226,17 @@ class FamilyAssetManager:
         family_id: str,
         user: User,
         *,
+        source_id: str,
         root: Path,
         path: Path,
+        stat: os.stat_result,
         space_id: str | None,
         visibility: str,
+        timezone: ZoneInfo,
     ) -> FamilyAssetRow:
-        stat = path.stat()
         mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         kind = _asset_type(mime_type)
-        photo = _photo_metadata(path) if kind == "PHOTO" else PhotoMetadata()
+        photo = _photo_metadata(path, timezone) if kind == "PHOTO" else PhotoMetadata()
         captured_at = photo.taken_at or int(stat.st_mtime)
         metadata = {
             "relative_path": path.relative_to(root).as_posix(),
@@ -198,6 +244,7 @@ class FamilyAssetManager:
         }
         asset = self.repo.upsert_asset(
             family_id=family_id,
+            source_id=source_id,
             space_id=space_id,
             asset_type=kind,
             name=path.name,
@@ -214,6 +261,38 @@ class FamilyAssetManager:
             self.repo.upsert_photo_metadata(asset.id, **asdict(photo))
         return asset
 
+    @staticmethod
+    def _is_unchanged(asset: FamilyAssetRow, size_bytes: int, modified_at: float) -> bool:
+        try:
+            metadata = json.loads(asset.metadata_json)
+        except (TypeError, ValueError):
+            return False
+        return asset.size_bytes == size_bytes and metadata.get("modified_at") == int(modified_at)
+
+    def list_sources(self, family_id: str, user: User) -> list[FamilyAssetSourceRow]:
+        self.family.require_access(family_id, user)
+        return self.repo.list_sources(family_id)
+
+    def scan_source(
+        self, family_id: str, source_id: str, user: User
+    ) -> AssetScanResult:
+        self.family.require_manager(family_id, user)
+        source = self.repo.get_source(source_id)
+        if source is None or source.family_id != family_id:
+            raise OctopError(ErrorCode.NOT_FOUND, "family asset source not found")
+        parsed = urlparse(source.directory_uri)
+        if parsed.scheme != "file":
+            raise OctopError(ErrorCode.FAMILY_INVALID, "asset source is not a local directory")
+        directory = url2pathname(unquote(parsed.path))
+        return self.scan_directory(
+            family_id,
+            user,
+            directory=directory,
+            space_id=source.space_id,
+            recursive=source.recursive,
+            visibility=source.visibility,
+        )
+
     def search(
         self,
         family_id: str,
@@ -223,6 +302,7 @@ class FamilyAssetManager:
         asset_type: str | None = None,
         space_id: str | None = None,
         content_hash: str | None = None,
+        status: str | None = "INDEXED",
         limit: int = 100,
     ) -> list[FamilyAssetRow]:
         self.family.require_access(family_id, user)
@@ -232,6 +312,7 @@ class FamilyAssetManager:
             asset_type=asset_type,
             space_id=space_id,
             content_hash=content_hash,
+            status=status,
             limit=limit,
         )
         return [row for row in rows if self._can_read(row, user)]

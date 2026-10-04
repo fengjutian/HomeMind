@@ -231,3 +231,14 @@ def test_duplicate_space_returns_stable_conflict(repo: FamilyRepo, owner: User) 
         )
 
     assert exc_info.value.code is ErrorCode.FAMILY_CONFLICT
+
+
+def test_invalid_family_timezone_is_rejected(repo: FamilyRepo, owner: User) -> None:
+    manager = FamilyManager(repo)
+
+    with pytest.raises(OctopError) as exc_info:
+        manager.create_family(
+            owner, name="My Family", timezone="Invalid/Timezone", locale="zh"
+        )
+
+    assert exc_info.value.code is ErrorCode.FAMILY_INVALID

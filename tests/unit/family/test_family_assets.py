@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PIL import Image
+
 from octop.infra.db.pool import SqlitePool
 from octop.infra.db.repos.families import FamilyRepo
 from octop.infra.db.repos.family_assets import FamilyAssetRepo
 from octop.infra.family.assets import FamilyAssetManager
-from octop.infra.family.manager import FamilyManager
+from octop.infra.family.manager import FamilyManager, MemberRole, SpaceType
 from octop.infra.users.identity import Role, User
 
 
@@ -24,7 +26,9 @@ def _repos(tmp_path: Path) -> tuple[FamilyRepo, FamilyAssetRepo]:
         )
         conn.execute(
             "INSERT INTO users(id, username, password_hash, role, disabled, locale, created_at) "
-            "VALUES (1, 'owner', 'x', 'user', 0, 'zh', 1)"
+            "VALUES (1, 'owner', 'x', 'user', 0, 'zh', 1), "
+            "(2, 'child', 'x', 'user', 0, 'zh', 1), "
+            "(3, 'other', 'x', 'user', 0, 'zh', 1)"
         )
     return FamilyRepo(pool), FamilyAssetRepo(pool)
 
@@ -42,7 +46,7 @@ def test_scan_search_duplicates_and_delete_index(tmp_path: Path) -> None:
     image = source / "photo.jpg"
     first.write_text("same content", encoding="utf-8")
     second.write_text("same content", encoding="utf-8")
-    image.write_bytes(b"not a real jpeg")
+    Image.new("RGB", (4, 3), color="red").save(image, format="JPEG")
     manager = FamilyAssetManager(family_repo, asset_repo)
 
     result = manager.scan_directory(family.id, user, directory=str(source))
@@ -55,7 +59,7 @@ def test_scan_search_duplicates_and_delete_index(tmp_path: Path) -> None:
     photo = next(asset for asset in assets if asset.asset_type == "PHOTO")
     metadata = manager.photo_metadata(family.id, photo.id, user)
     assert metadata is not None
-    assert metadata.width is None
+    assert (metadata.width, metadata.height) == (4, 3)
 
     second_scan = manager.scan_directory(family.id, user, directory=str(source))
     assert set(second_scan.asset_ids) == {asset.id for asset in assets}
@@ -81,3 +85,49 @@ def test_non_recursive_scan_ignores_nested_files(tmp_path: Path) -> None:
     )
 
     assert result.indexed == 1
+
+
+def test_private_assets_are_visible_only_to_space_owner(tmp_path: Path) -> None:
+    family_repo, asset_repo = _repos(tmp_path)
+    owner = User(id=1, username="owner", role=Role.USER, display_name="Owner")
+    child_user = User(id=2, username="child", role=Role.USER, display_name="Child")
+    other_user = User(id=3, username="other", role=Role.USER, display_name="Other")
+    family_manager = FamilyManager(family_repo)
+    family = family_manager.create_family(
+        owner, name="My Family", timezone="Asia/Shanghai", locale="zh"
+    )
+    child = family_manager.create_member(
+        family.id,
+        owner,
+        display_name="Child",
+        role=MemberRole.CHILD,
+        user_id=child_user.id,
+    )
+    family_manager.create_member(
+        family.id,
+        owner,
+        display_name="Other",
+        role=MemberRole.MEMBER,
+        user_id=other_user.id,
+    )
+    private_space = family_manager.create_space(
+        family.id,
+        owner,
+        name="Child private",
+        space_type=SpaceType.PRIVATE,
+        owner_member_id=child.id,
+    )
+    source = tmp_path / "private"
+    source.mkdir()
+    (source / "secret.txt").write_text("secret", encoding="utf-8")
+    assets = FamilyAssetManager(family_repo, asset_repo)
+    assets.scan_directory(
+        family.id,
+        owner,
+        directory=str(source),
+        space_id=private_space.id,
+        visibility="PRIVATE",
+    )
+
+    assert len(assets.search(family.id, child_user)) == 1
+    assert assets.search(family.id, other_user) == []

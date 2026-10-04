@@ -6,6 +6,7 @@ import sqlite3
 import time
 from enum import StrEnum
 from typing import Callable, TypeVar
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 try:
     from psycopg import errors as pg_errors
@@ -74,6 +75,14 @@ def _reject_null(changes: dict[str, object], fields: set[str]) -> None:
         raise OctopError(ErrorCode.FAMILY_INVALID, "required family field cannot be null")
 
 
+def _validate_timezone(value: str) -> str:
+    try:
+        ZoneInfo(value)
+    except ZoneInfoNotFoundError as exc:
+        raise OctopError(ErrorCode.FAMILY_INVALID, "invalid family timezone") from exc
+    return value
+
+
 class FamilyManager:
     def __init__(self, repo: FamilyRepo) -> None:
         self.repo = repo
@@ -92,7 +101,7 @@ class FamilyManager:
                 owner_user_id=user.id,
                 owner_display_name=user.label,
                 name=name.strip(),
-                timezone=timezone,
+                timezone=_validate_timezone(timezone),
                 locale=locale,
                 avatar=avatar,
             )
@@ -123,6 +132,8 @@ class FamilyManager:
     ) -> FamilyRow:
         self.require_manager(family_id, user)
         _reject_null(changes, {"name", "timezone", "locale"})
+        if "timezone" in changes:
+            changes["timezone"] = _validate_timezone(str(changes["timezone"]))
         if "name" in changes:
             changes["name"] = str(changes["name"]).strip()
         row = _write(lambda: self.repo.update_family(family_id, **changes))

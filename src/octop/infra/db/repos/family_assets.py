@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from octop.infra.db.pool import DatabasePool
-from octop.infra.db.repos._base import DbRow, map_rows, now_ts
+from octop.infra.db.repos._base import DbRow, bool_int, map_rows, now_ts, sql_in_placeholders
 from octop.infra.utils.ulid import new_ulid
 
 
@@ -14,6 +14,7 @@ class FamilyAssetRow:
     id: str
     pk: int
     family_id: str
+    source_id: str | None
     space_id: str | None
     asset_type: str
     name: str
@@ -36,6 +37,7 @@ class FamilyAssetRow:
             id=str(row["asset_id"]),
             pk=int(row["id"]),
             family_id=str(row["family_id"]),
+            source_id=row["source_id"],
             space_id=row["space_id"],
             asset_type=str(row["asset_type"]),
             name=str(row["name"]),
@@ -79,6 +81,41 @@ class PhotoMetadataRow:
         )
 
 
+@dataclass(frozen=True)
+class FamilyAssetSourceRow:
+    id: str
+    pk: int
+    family_id: str
+    space_id: str | None
+    directory_uri: str
+    recursive: bool
+    visibility: str
+    status: str
+    last_scanned_at: int | None
+    created_by: int
+    created_at: int
+    updated_at: int
+
+    @classmethod
+    def from_row(cls, row: DbRow) -> FamilyAssetSourceRow:
+        return cls(
+            id=str(row["source_id"]),
+            pk=int(row["id"]),
+            family_id=str(row["family_id"]),
+            space_id=row["space_id"],
+            directory_uri=str(row["directory_uri"]),
+            recursive=bool(row["recursive"]),
+            visibility=str(row["visibility"]),
+            status=str(row["status"]),
+            last_scanned_at=(
+                int(row["last_scanned_at"]) if row["last_scanned_at"] is not None else None
+            ),
+            created_by=int(row["created_by"]),
+            created_at=int(row["created_at"]),
+            updated_at=int(row["updated_at"]),
+        )
+
+
 class FamilyAssetRepo:
     def __init__(self, db: DatabasePool) -> None:
         self._db = db
@@ -87,6 +124,7 @@ class FamilyAssetRepo:
         self,
         *,
         family_id: str,
+        source_id: str,
         space_id: str | None,
         asset_type: str,
         name: str,
@@ -104,12 +142,14 @@ class FamilyAssetRepo:
         ts = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO family_assets(asset_id, family_id, space_id, asset_type, name, uri, "
+                "INSERT INTO family_assets(asset_id, family_id, source_id, space_id, asset_type, "
+                "name, uri, "
                 "mime_type, size_bytes, content_hash, captured_at, indexed_at, metadata_json, "
                 "created_by, visibility, status, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INDEXED', ?, ?) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'INDEXED', ?, ?) "
                 "ON CONFLICT(family_id, uri) DO UPDATE SET "
-                "space_id = excluded.space_id, asset_type = excluded.asset_type, "
+                "source_id = excluded.source_id, space_id = excluded.space_id, "
+                "asset_type = excluded.asset_type, "
                 "name = excluded.name, mime_type = excluded.mime_type, "
                 "size_bytes = excluded.size_bytes, content_hash = excluded.content_hash, "
                 "captured_at = excluded.captured_at, indexed_at = excluded.indexed_at, "
@@ -118,6 +158,7 @@ class FamilyAssetRepo:
                 (
                     asset_id,
                     family_id,
+                    source_id,
                     space_id,
                     asset_type,
                     name,
@@ -138,6 +179,100 @@ class FamilyAssetRepo:
         if row is None:
             raise RuntimeError("family asset upsert failed")
         return row
+
+    def upsert_source(
+        self,
+        *,
+        family_id: str,
+        space_id: str | None,
+        directory_uri: str,
+        recursive: bool,
+        visibility: str,
+        created_by: int,
+    ) -> FamilyAssetSourceRow:
+        existing = self.get_source_by_uri(family_id, directory_uri)
+        source_id = existing.id if existing else new_ulid()
+        ts = now_ts()
+        with self._db.transaction() as conn:
+            conn.execute(
+                "INSERT INTO family_asset_sources(source_id, family_id, space_id, directory_uri, "
+                "recursive, visibility, status, created_by, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?) "
+                "ON CONFLICT(family_id, directory_uri) DO UPDATE SET "
+                "space_id = excluded.space_id, recursive = excluded.recursive, "
+                "visibility = excluded.visibility, status = 'ACTIVE', "
+                "updated_at = excluded.updated_at",
+                (
+                    source_id,
+                    family_id,
+                    space_id,
+                    directory_uri,
+                    bool_int(recursive),
+                    visibility,
+                    created_by,
+                    ts,
+                    ts,
+                ),
+            )
+        row = self.get_source_by_uri(family_id, directory_uri)
+        if row is None:
+            raise RuntimeError("family asset source upsert failed")
+        return row
+
+    def get_source(self, source_id: str) -> FamilyAssetSourceRow | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM family_asset_sources WHERE source_id = ?", (source_id,)
+            ).fetchone()
+        return FamilyAssetSourceRow.from_row(row) if row else None
+
+    def get_source_by_uri(
+        self, family_id: str, directory_uri: str
+    ) -> FamilyAssetSourceRow | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM family_asset_sources WHERE family_id = ? AND directory_uri = ?",
+                (family_id, directory_uri),
+            ).fetchone()
+        return FamilyAssetSourceRow.from_row(row) if row else None
+
+    def list_sources(self, family_id: str) -> list[FamilyAssetSourceRow]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM family_asset_sources WHERE family_id = ? ORDER BY created_at, id",
+                (family_id,),
+            ).fetchall()
+        return map_rows(rows, FamilyAssetSourceRow)
+
+    def finish_source_scan(self, source_id: str, scanned_at: int) -> None:
+        with self._db.transaction() as conn:
+            conn.execute(
+                "UPDATE family_asset_sources SET last_scanned_at = ?, status = 'ACTIVE', "
+                "updated_at = ? WHERE source_id = ?",
+                (scanned_at, scanned_at, source_id),
+            )
+
+    def touch_asset(self, asset_id: str, indexed_at: int) -> None:
+        with self._db.transaction() as conn:
+            conn.execute(
+                "UPDATE family_assets SET indexed_at = ?, status = 'INDEXED', updated_at = ? "
+                "WHERE asset_id = ?",
+                (indexed_at, indexed_at, asset_id),
+            )
+
+    def mark_missing(self, source_id: str, seen_asset_ids: list[str], timestamp: int) -> int:
+        sql = (
+            "UPDATE family_assets SET status = 'MISSING', updated_at = ? "
+            "WHERE source_id = ? AND status <> 'MISSING'"
+        )
+        params: list[object] = [timestamp, source_id]
+        if seen_asset_ids:
+            sql += f" AND asset_id NOT IN ({sql_in_placeholders(len(seen_asset_ids))})"
+            params.extend(seen_asset_ids)
+        with self._db.transaction() as conn:
+            cursor = conn.execute(sql, params)
+            changed = int(cursor.rowcount or 0)
+        return changed
 
     def upsert_photo_metadata(
         self,
@@ -201,6 +336,7 @@ class FamilyAssetRepo:
         asset_type: str | None = None,
         space_id: str | None = None,
         content_hash: str | None = None,
+        status: str | None = "INDEXED",
         limit: int = 100,
     ) -> list[FamilyAssetRow]:
         clauses = ["family_id = ?"]
@@ -217,6 +353,9 @@ class FamilyAssetRepo:
         if content_hash:
             clauses.append("content_hash = ?")
             params.append(content_hash)
+        if status:
+            clauses.append("status = ?")
+            params.append(status)
         params.append(limit)
         with self._db.connect() as conn:
             rows = conn.execute(

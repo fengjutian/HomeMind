@@ -1962,3 +1962,5 @@ def _ensure_family_foundation_schema(db: DatabasePool) -> None:
     sql = re.sub(r"UPDATE _schema_version SET version = 20;\s*$", "", sql)
     with db.connect() as conn:
         conn.executescript(sql)
+    if _table_exists(db, "family_assets"):
+        _ensure_column(db, "family_assets", "source_id", "TEXT")
