@@ -1,0 +1,255 @@
+"""Built-in HomeMind family tools for Octop agents."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Callable
+from dataclasses import asdict
+from typing import Annotated, Any
+
+from langchain_core.tools import StructuredTool
+from langgraph.config import get_config
+from pydantic import Field
+
+from homemind.infra.db.migrate import run_migrations
+from homemind.infra.db.services import HomeMindServices
+from homemind.infra.family.assets import FamilyAssetManager
+from homemind.infra.family.context import FamilyContextManager
+from homemind.infra.family.manager import FamilyManager, PermissionEffect
+from homemind.infra.family.tasks import FamilyTaskManager, TaskStatus
+from octop.infra.db.pool import DatabasePool
+from octop.infra.db.repos.users import UserRepo
+from octop.infra.users.identity import User
+
+
+def _ok(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, default=str)
+
+
+def _error(exc: Exception) -> str:
+    return _ok({"error": str(exc)})
+
+
+def _current_user(user_repo: UserRepo) -> User:
+    configurable = get_config().get("configurable") or {}
+    raw_user_id = configurable.get("user")
+    if raw_user_id is None:
+        raise ValueError("missing configurable.user")
+    row = user_repo.get(int(raw_user_id))
+    if row is None or row.disabled:
+        raise ValueError("current user not found")
+    return User(
+        id=row.id,
+        username=row.username,
+        role=row.role,
+        display_name=row.display_name,
+        locale=row.locale,
+        permissions=row.permissions,
+    )
+
+
+def build_family_tools(
+    db: DatabasePool,
+    *,
+    user_repo: UserRepo,
+) -> list[StructuredTool]:
+    """Build family tools backed by the current HomeMind control-plane database."""
+    run_migrations(db)
+    services = HomeMindServices.from_pool(db)
+    families = FamilyManager(services.family_repo)
+    context = FamilyContextManager(families, services.family_context_repo)
+    assets = FamilyAssetManager(services.family_repo, services.family_asset_repo)
+    tasks = FamilyTaskManager(families, services.family_task_repo)
+
+    def family_list_members(family_id: str) -> str:
+        try:
+            user = _current_user(user_repo)
+            families.require_access(family_id, user)
+            return _ok([asdict(row) for row in families.repo.list_members(family_id)])
+        except Exception as exc:
+            return _error(exc)
+
+    def family_get_member(family_id: str, member_id: str) -> str:
+        try:
+            user = _current_user(user_repo)
+            families.require_access(family_id, user)
+            row = families.repo.get_member(member_id)
+            if row is None or row.family_id != family_id:
+                raise ValueError("family member not found")
+            return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
+    def family_search_memory(family_id: str, query: str = "") -> str:
+        try:
+            rows = context.search_memories(
+                family_id, _current_user(user_repo), query or None
+            )
+            return _ok([asdict(row) for row in rows])
+        except Exception as exc:
+            return _error(exc)
+
+    def family_create_memory(
+        family_id: str,
+        content: str,
+        memory_type: str,
+        subject_type: str = "FAMILY",
+        subject_id: str | None = None,
+    ) -> str:
+        try:
+            user = _current_user(user_repo)
+            _require_permission(families, family_id, user, "memory.create")
+            row = context.create_memory(
+                family_id,
+                user,
+                subject_type=subject_type,
+                subject_id=subject_id,
+                content=content,
+                memory_type=memory_type,
+                importance=0.5,
+                confidence=0.5,
+                visibility="FAMILY",
+                source_type="AGENT",
+                source_id=None,
+                expires_at=None,
+            )
+            return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
+    def family_search_assets(
+        family_id: str,
+        query: str = "",
+        asset_type: str | None = None,
+    ) -> str:
+        try:
+            rows = assets.search(
+                family_id,
+                _current_user(user_repo),
+                query=query or None,
+                asset_type=asset_type,
+            )
+            return _ok([asdict(row) for row in rows])
+        except Exception as exc:
+            return _error(exc)
+
+    def family_get_asset(family_id: str, asset_id: str) -> str:
+        try:
+            row = assets.get(family_id, asset_id, _current_user(user_repo))
+            return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
+    def family_list_events(family_id: str, query: str = "") -> str:
+        try:
+            rows = context.list_events(family_id, _current_user(user_repo))
+            if query:
+                normalized = query.casefold()
+                rows = [
+                    row
+                    for row in rows
+                    if normalized in row.title.casefold()
+                    or normalized in (row.location or "").casefold()
+                    or normalized in row.description.casefold()
+                ]
+            return _ok([asdict(row) for row in rows])
+        except Exception as exc:
+            return _error(exc)
+
+    def family_create_event(
+        family_id: str,
+        title: str,
+        event_type: str,
+        start_at: int,
+        end_at: int,
+        location: str | None = None,
+    ) -> str:
+        try:
+            user = _current_user(user_repo)
+            _require_permission(families, family_id, user, "event.create")
+            row = context.create_event(
+                family_id,
+                user,
+                title=title,
+                event_type=event_type,
+                start_at=start_at,
+                end_at=end_at,
+                location=location,
+                description="",
+                metadata={},
+            )
+            return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
+    def family_list_tasks(family_id: str, status: str | None = None) -> str:
+        try:
+            parsed = TaskStatus(status) if status else None
+            rows = tasks.list(
+                family_id,
+                _current_user(user_repo),
+                status=parsed,
+            )
+            return _ok([asdict(row) for row in rows])
+        except Exception as exc:
+            return _error(exc)
+
+    def family_create_task(
+        family_id: str,
+        title: Annotated[str, Field(min_length=1, max_length=200)],
+        description: str = "",
+        assigned_member_id: str | None = None,
+        due_at: int | None = None,
+    ) -> str:
+        try:
+            user = _current_user(user_repo)
+            _require_permission(families, family_id, user, "task.create")
+            row = tasks.create(
+                family_id,
+                user,
+                title=title,
+                description=description,
+                assigned_member_id=assigned_member_id,
+                due_at=due_at,
+            )
+            return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
+    specs: list[tuple[str, Callable[..., str], str]] = [
+        ("family.list_members", family_list_members, "List members of a family."),
+        ("family.get_member", family_get_member, "Get one family member."),
+        ("family.search_memory", family_search_memory, "Search durable family memories."),
+        ("family.create_memory", family_create_memory, "Create a durable family memory."),
+        ("family.search_assets", family_search_assets, "Search indexed family assets."),
+        ("family.get_asset", family_get_asset, "Get one indexed family asset."),
+        ("family.list_events", family_list_events, "List or search family events."),
+        ("family.create_event", family_create_event, "Create a family event."),
+        ("family.list_tasks", family_list_tasks, "List family tasks."),
+        ("family.create_task", family_create_task, "Create a family task."),
+    ]
+    return [
+        StructuredTool.from_function(func=func, name=name, description=description)
+        for name, func, description in specs
+    ]
+
+
+def _require_permission(
+    families: FamilyManager,
+    family_id: str,
+    user: User,
+    action: str,
+) -> None:
+    membership = families.repo.get_membership(family_id, user.id)
+    if membership is None:
+        raise ValueError("family membership required")
+    effect = families.evaluate_permission(
+        family_id,
+        user,
+        subject_member_id=str(membership["member_id"]),
+        action=action,
+    )
+    if effect is PermissionEffect.REQUIRE_CONFIRMATION:
+        raise ValueError(f"approval required for {action}")
+    if effect is not PermissionEffect.ALLOW:
+        raise ValueError(f"permission denied for {action}")

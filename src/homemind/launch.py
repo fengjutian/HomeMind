@@ -6,11 +6,16 @@ import asyncio
 from typing import Any
 
 from homemind.api.app import build_app
+from homemind.infra.server import HomeMindServer
 from octop.launch import run_foreground as run_octop_foreground
 
 
 async def run_foreground(**kwargs: Any) -> None:
-    await run_octop_foreground(app_factory=build_app, **kwargs)
+    await run_octop_foreground(
+        app_factory=build_app,
+        server_factory=HomeMindServer,
+        **kwargs,
+    )
 
 
 def run_foreground_blocking(**kwargs: Any) -> None:

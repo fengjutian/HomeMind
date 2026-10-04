@@ -280,6 +280,10 @@ class OctopServer:
     def database_bound(self) -> bool:
         return self.services is not None and self.app_runtime is not None
 
+    def build_extra_agent_tools(self) -> list[Any]:
+        """Return product-specific tools; downstream servers may override this hook."""
+        return []
+
     async def start(self) -> None:
         if self._started:
             return
@@ -378,6 +382,7 @@ class OctopServer:
             config=config,
             expert_catalog=self.expert_catalog,
             plugin_manager=self.plugin_manager,
+            extra_tools_factory=self.build_extra_agent_tools,
         )
 
         from octop.infra.history.trajectory.live import TrajectoryLiveBus  # noqa: PLC0415

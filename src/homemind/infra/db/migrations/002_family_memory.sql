@@ -25,4 +25,21 @@ CREATE INDEX IF NOT EXISTS idx_homemind_family_memories_family
 CREATE INDEX IF NOT EXISTS idx_homemind_family_memories_subject
   ON homemind_family_memories(family_id, subject_type, subject_id);
 
+CREATE TABLE IF NOT EXISTS homemind_family_tasks (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id            TEXT NOT NULL UNIQUE,
+  family_id          TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
+  title              TEXT NOT NULL,
+  description        TEXT NOT NULL DEFAULT '',
+  status             TEXT NOT NULL DEFAULT 'TODO',
+  assigned_member_id TEXT REFERENCES homemind_family_members(member_id) ON DELETE SET NULL,
+  due_at             INTEGER,
+  created_by         INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_family_tasks_family
+  ON homemind_family_tasks(family_id, status, due_at);
+
 UPDATE _homemind_schema_version SET version = 2;

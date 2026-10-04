@@ -345,6 +345,7 @@ class AgentManager:
         config: OctopConfig | None = None,
         expert_catalog: ExpertCatalog | None = None,
         plugin_manager: PluginManager | None = None,
+        extra_tools_factory: Callable[[], list[Any]] | None = None,
     ) -> None:
         self._repos = repos
         self._paths = paths
@@ -353,6 +354,7 @@ class AgentManager:
         self._config = config or _OctopConfig()
         self._expert_catalog = expert_catalog
         self._plugin_manager = plugin_manager
+        self._extra_tools_factory = extra_tools_factory
         self._cron_manager: CronManager | None = None
         self._proactive_scheduler: ProactiveCareScheduler | None = None
         self._team_processor: Any | None = None
@@ -3143,6 +3145,8 @@ class AgentManager:
         merged_tools.extend(knowledge_tools)
         merged_tools.extend(mobile_tools)
         merged_tools.extend(plugin_tools)
+        if self._extra_tools_factory is not None and not team_host:
+            merged_tools.extend(self._extra_tools_factory())
         # agent_list / ask_agent: PeerAgentMiddleware (team_enabled=True), not config.tools.
 
         acp_section = cfg.get("acp")

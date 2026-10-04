@@ -66,6 +66,7 @@ async def run_foreground(
     ssl_certfile: str | None,
     ssl_keyfile: str | None,
     app_factory: Callable[[OctopServer], FastAPI] | None = None,
+    server_factory: Callable[[], OctopServer] = OctopServer,
 ) -> None:
     """Boot the domain server, serve the HTTP API, then shut down cleanly."""
     import uvicorn
@@ -75,7 +76,7 @@ async def run_foreground(
     from octop.infra.setup.tls.listeners import build_listen_plan
     from octop.infra.setup.tls.store import resolve_tls_paths
 
-    srv = OctopServer()
+    srv = server_factory()
     await srv.start()
     bwrap_task = _schedule_linux_bubblewrap_ensure()
     # Greenfield deferral leaves services unset until /setup/database binds.
