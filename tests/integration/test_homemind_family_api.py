@@ -230,3 +230,11 @@ async def test_family_context_api(
     assert response.status_code == 200
     assert response.json()["event_ids"] == [event_id]
     assert response.json()["memory_ids"] == [memory_id]
+
+    response = await client.get(
+        f"/api/homemind/families/{family_id}/search",
+        headers=auth,
+        params={"query": "京都"},
+    )
+    assert response.status_code == 200
+    assert {row["kind"] for row in response.json()} == {"EVENT", "MEMORY"}

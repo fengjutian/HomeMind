@@ -94,7 +94,15 @@ class FamilyTransactionRepo:
                 "INSERT INTO homemind_family_transactions(transaction_id, family_id, "
                 "requested_by, action, payload_json, status, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, 'PLANNED', ?, ?)",
-                (transaction_id, family_id, requested_by, action, payload_json, timestamp, timestamp),
+                (
+                    transaction_id,
+                    family_id,
+                    requested_by,
+                    action,
+                    payload_json,
+                    timestamp,
+                    timestamp,
+                ),
             )
         return self.get_transaction(transaction_id)  # type: ignore[return-value]
 
@@ -124,7 +132,13 @@ class FamilyTransactionRepo:
             conn.execute(
                 "INSERT INTO homemind_family_approvals(approval_id, transaction_id, family_id, "
                 "requested_by, created_at) VALUES (?, ?, ?, ?, ?)",
-                (approval_id, transaction.id, transaction.family_id, transaction.requested_by, timestamp),
+                (
+                    approval_id,
+                    transaction.id,
+                    transaction.family_id,
+                    transaction.requested_by,
+                    timestamp,
+                ),
             )
         return self.get_approval(approval_id)  # type: ignore[return-value]
 

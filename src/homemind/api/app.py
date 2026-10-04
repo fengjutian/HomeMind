@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from homemind.api.routers import context, families, transactions
+from homemind.api.routers import context, families, search, transactions
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.errors import HomeMindError
 from octop.api.app import build_app as build_octop_app
@@ -36,5 +36,10 @@ def build_app(server: OctopServer) -> FastAPI:
         transactions.router,
         prefix="/api/homemind/families",
         tags=["homemind-transactions"],
+    )
+    app.include_router(
+        search.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-search"],
     )
     return app

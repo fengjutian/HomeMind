@@ -16,6 +16,7 @@ from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.search import FamilySearchManager, SearchKind
 from homemind.infra.family.tasks import FamilyTaskManager, TaskStatus
 from homemind.infra.family.transactions import FamilyTransactionManager
 from octop.infra.db.pool import DatabasePool
@@ -60,6 +61,7 @@ def build_family_tools(
     families = FamilyManager(services.family_repo)
     context = FamilyContextManager(families, services.family_context_repo)
     assets = FamilyAssetManager(services.family_repo, services.family_asset_repo)
+    search = FamilySearchManager(families, context, assets)
     tasks = FamilyTaskManager(families, services.family_task_repo)
     transactions = FamilyTransactionManager(
         families,
@@ -250,6 +252,27 @@ def build_family_tools(
         except Exception as exc:
             return _error(exc)
 
+    def family_search(
+        family_id: str,
+        query: str,
+        kinds: list[str] | None = None,
+        asset_type: str | None = None,
+        limit: int = 50,
+    ) -> str:
+        try:
+            selected = {SearchKind(value) for value in kinds} if kinds else None
+            rows = search.search(
+                family_id,
+                _current_user(user_repo),
+                query=query,
+                kinds=selected,
+                asset_type=asset_type,
+                limit=limit,
+            )
+            return _ok([asdict(row) for row in rows])
+        except Exception as exc:
+            return _error(exc)
+
     specs: list[tuple[str, Callable[..., str], str]] = [
         ("family.list_members", family_list_members, "List members of a family."),
         ("family.get_member", family_get_member, "Get one family member."),
@@ -263,6 +286,11 @@ def build_family_tools(
         ("family.create_task", family_create_task, "Create a family task."),
         ("family.get_devices", family_get_devices, "List registered family devices."),
         ("family.get_device", family_get_device, "Get one registered family device."),
+        (
+            "family.search",
+            family_search,
+            "Search family members, events, memories, and indexed assets.",
+        ),
     ]
     return [
         StructuredTool.from_function(func=func, name=name, description=description)
