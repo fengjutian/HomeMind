@@ -1,6 +1,6 @@
 -- Schema v20: HomeMind family foundation.
 
-CREATE TABLE families (
+CREATE TABLE IF NOT EXISTS families (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   family_id      TEXT NOT NULL UNIQUE,
   name           TEXT NOT NULL,
@@ -12,9 +12,9 @@ CREATE TABLE families (
   updated_at     INTEGER NOT NULL
 );
 
-CREATE INDEX idx_families_owner ON families(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_families_owner ON families(owner_user_id);
 
-CREATE TABLE family_members (
+CREATE TABLE IF NOT EXISTS family_members (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   member_id      TEXT NOT NULL UNIQUE,
   family_id      TEXT NOT NULL REFERENCES families(family_id) ON DELETE CASCADE,
@@ -29,9 +29,9 @@ CREATE TABLE family_members (
   UNIQUE(family_id, user_id)
 );
 
-CREATE INDEX idx_family_members_family ON family_members(family_id);
+CREATE INDEX IF NOT EXISTS idx_family_members_family ON family_members(family_id);
 
-CREATE TABLE family_memberships (
+CREATE TABLE IF NOT EXISTS family_memberships (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   membership_id  TEXT NOT NULL UNIQUE,
   family_id      TEXT NOT NULL REFERENCES families(family_id) ON DELETE CASCADE,
@@ -44,9 +44,9 @@ CREATE TABLE family_memberships (
   UNIQUE(family_id, user_id)
 );
 
-CREATE INDEX idx_family_memberships_user ON family_memberships(user_id);
+CREATE INDEX IF NOT EXISTS idx_family_memberships_user ON family_memberships(user_id);
 
-CREATE TABLE family_relationships (
+CREATE TABLE IF NOT EXISTS family_relationships (
   id                 INTEGER PRIMARY KEY AUTOINCREMENT,
   relationship_id    TEXT NOT NULL UNIQUE,
   family_id          TEXT NOT NULL REFERENCES families(family_id) ON DELETE CASCADE,
@@ -59,9 +59,9 @@ CREATE TABLE family_relationships (
   UNIQUE(family_id, from_member_id, to_member_id, relationship_type)
 );
 
-CREATE INDEX idx_family_relationships_family ON family_relationships(family_id);
+CREATE INDEX IF NOT EXISTS idx_family_relationships_family ON family_relationships(family_id);
 
-CREATE TABLE family_spaces (
+CREATE TABLE IF NOT EXISTS family_spaces (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   space_id    TEXT NOT NULL UNIQUE,
   family_id   TEXT NOT NULL REFERENCES families(family_id) ON DELETE CASCADE,
@@ -73,9 +73,9 @@ CREATE TABLE family_spaces (
   UNIQUE(family_id, name)
 );
 
-CREATE INDEX idx_family_spaces_family ON family_spaces(family_id);
+CREATE INDEX IF NOT EXISTS idx_family_spaces_family ON family_spaces(family_id);
 
-CREATE TABLE family_permissions (
+CREATE TABLE IF NOT EXISTS family_permissions (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   permission_id     TEXT NOT NULL UNIQUE,
   family_id         TEXT NOT NULL REFERENCES families(family_id) ON DELETE CASCADE,
@@ -89,9 +89,9 @@ CREATE TABLE family_permissions (
   updated_at        INTEGER NOT NULL
 );
 
-CREATE INDEX idx_family_permissions_family ON family_permissions(family_id);
-CREATE INDEX idx_family_permissions_subject ON family_permissions(subject_member_id);
-CREATE UNIQUE INDEX idx_family_permissions_rule
+CREATE INDEX IF NOT EXISTS idx_family_permissions_family ON family_permissions(family_id);
+CREATE INDEX IF NOT EXISTS idx_family_permissions_subject ON family_permissions(subject_member_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_family_permissions_rule
   ON family_permissions(
     family_id,
     COALESCE(subject_member_id, ''),

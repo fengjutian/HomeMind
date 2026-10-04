@@ -24,10 +24,10 @@ def repo(tmp_path: Path) -> FamilyRepo:
     run_migrations(pool)
     with pool.transaction() as conn:
         conn.execute(
-            "INSERT INTO users(id, username, role, disabled, locale, created_at) "
-            "VALUES (1, 'owner', 'user', 0, 'zh', 1), "
-            "(2, 'member', 'user', 0, 'zh', 1), "
-            "(3, 'outsider', 'user', 0, 'zh', 1)"
+            "INSERT INTO users(id, username, password_hash, role, disabled, locale, created_at) "
+            "VALUES (1, 'owner', 'x', 'user', 0, 'zh', 1), "
+            "(2, 'member', 'x', 'user', 0, 'zh', 1), "
+            "(3, 'outsider', 'x', 'user', 0, 'zh', 1)"
         )
     return FamilyRepo(pool)
 
