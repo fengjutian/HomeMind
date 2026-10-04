@@ -1,0 +1,96 @@
+-- Schema v20: HomeMind family foundation.
+
+CREATE TABLE families (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  family_id      TEXT NOT NULL UNIQUE,
+  name           TEXT NOT NULL,
+  avatar         TEXT,
+  owner_user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  timezone       TEXT NOT NULL,
+  locale         TEXT NOT NULL,
+  created_at     INTEGER NOT NULL,
+  updated_at     INTEGER NOT NULL
+);
+
+CREATE INDEX idx_families_owner ON families(owner_user_id);
+
+CREATE TABLE family_members (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  member_id      TEXT NOT NULL UNIQUE,
+  family_id      TEXT NOT NULL REFERENCES families(family_id) ON DELETE CASCADE,
+  user_id        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  display_name   TEXT NOT NULL,
+  role           TEXT NOT NULL DEFAULT 'MEMBER',
+  avatar         TEXT,
+  birthday       TEXT,
+  status         TEXT NOT NULL DEFAULT 'ACTIVE',
+  created_at     INTEGER NOT NULL,
+  updated_at     INTEGER NOT NULL,
+  UNIQUE(family_id, user_id)
+);
+
+CREATE INDEX idx_family_members_family ON family_members(family_id);
+
+CREATE TABLE family_memberships (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  membership_id  TEXT NOT NULL UNIQUE,
+  family_id      TEXT NOT NULL REFERENCES families(family_id) ON DELETE CASCADE,
+  member_id      TEXT NOT NULL UNIQUE REFERENCES family_members(member_id) ON DELETE CASCADE,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role           TEXT NOT NULL DEFAULT 'MEMBER',
+  status         TEXT NOT NULL DEFAULT 'ACTIVE',
+  created_at     INTEGER NOT NULL,
+  updated_at     INTEGER NOT NULL,
+  UNIQUE(family_id, user_id)
+);
+
+CREATE INDEX idx_family_memberships_user ON family_memberships(user_id);
+
+CREATE TABLE family_relationships (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  relationship_id    TEXT NOT NULL UNIQUE,
+  family_id          TEXT NOT NULL REFERENCES families(family_id) ON DELETE CASCADE,
+  from_member_id     TEXT NOT NULL REFERENCES family_members(member_id) ON DELETE CASCADE,
+  to_member_id       TEXT NOT NULL REFERENCES family_members(member_id) ON DELETE CASCADE,
+  relationship_type  TEXT NOT NULL,
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL,
+  CHECK(from_member_id <> to_member_id),
+  UNIQUE(family_id, from_member_id, to_member_id, relationship_type)
+);
+
+CREATE INDEX idx_family_relationships_family ON family_relationships(family_id);
+
+CREATE TABLE family_spaces (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  space_id    TEXT NOT NULL UNIQUE,
+  family_id   TEXT NOT NULL REFERENCES families(family_id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  space_type  TEXT NOT NULL,
+  owner_member_id TEXT REFERENCES family_members(member_id) ON DELETE SET NULL,
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL,
+  UNIQUE(family_id, name)
+);
+
+CREATE INDEX idx_family_spaces_family ON family_spaces(family_id);
+
+CREATE TABLE family_permissions (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  permission_id     TEXT NOT NULL UNIQUE,
+  family_id         TEXT NOT NULL REFERENCES families(family_id) ON DELETE CASCADE,
+  subject_member_id TEXT REFERENCES family_members(member_id) ON DELETE CASCADE,
+  space_id          TEXT REFERENCES family_spaces(space_id) ON DELETE CASCADE,
+  action            TEXT NOT NULL,
+  effect            TEXT NOT NULL,
+  expires_at        INTEGER,
+  created_by        INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at        INTEGER NOT NULL,
+  updated_at        INTEGER NOT NULL,
+  UNIQUE(family_id, subject_member_id, space_id, action)
+);
+
+CREATE INDEX idx_family_permissions_family ON family_permissions(family_id);
+CREATE INDEX idx_family_permissions_subject ON family_permissions(subject_member_id);
+
+UPDATE _schema_version SET version = 20;
