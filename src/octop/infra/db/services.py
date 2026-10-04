@@ -14,6 +14,7 @@ from octop.infra.db.repos.care_push import CarePushRepo
 from octop.infra.db.repos.channels import ChannelRepo
 from octop.infra.db.repos.connectors import ConnectorRepo
 from octop.infra.db.repos.cron import CronJobRepo
+from octop.infra.db.repos.family_assets import FamilyAssetRepo
 from octop.infra.db.repos.families import FamilyRepo
 from octop.infra.db.repos.invites import InviteRepo
 from octop.infra.db.repos.knowledge import KnowledgeRepo
@@ -47,6 +48,7 @@ class RepoBundle:
     channel_repo: ChannelRepo
     cron_repo: CronJobRepo
     family_repo: FamilyRepo
+    family_asset_repo: FamilyAssetRepo
     session_repo: SessionRepo
     thread_repo: ThreadRepo
     thread_message_repo: ThreadMessageRepo
@@ -78,6 +80,7 @@ class RepoBundle:
             channel_repo=ChannelRepo(db),
             cron_repo=CronJobRepo(db),
             family_repo=FamilyRepo(db),
+            family_asset_repo=FamilyAssetRepo(db),
             session_repo=SessionRepo(db),
             thread_repo=ThreadRepo(db),
             thread_message_repo=ThreadMessageRepo(db),
@@ -140,6 +143,10 @@ class SharedServices:
     @property
     def family_repo(self) -> FamilyRepo:
         return self.repos.family_repo
+
+    @property
+    def family_asset_repo(self) -> FamilyAssetRepo:
+        return self.repos.family_asset_repo
 
     @property
     def session_repo(self) -> SessionRepo:

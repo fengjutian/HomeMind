@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -11,6 +12,7 @@ from octop.infra.server import OctopServer
 @pytest.mark.asyncio
 async def test_family_foundation_api(
     env: tuple[httpx.AsyncClient, OctopServer, dict[str, str]],
+    tmp_path: Path,
 ) -> None:
     client, _, auth = env
 
@@ -113,6 +115,33 @@ async def test_family_foundation_api(
     )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "FAMILY_CONFLICT"
+
+    assets_dir = tmp_path / "family-assets"
+    assets_dir.mkdir()
+    first_file = assets_dir / "first.txt"
+    first_file.write_text("duplicate", encoding="utf-8")
+    (assets_dir / "second.txt").write_text("duplicate", encoding="utf-8")
+    response = await client.post(
+        f"/api/families/{family_id}/assets/scan",
+        headers=auth,
+        json={"directory": str(assets_dir)},
+    )
+    assert response.status_code == 200
+    assert response.json()["indexed"] == 2
+    response = await client.get(f"/api/families/{family_id}/assets", headers=auth)
+    assert response.status_code == 200
+    assets = response.json()
+    assert len(assets) == 2
+    response = await client.get(
+        f"/api/families/{family_id}/assets/duplicates", headers=auth
+    )
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    response = await client.delete(
+        f"/api/families/{family_id}/assets/{assets[0]['id']}", headers=auth
+    )
+    assert response.status_code == 204
+    assert first_file.exists()
 
     response = await client.delete(f"/api/families/{family_id}", headers=auth)
     assert response.status_code == 204

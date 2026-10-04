@@ -131,6 +131,12 @@ family `OWNER` or `ADMIN` role; a server administrator may also manage any famil
 | `GET` / `POST` | `/families/{id}/permissions` | member / manager | Family permission rules (`ALLOW`, `DENY`, `REQUIRE_CONFIRMATION`) |
 | `PATCH` / `DELETE` | `/families/{id}/permissions/{permission_id}` | manager | Update or remove a permission rule |
 | `POST` | `/families/{id}/permissions/evaluate` | member | Resolve a member/action/space tuple; unmatched requests default to `DENY` |
+| `POST` | `/families/{id}/assets/scan` | manager | Recursively index a local directory without modifying source files |
+| `GET` | `/families/{id}/assets` | member | Filter by name, type, space, or SHA-256 hash |
+| `GET` | `/families/{id}/assets/duplicates` | member | Exact duplicate groups based on SHA-256 |
+| `GET` | `/families/{id}/assets/{asset_id}` | member | Indexed file metadata and source URI |
+| `GET` | `/families/{id}/assets/{asset_id}/photo-metadata` | member | Dimensions, EXIF camera/time, and GPS when available |
+| `DELETE` | `/families/{id}/assets/{asset_id}` | manager | Remove metadata from the index; never deletes the source file |
 
 ## Agents
 

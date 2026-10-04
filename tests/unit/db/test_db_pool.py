@@ -74,6 +74,8 @@ def test_run_migrations_creates_tables(db: SqlitePool):
         "family_relationships",
         "family_spaces",
         "family_permissions",
+        "family_assets",
+        "family_photo_metadata",
     }
     assert expected.issubset(names)
     assert "knowledge_base_members" not in names

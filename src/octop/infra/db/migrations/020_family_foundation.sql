@@ -99,4 +99,41 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_family_permissions_rule
     action
   );
 
+CREATE TABLE IF NOT EXISTS family_assets (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  asset_id      TEXT NOT NULL UNIQUE,
+  family_id     TEXT NOT NULL REFERENCES families(family_id) ON DELETE CASCADE,
+  space_id      TEXT REFERENCES family_spaces(space_id) ON DELETE SET NULL,
+  asset_type    TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  uri           TEXT NOT NULL,
+  mime_type     TEXT NOT NULL,
+  size_bytes    INTEGER NOT NULL,
+  content_hash  TEXT NOT NULL,
+  captured_at   INTEGER,
+  indexed_at    INTEGER NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_by    INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  visibility    TEXT NOT NULL DEFAULT 'FAMILY',
+  status        TEXT NOT NULL DEFAULT 'INDEXED',
+  created_at    INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL,
+  UNIQUE(family_id, uri)
+);
+
+CREATE INDEX IF NOT EXISTS idx_family_assets_family ON family_assets(family_id);
+CREATE INDEX IF NOT EXISTS idx_family_assets_hash ON family_assets(family_id, content_hash);
+CREATE INDEX IF NOT EXISTS idx_family_assets_captured ON family_assets(family_id, captured_at);
+
+CREATE TABLE IF NOT EXISTS family_photo_metadata (
+  asset_id     TEXT PRIMARY KEY REFERENCES family_assets(asset_id) ON DELETE CASCADE,
+  width        INTEGER,
+  height       INTEGER,
+  camera_make  TEXT,
+  camera_model TEXT,
+  latitude     REAL,
+  longitude    REAL,
+  taken_at     INTEGER
+);
+
 UPDATE _schema_version SET version = 20;

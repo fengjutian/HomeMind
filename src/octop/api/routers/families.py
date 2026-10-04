@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+import asyncio
+import json
+from functools import partial
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from octop.api.deps import current_user, get_server
+from octop.infra.family.assets import FamilyAssetManager
 from octop.infra.family.manager import (
     FamilyManager,
     MemberRole,
@@ -158,9 +162,76 @@ class FamilyPermissionDecision(BaseModel):
     effect: PermissionEffect
 
 
+class FamilyAssetResponse(BaseModel):
+    id: str
+    family_id: str
+    space_id: str | None
+    asset_type: str
+    name: str
+    uri: str
+    mime_type: str
+    size_bytes: int
+    content_hash: str
+    captured_at: int | None
+    indexed_at: int
+    metadata: dict[str, object]
+    visibility: str
+    status: str
+
+
+class FamilyPhotoMetadataResponse(_RowModel):
+    asset_id: str
+    width: int | None
+    height: int | None
+    camera_make: str | None
+    camera_model: str | None
+    latitude: float | None
+    longitude: float | None
+    taken_at: int | None
+
+
+class FamilyAssetScanBody(BaseModel):
+    directory: str = Field(min_length=1, max_length=4096)
+    space_id: str | None = None
+    recursive: bool = True
+    visibility: Literal["PUBLIC", "FAMILY", "PRIVATE", "SENSITIVE"] = "FAMILY"
+
+
+class FamilyAssetScanResponse(BaseModel):
+    indexed: int
+    skipped: int
+    failed: int
+    asset_ids: list[str]
+    errors: list[str]
+
+
 def _manager(server: OctopServer) -> FamilyManager:
     assert server.services is not None
     return FamilyManager(server.services.family_repo)
+
+
+def _asset_manager(server: OctopServer) -> FamilyAssetManager:
+    assert server.services is not None
+    return FamilyAssetManager(server.services.family_repo, server.services.family_asset_repo)
+
+
+def _asset_response(row: Any) -> FamilyAssetResponse:
+    return FamilyAssetResponse(
+        id=row.id,
+        family_id=row.family_id,
+        space_id=row.space_id,
+        asset_type=row.asset_type,
+        name=row.name,
+        uri=row.uri,
+        mime_type=row.mime_type,
+        size_bytes=row.size_bytes,
+        content_hash=row.content_hash,
+        captured_at=row.captured_at,
+        indexed_at=row.indexed_at,
+        metadata=json.loads(row.metadata_json),
+        visibility=row.visibility,
+        status=row.status,
+    )
 
 
 Server = Annotated[OctopServer, Depends(get_server)]
@@ -395,3 +466,94 @@ async def evaluate_permission(
         family_id, user, **body.model_dump()
     )
     return FamilyPermissionDecision(effect=effect)
+
+
+@router.post(
+    "/{family_id}/assets/scan",
+    response_model=FamilyAssetScanResponse,
+    summary="Scan a local directory into the family asset index",
+    description="Reads file metadata and hashes only; source files are never copied or modified.",
+)
+async def scan_assets(
+    family_id: str,
+    body: FamilyAssetScanBody,
+    server: Server,
+    user: CurrentUser,
+) -> object:
+    manager = _asset_manager(server)
+    scan = partial(manager.scan_directory, family_id, user, **body.model_dump())
+    return await asyncio.get_running_loop().run_in_executor(None, scan)
+
+
+@router.get(
+    "/{family_id}/assets",
+    response_model=list[FamilyAssetResponse],
+    summary="Search family assets",
+)
+async def search_assets(
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
+    query: str | None = Query(default=None, max_length=200),
+    asset_type: str | None = Query(default=None),
+    space_id: str | None = Query(default=None),
+    content_hash: str | None = Query(default=None, min_length=64, max_length=64),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[FamilyAssetResponse]:
+    rows = _asset_manager(server).search(
+        family_id,
+        user,
+        query=query,
+        asset_type=asset_type,
+        space_id=space_id,
+        content_hash=content_hash,
+        limit=limit,
+    )
+    return [_asset_response(row) for row in rows]
+
+
+@router.get(
+    "/{family_id}/assets/duplicates",
+    response_model=list[list[FamilyAssetResponse]],
+    summary="List exact duplicate asset groups",
+)
+async def duplicate_assets(
+    family_id: str, server: Server, user: CurrentUser
+) -> list[list[FamilyAssetResponse]]:
+    groups = _asset_manager(server).duplicate_groups(family_id, user)
+    return [[_asset_response(row) for row in group] for group in groups]
+
+
+@router.get(
+    "/{family_id}/assets/{asset_id}",
+    response_model=FamilyAssetResponse,
+    summary="Get a family asset",
+)
+async def get_asset(
+    family_id: str, asset_id: str, server: Server, user: CurrentUser
+) -> FamilyAssetResponse:
+    return _asset_response(_asset_manager(server).get(family_id, asset_id, user))
+
+
+@router.get(
+    "/{family_id}/assets/{asset_id}/photo-metadata",
+    response_model=FamilyPhotoMetadataResponse | None,
+    summary="Get indexed photo metadata",
+)
+async def get_photo_metadata(
+    family_id: str, asset_id: str, server: Server, user: CurrentUser
+) -> object:
+    return _asset_manager(server).photo_metadata(family_id, asset_id, user)
+
+
+@router.delete(
+    "/{family_id}/assets/{asset_id}",
+    status_code=204,
+    summary="Remove an asset from the index",
+    description="Deletes metadata only; the source file is never removed.",
+)
+async def delete_asset_index(
+    family_id: str, asset_id: str, server: Server, user: CurrentUser
+) -> Response:
+    _asset_manager(server).delete_index(family_id, asset_id, user)
+    return Response(status_code=204)
