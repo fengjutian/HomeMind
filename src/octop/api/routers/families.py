@@ -541,9 +541,7 @@ async def search_assets(
 async def list_asset_sources(
     family_id: str, server: Server, user: CurrentUser
 ) -> object:
-    manager = _asset_manager(server)
-    manager.family.require_manager(family_id, user)
-    return manager.repo.list_sources(family_id)
+    return _asset_manager(server).list_sources(family_id, user)
 
 
 @router.post(

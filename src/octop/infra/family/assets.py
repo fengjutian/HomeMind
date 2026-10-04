@@ -187,7 +187,9 @@ class FamilyAssetManager:
                 stat = path.stat()
                 if existing is not None:
                     seen.append(existing.id)
-                if existing is not None and self._is_unchanged(existing, stat.st_size, stat.st_mtime):
+                if existing is not None and self._is_unchanged(
+                    existing, stat.st_size, stat.st_mtime
+                ):
                     self.repo.touch_asset(existing.id, now_ts())
                     unchanged += 1
                     continue
@@ -270,7 +272,7 @@ class FamilyAssetManager:
         return asset.size_bytes == size_bytes and metadata.get("modified_at") == int(modified_at)
 
     def list_sources(self, family_id: str, user: User) -> list[FamilyAssetSourceRow]:
-        self.family.require_access(family_id, user)
+        self.family.require_manager(family_id, user)
         return self.repo.list_sources(family_id)
 
     def scan_source(

@@ -62,7 +62,13 @@ def test_scan_search_duplicates_and_delete_index(tmp_path: Path) -> None:
     assert (metadata.width, metadata.height) == (4, 3)
 
     second_scan = manager.scan_directory(family.id, user, directory=str(source))
-    assert set(second_scan.asset_ids) == {asset.id for asset in assets}
+    assert second_scan.source_id == result.source_id
+    assert (second_scan.indexed, second_scan.unchanged) == (0, 3)
+    first.unlink()
+    missing_scan = manager.scan_source(family.id, result.source_id, user)
+    assert missing_scan.missing == 1
+    assert len(manager.search(family.id, user)) == 2
+    assert len(manager.search(family.id, user, status="MISSING")) == 1
     manager.delete_index(family.id, photo.id, user)
     assert image.exists()
     assert asset_repo.get(photo.id) is None

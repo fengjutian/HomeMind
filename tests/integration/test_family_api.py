@@ -127,13 +127,26 @@ async def test_family_foundation_api(
         json={"directory": str(assets_dir)},
     )
     assert response.status_code == 200
-    assert response.json()["indexed"] == 2
+    scan_result = response.json()
+    assert scan_result["indexed"] == 2
     response = await client.get(f"/api/families/{family_id}/assets", headers=auth)
     assert response.status_code == 200
     assets = response.json()
     assert len(assets) == 2
     response = await client.get(
         f"/api/families/{family_id}/assets/duplicates", headers=auth
+    )
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    (assets_dir / "second.txt").unlink()
+    response = await client.post(
+        f"/api/families/{family_id}/asset-sources/{scan_result['source_id']}/scan",
+        headers=auth,
+    )
+    assert response.status_code == 200
+    assert response.json()["missing"] == 1
+    response = await client.get(
+        f"/api/families/{family_id}/assets", headers=auth, params={"status": "MISSING"}
     )
     assert response.status_code == 200
     assert len(response.json()) == 1
