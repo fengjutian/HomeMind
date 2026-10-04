@@ -124,52 +124,128 @@ def _manager(server: OctopServer) -> FamilyContextManager:
 
 
 def _event_response(row: Any) -> EventResponse:
-    return EventResponse.model_validate({**row.__dict__, "metadata": json.loads(row.metadata_json)})
+    return EventResponse.model_validate(
+        {**row.__dict__, "metadata": json.loads(row.metadata_json)}
+    )
 
 
-@router.post("/{family_id}/events", response_model=EventResponse, status_code=201, summary="Create a family event")
-async def create_event(family_id: str, body: EventBody, server: Server, user: CurrentUser) -> EventResponse:
+@router.post(
+    "/{family_id}/events",
+    response_model=EventResponse,
+    status_code=201,
+    summary="Create a family event",
+)
+async def create_event(
+    family_id: str, body: EventBody, server: Server, user: CurrentUser
+) -> EventResponse:
     return _event_response(_manager(server).create_event(family_id, user, **body.model_dump()))
 
 
-@router.get("/{family_id}/events", response_model=list[EventResponse], summary="List family events")
-async def list_events(family_id: str, server: Server, user: CurrentUser, start_at: int | None = Query(default=None), end_at: int | None = Query(default=None)) -> list[EventResponse]:
-    return [_event_response(row) for row in _manager(server).list_events(family_id, user, start_at=start_at, end_at=end_at)]
+@router.get(
+    "/{family_id}/events",
+    response_model=list[EventResponse],
+    summary="List family events",
+)
+async def list_events(
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
+    start_at: int | None = Query(default=None),
+    end_at: int | None = Query(default=None),
+) -> list[EventResponse]:
+    rows = _manager(server).list_events(
+        family_id, user, start_at=start_at, end_at=end_at
+    )
+    return [_event_response(row) for row in rows]
 
 
-@router.patch("/{family_id}/events/{event_id}", response_model=EventResponse, summary="Update a family event")
-async def update_event(family_id: str, event_id: str, body: EventUpdateBody, server: Server, user: CurrentUser) -> EventResponse:
-    row = _manager(server).update_event(family_id, event_id, user, body.model_dump(exclude_unset=True))
+@router.patch(
+    "/{family_id}/events/{event_id}",
+    response_model=EventResponse,
+    summary="Update a family event",
+)
+async def update_event(
+    family_id: str,
+    event_id: str,
+    body: EventUpdateBody,
+    server: Server,
+    user: CurrentUser,
+) -> EventResponse:
+    row = _manager(server).update_event(
+        family_id, event_id, user, body.model_dump(exclude_unset=True)
+    )
     return _event_response(row)
 
 
 @router.delete("/{family_id}/events/{event_id}", status_code=204, summary="Delete a family event")
-async def delete_event(family_id: str, event_id: str, server: Server, user: CurrentUser) -> Response:
+async def delete_event(
+    family_id: str, event_id: str, server: Server, user: CurrentUser
+) -> Response:
     _manager(server).delete_event(family_id, event_id, user)
     return Response(status_code=204)
 
 
-@router.post("/{family_id}/memories", response_model=MemoryResponse, status_code=201, summary="Create a family memory")
-async def create_memory(family_id: str, body: MemoryBody, server: Server, user: CurrentUser) -> object:
+@router.post(
+    "/{family_id}/memories",
+    response_model=MemoryResponse,
+    status_code=201,
+    summary="Create a family memory",
+)
+async def create_memory(
+    family_id: str, body: MemoryBody, server: Server, user: CurrentUser
+) -> object:
     return _manager(server).create_memory(family_id, user, **body.model_dump())
 
 
-@router.get("/{family_id}/memories", response_model=list[MemoryResponse], summary="Search family memories")
-async def search_memories(family_id: str, server: Server, user: CurrentUser, query: str | None = Query(default=None, max_length=500)) -> object:
+@router.get(
+    "/{family_id}/memories",
+    response_model=list[MemoryResponse],
+    summary="Search family memories",
+)
+async def search_memories(
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
+    query: str | None = Query(default=None, max_length=500),
+) -> object:
     return _manager(server).search_memories(family_id, user, query)
 
 
-@router.patch("/{family_id}/memories/{memory_id}", response_model=MemoryResponse, summary="Update a family memory")
-async def update_memory(family_id: str, memory_id: str, body: MemoryUpdateBody, server: Server, user: CurrentUser) -> object:
-    return _manager(server).update_memory(family_id, memory_id, user, body.model_dump(exclude_unset=True))
+@router.patch(
+    "/{family_id}/memories/{memory_id}",
+    response_model=MemoryResponse,
+    summary="Update a family memory",
+)
+async def update_memory(
+    family_id: str,
+    memory_id: str,
+    body: MemoryUpdateBody,
+    server: Server,
+    user: CurrentUser,
+) -> object:
+    return _manager(server).update_memory(
+        family_id, memory_id, user, body.model_dump(exclude_unset=True)
+    )
 
 
-@router.delete("/{family_id}/memories/{memory_id}", status_code=204, summary="Delete a family memory")
-async def delete_memory(family_id: str, memory_id: str, server: Server, user: CurrentUser) -> Response:
+@router.delete(
+    "/{family_id}/memories/{memory_id}",
+    status_code=204,
+    summary="Delete a family memory",
+)
+async def delete_memory(
+    family_id: str, memory_id: str, server: Server, user: CurrentUser
+) -> Response:
     _manager(server).delete_memory(family_id, memory_id, user)
     return Response(status_code=204)
 
 
-@router.post("/{family_id}/context/resolve", response_model=ContextResponse, summary="Resolve family context")
-async def resolve_context(family_id: str, body: ContextResolveBody, server: Server, user: CurrentUser) -> object:
+@router.post(
+    "/{family_id}/context/resolve",
+    response_model=ContextResponse,
+    summary="Resolve family context",
+)
+async def resolve_context(
+    family_id: str, body: ContextResolveBody, server: Server, user: CurrentUser
+) -> object:
     return _manager(server).resolve(family_id, user, body.query)

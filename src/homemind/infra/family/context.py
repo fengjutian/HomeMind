@@ -15,7 +15,7 @@ from homemind.infra.db.repos.family_context import (
     FamilyMemoryRow,
 )
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
-from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.manager import FamilyManager, PermissionEffect
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
 
@@ -85,7 +85,7 @@ class FamilyContextManager:
             )
         if "metadata" in changes:
             changes["metadata_json"] = json.dumps(
-                changes.pop("metadata"), ensure_ascii=False, sort_keys=True
+                changes.pop("metadata") or {}, ensure_ascii=False, sort_keys=True
             )
         return self.repo.update_event(event_id, **changes)  # type: ignore[return-value]
 
@@ -109,7 +109,8 @@ class FamilyContextManager:
         self, family_id: str, user: User, query: str | None = None
     ) -> list[FamilyMemoryRow]:
         self.family.require_access(family_id, user)
-        return self.repo.search_memories(family_id, query=query)
+        memories = self.repo.search_memories(family_id, query=query)
+        return [memory for memory in memories if self._can_read_memory(memory, user)]
 
     def update_memory(
         self,
@@ -167,7 +168,7 @@ class FamilyContextManager:
                 )
             ]
             events = event_matches or events
-        memories = self.repo.search_memories(family_id)
+        memories = self.search_memories(family_id, user)
         memory_matches = [
             memory
             for memory in memories
@@ -205,3 +206,21 @@ class FamilyContextManager:
         if memory is None or memory.family_id != family_id:
             raise OctopError(ErrorCode.NOT_FOUND, "family memory not found")
         return memory
+
+    def _can_read_memory(self, memory: FamilyMemoryRow, user: User) -> bool:
+        if user.is_admin or memory.visibility in {"PUBLIC", "FAMILY"}:
+            return True
+        if memory.created_by == user.id:
+            return True
+        membership = self.family.repo.get_membership(memory.family_id, user.id)
+        if membership is None:
+            return False
+        return (
+            self.family.evaluate_permission(
+                memory.family_id,
+                user,
+                subject_member_id=str(membership["member_id"]),
+                action="memory.read",
+            )
+            is PermissionEffect.ALLOW
+        )

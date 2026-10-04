@@ -173,8 +173,9 @@ class FamilyContextRepo:
         memory_id, ts = new_ulid(), now_ts()
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO homemind_family_memories(memory_id, family_id, subject_type, subject_id, "
-                "content, memory_type, importance, confidence, visibility, source_type, source_id, "
+                "INSERT INTO homemind_family_memories(memory_id, family_id, subject_type, "
+                "subject_id, content, memory_type, importance, confidence, visibility, "
+                "source_type, source_id, "
                 "created_by, created_at, updated_at, expires_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (

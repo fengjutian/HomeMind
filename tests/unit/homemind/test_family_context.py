@@ -50,7 +50,10 @@ def test_event_and_memory_crud(tmp_path: Path) -> None:
 
     assert context.list_events(family.id, user) == [event]
     assert context.search_memories(family.id, user, "京都") == [memory]
-    assert context.update_memory(family.id, memory.id, user, {"content": "我们去了京都和大阪"}).content.endswith("大阪")
+    updated = context.update_memory(
+        family.id, memory.id, user, {"content": "我们去了京都和大阪"}
+    )
+    assert updated.content.endswith("大阪")
     context.delete_memory(family.id, memory.id, user)
     context.delete_event(family.id, event.id, user)
     assert context.search_memories(family.id, user) == []
