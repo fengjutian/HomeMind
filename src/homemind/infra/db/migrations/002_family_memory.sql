@@ -42,4 +42,22 @@ CREATE TABLE IF NOT EXISTS homemind_family_tasks (
 CREATE INDEX IF NOT EXISTS idx_homemind_family_tasks_family
   ON homemind_family_tasks(family_id, status, due_at);
 
+CREATE TABLE IF NOT EXISTS homemind_family_devices (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  device_id    TEXT NOT NULL UNIQUE,
+  family_id    TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
+  name         TEXT NOT NULL,
+  device_type  TEXT NOT NULL,
+  platform     TEXT,
+  status       TEXT NOT NULL DEFAULT 'OFFLINE',
+  address      TEXT,
+  capabilities TEXT NOT NULL DEFAULT '[]',
+  last_seen    INTEGER,
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_family_devices_family
+  ON homemind_family_devices(family_id, status);
+
 UPDATE _homemind_schema_version SET version = 2;

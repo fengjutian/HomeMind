@@ -65,4 +65,8 @@ def test_family_tools_enforce_permission_and_create_task(tmp_path: Path) -> None
     assert [task["id"] for task in listed] == [created["id"]]
     assert "family.search_assets" in tools
     assert "family.search_memory" in tools
+    assert json.loads(
+        tools["family.get_devices"].invoke({"family_id": family.id}, config=config)
+    ) == []
+    assert "family.get_device" in tools
     assert HomeMindServices.from_pool(pool).family_task_repo.get(created["id"]) is not None

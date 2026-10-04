@@ -60,6 +60,7 @@ def build_family_tools(
     context = FamilyContextManager(families, services.family_context_repo)
     assets = FamilyAssetManager(services.family_repo, services.family_asset_repo)
     tasks = FamilyTaskManager(families, services.family_task_repo)
+    devices = services.family_device_repo
 
     def family_list_members(family_id: str) -> str:
         try:
@@ -216,6 +217,25 @@ def build_family_tools(
         except Exception as exc:
             return _error(exc)
 
+    def family_get_devices(family_id: str) -> str:
+        try:
+            user = _current_user(user_repo)
+            families.require_access(family_id, user)
+            return _ok([asdict(row) for row in devices.list(family_id)])
+        except Exception as exc:
+            return _error(exc)
+
+    def family_get_device(family_id: str, device_id: str) -> str:
+        try:
+            user = _current_user(user_repo)
+            families.require_access(family_id, user)
+            row = devices.get(device_id)
+            if row is None or row.family_id != family_id:
+                raise ValueError("family device not found")
+            return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
     specs: list[tuple[str, Callable[..., str], str]] = [
         ("family.list_members", family_list_members, "List members of a family."),
         ("family.get_member", family_get_member, "Get one family member."),
@@ -227,6 +247,8 @@ def build_family_tools(
         ("family.create_event", family_create_event, "Create a family event."),
         ("family.list_tasks", family_list_tasks, "List family tasks."),
         ("family.create_task", family_create_task, "Create a family task."),
+        ("family.get_devices", family_get_devices, "List registered family devices."),
+        ("family.get_device", family_get_device, "Get one registered family device."),
     ]
     return [
         StructuredTool.from_function(func=func, name=name, description=description)
