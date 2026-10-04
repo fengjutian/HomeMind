@@ -77,6 +77,12 @@ def run_migrations(db: DatabasePool) -> None:
 
 def _reapply_unreleased_v2(db: DatabasePool) -> None:
     """Keep databases that recorded unreleased v2 equivalent to its canonical DDL."""
+    try:
+        with db.connect() as conn:
+            conn.execute("SELECT 1 FROM homemind_family_audit_log WHERE 1 = 0")
+        return
+    except Exception:
+        pass
     suffix = ".pg.sql" if db.dialect == "postgresql" else ".sql"
     sql = (_MIGRATIONS_DIR / f"002_family_memory{suffix}").read_text(encoding="utf-8")
     if db.dialect == "postgresql":

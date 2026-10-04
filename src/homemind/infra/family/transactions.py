@@ -13,6 +13,7 @@ from homemind.infra.db.repos.family_transactions import (
     FamilyTransactionRepo,
     FamilyTransactionRow,
 )
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.manager import FamilyManager, PermissionEffect
 from homemind.infra.family.tasks import FamilyTaskManager
@@ -83,8 +84,39 @@ class FamilyTransactionManager:
     ) -> FamilyTransactionRow:
         self.family.require_manager(family_id, user)
         approval = self._pending_approval(family_id, approval_id)
-        self.repo.decide_approval(approval_id, "APPROVED", user.id, reason)
         transaction = self._transaction(family_id, approval.transaction_id)
+        requester = self._user(transaction.requested_by)
+        membership = self.family.repo.get_membership(family_id, requester.id)
+        if membership is None or self.family.evaluate_permission(
+            family_id,
+            requester,
+            subject_member_id=str(membership["member_id"]),
+            action=transaction.action,
+        ) is PermissionEffect.DENY:
+            try:
+                self.repo.decide_approval(
+                    approval_id,
+                    "REJECTED",
+                    user.id,
+                    "permission no longer allows action",
+                )
+            except ValueError as exc:
+                raise HomeMindError(
+                    HomeMindErrorCode.FAMILY_CONFLICT,
+                    "family approval is already decided",
+                ) from exc
+            transaction = self.repo.set_transaction(
+                transaction.id, TransactionStatus.DENIED
+            )
+            self._audit(transaction, user.id, "DENIED", approval="REJECTED")
+            return transaction
+        try:
+            self.repo.decide_approval(approval_id, "APPROVED", user.id, reason)
+        except ValueError as exc:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "family approval is already decided",
+            ) from exc
         self._audit(transaction, user.id, "APPROVED", approval="APPROVED")
         return self._execute(transaction)
 
@@ -93,7 +125,13 @@ class FamilyTransactionManager:
     ) -> FamilyTransactionRow:
         self.family.require_manager(family_id, user)
         approval = self._pending_approval(family_id, approval_id)
-        self.repo.decide_approval(approval_id, "REJECTED", user.id, reason)
+        try:
+            self.repo.decide_approval(approval_id, "REJECTED", user.id, reason)
+        except ValueError as exc:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "family approval is already decided",
+            ) from exc
         transaction = self.repo.set_transaction(
             approval.transaction_id, TransactionStatus.REJECTED
         )
@@ -149,7 +187,10 @@ class FamilyTransactionManager:
         if approval is None or approval.family_id != family_id:
             raise OctopError(ErrorCode.NOT_FOUND, "family approval not found")
         if approval.status != "PENDING":
-            raise ValueError("family approval is already decided")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "family approval is already decided",
+            )
         return approval
 
     def _transaction(self, family_id: str, transaction_id: str) -> FamilyTransactionRow:

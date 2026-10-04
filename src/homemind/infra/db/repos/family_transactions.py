@@ -148,11 +148,13 @@ class FamilyTransactionRepo:
         self, approval_id: str, status: str, decided_by: int, reason: str | None
     ) -> FamilyApprovalRow:
         with self._db.transaction() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 "UPDATE homemind_family_approvals SET status = ?, decided_by = ?, reason = ?, "
                 "decided_at = ? WHERE approval_id = ? AND status = 'PENDING'",
                 (status, decided_by, reason, now_ts(), approval_id),
             )
+            if cursor.rowcount != 1:
+                raise ValueError("family approval is already decided")
         return self.get_approval(approval_id)  # type: ignore[return-value]
 
     def add_audit(
