@@ -13,6 +13,7 @@ from pydantic import Field
 
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
+from homemind.infra.family.albums import FamilyAlbumManager, OrganizationStrategy
 from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.filesystem import FamilyFilesystemManager
@@ -62,6 +63,7 @@ def build_family_tools(
     families = FamilyManager(services.family_repo)
     context = FamilyContextManager(families, services.family_context_repo)
     assets = FamilyAssetManager(services.family_repo, services.family_asset_repo)
+    albums = FamilyAlbumManager(families, assets, services.family_album_repo)
     search = FamilySearchManager(families, context, assets)
     tasks = FamilyTaskManager(families, services.family_task_repo)
     filesystem = FamilyFilesystemManager(
@@ -367,6 +369,61 @@ def build_family_tools(
     def filesystem_delete(family_id: str, source_id: str, path: str) -> str:
         return filesystem_mutation("filesystem.delete", family_id, source_id, path)
 
+    def family_list_albums(family_id: str) -> str:
+        try:
+            rows = albums.list(family_id, _current_user(user_repo))
+            return _ok([asdict(row) for row in rows])
+        except Exception as exc:
+            return _error(exc)
+
+    def family_create_album(
+        family_id: str, name: str, description: str = ""
+    ) -> str:
+        try:
+            row = albums.create(
+                family_id,
+                _current_user(user_repo),
+                name=name,
+                description=description,
+            )
+            return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
+    def family_add_album_asset(
+        family_id: str, album_id: str, asset_id: str
+    ) -> str:
+        try:
+            albums.add_asset(
+                family_id, album_id, asset_id, _current_user(user_repo)
+            )
+            return _ok({"album_id": album_id, "asset_id": asset_id, "added": True})
+        except Exception as exc:
+            return _error(exc)
+
+    def family_plan_photo_organization(family_id: str, strategy: str) -> str:
+        try:
+            row = albums.plan(
+                family_id,
+                _current_user(user_repo),
+                OrganizationStrategy(strategy),
+            )
+            value = asdict(row)
+            value["groups"] = json.loads(row.groups_json)
+            del value["groups_json"]
+            return _ok(value)
+        except Exception as exc:
+            return _error(exc)
+
+    def family_apply_photo_organization(family_id: str, plan_id: str) -> str:
+        try:
+            row = albums.apply_plan(
+                family_id, plan_id, _current_user(user_repo)
+            )
+            return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
     specs: list[tuple[str, Callable[..., str], str]] = [
         ("family.list_members", family_list_members, "List members of a family."),
         ("family.get_member", family_get_member, "Get one family member."),
@@ -392,6 +449,19 @@ def build_family_tools(
         ("filesystem.move", filesystem_move, "Move a file after permission evaluation."),
         ("filesystem.rename", filesystem_rename, "Rename a file after permission evaluation."),
         ("filesystem.delete", filesystem_delete, "Move a file to recoverable HomeMind trash after approval."),
+        ("family.list_albums", family_list_albums, "List family photo albums."),
+        ("family.create_album", family_create_album, "Create a family photo album."),
+        ("family.add_album_asset", family_add_album_asset, "Add an indexed asset to an album."),
+        (
+            "family.plan_photo_organization",
+            family_plan_photo_organization,
+            "Preview time-based or exact-duplicate photo organization.",
+        ),
+        (
+            "family.apply_photo_organization",
+            family_apply_photo_organization,
+            "Apply a saved organization plan as non-destructive album links.",
+        ),
     ]
     return [
         StructuredTool.from_function(func=func, name=name, description=description)

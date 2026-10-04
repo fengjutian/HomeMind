@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from homemind.infra.db.migrate import run_migrations
+from homemind.infra.db.repos.family_albums import OrganizationPlanRow
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.albums import FamilyAlbumManager, OrganizationStrategy
 from homemind.infra.family.assets import FamilyAssetManager
@@ -72,16 +73,16 @@ def _manager(server: OctopServer) -> FamilyAlbumManager:
     return FamilyAlbumManager(families, assets, services.family_album_repo)
 
 
-def _plan_response(row: object) -> OrganizationPlanResponse:
+def _plan_response(row: OrganizationPlanRow) -> OrganizationPlanResponse:
     return OrganizationPlanResponse(
-        id=row.id,  # type: ignore[attr-defined]
-        family_id=row.family_id,  # type: ignore[attr-defined]
-        strategy=row.strategy,  # type: ignore[attr-defined]
-        status=row.status,  # type: ignore[attr-defined]
-        groups=json.loads(row.groups_json),  # type: ignore[attr-defined]
-        created_by=row.created_by,  # type: ignore[attr-defined]
-        created_at=row.created_at,  # type: ignore[attr-defined]
-        applied_at=row.applied_at,  # type: ignore[attr-defined]
+        id=row.id,
+        family_id=row.family_id,
+        strategy=row.strategy,
+        status=row.status,
+        groups=json.loads(row.groups_json),
+        created_by=row.created_by,
+        created_at=row.created_at,
+        applied_at=row.applied_at,
     )
 
 
