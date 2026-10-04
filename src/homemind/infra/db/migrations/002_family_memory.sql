@@ -111,4 +111,43 @@ CREATE TABLE IF NOT EXISTS homemind_family_audit_log (
 CREATE INDEX IF NOT EXISTS idx_homemind_family_audit_family
   ON homemind_family_audit_log(family_id, created_at);
 
+CREATE TABLE IF NOT EXISTS homemind_family_albums (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  album_id    TEXT NOT NULL UNIQUE,
+  family_id   TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  cover_asset_id TEXT REFERENCES homemind_family_assets(asset_id) ON DELETE SET NULL,
+  created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL,
+  UNIQUE(family_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_family_albums_family
+  ON homemind_family_albums(family_id, updated_at);
+
+CREATE TABLE IF NOT EXISTS homemind_family_album_assets (
+  album_id TEXT NOT NULL REFERENCES homemind_family_albums(album_id) ON DELETE CASCADE,
+  asset_id TEXT NOT NULL REFERENCES homemind_family_assets(asset_id) ON DELETE CASCADE,
+  added_by INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  added_at INTEGER NOT NULL,
+  PRIMARY KEY(album_id, asset_id)
+);
+
+CREATE TABLE IF NOT EXISTS homemind_family_organization_plans (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  plan_id     TEXT NOT NULL UNIQUE,
+  family_id   TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
+  strategy    TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'PLANNED',
+  groups_json TEXT NOT NULL,
+  created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at  INTEGER NOT NULL,
+  applied_at  INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_family_organization_plans_family
+  ON homemind_family_organization_plans(family_id, status, created_at);
+
 UPDATE _homemind_schema_version SET version = 2;

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from homemind.infra.db.repos.families import FamilyRepo
+from homemind.infra.db.repos.family_albums import FamilyAlbumRepo
 from homemind.infra.db.repos.family_assets import FamilyAssetRepo
 from homemind.infra.db.repos.family_context import FamilyContextRepo
 from homemind.infra.db.repos.family_devices import FamilyDeviceRepo
@@ -17,6 +18,7 @@ from octop.infra.db.pool import DatabasePool
 class HomeMindServices:
     db: DatabasePool
     family_repo: FamilyRepo
+    family_album_repo: FamilyAlbumRepo
     family_asset_repo: FamilyAssetRepo
     family_context_repo: FamilyContextRepo
     family_device_repo: FamilyDeviceRepo
@@ -28,6 +30,7 @@ class HomeMindServices:
         return cls(
             db=db,
             family_repo=FamilyRepo(db),
+            family_album_repo=FamilyAlbumRepo(db),
             family_asset_repo=FamilyAssetRepo(db),
             family_context_repo=FamilyContextRepo(db),
             family_device_repo=FamilyDeviceRepo(db),

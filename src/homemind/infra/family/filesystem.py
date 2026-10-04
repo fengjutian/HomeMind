@@ -174,6 +174,21 @@ class FamilyFilesystemManager:
         source = self.assets.get_source(source_id)
         if source is None or source.family_id != family_id:
             raise OctopError(ErrorCode.NOT_FOUND, "family asset source not found")
+        if source.visibility not in {"PUBLIC", "FAMILY"} and not user.is_admin:
+            membership = self.family.repo.get_membership(family_id, user.id)
+            is_manager = membership is not None and str(membership["role"]) in {
+                "OWNER",
+                "ADMIN",
+            }
+            owns_space = False
+            if membership is not None and source.space_id is not None:
+                space = self.family.repo.get_space(source.space_id)
+                owns_space = (
+                    space is not None
+                    and space.owner_member_id == str(membership["member_id"])
+                )
+            if not is_manager and not owns_space:
+                raise OctopError(ErrorCode.FORBIDDEN, "family asset source access denied")
         return self._source_path(source)
 
     @staticmethod
@@ -188,7 +203,11 @@ class FamilyFilesystemManager:
 
     def _resolve(self, root: Path, relative: str, *, must_exist: bool) -> Path:
         raw = PurePath(relative)
-        if raw.is_absolute() or any(part == ".." for part in raw.parts):
+        if (
+            raw.is_absolute()
+            or any(part == ".." for part in raw.parts)
+            or ".homemind-trash" in raw.parts
+        ):
             raise self._invalid("absolute paths and parent traversal are forbidden")
         candidate = root.joinpath(*raw.parts)
         check = candidate if candidate.exists() else candidate.parent

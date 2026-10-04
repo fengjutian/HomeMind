@@ -79,7 +79,7 @@ def _reapply_unreleased_v2(db: DatabasePool) -> None:
     """Keep databases that recorded unreleased v2 equivalent to its canonical DDL."""
     try:
         with db.connect() as conn:
-            conn.execute("SELECT 1 FROM homemind_family_audit_log WHERE 1 = 0")
+            conn.execute("SELECT 1 FROM homemind_family_organization_plans WHERE 1 = 0")
         return
     except Exception:
         pass
