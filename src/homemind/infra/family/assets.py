@@ -22,6 +22,7 @@ from homemind.infra.db.repos.family_assets import (
     PhotoMetadataRow,
 )
 from homemind.infra.db.repos.families import FamilyRepo
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from octop.infra.errors import ErrorCode, OctopError
 from homemind.infra.family.manager import FamilyManager, PermissionEffect
 from octop.infra.users.identity import User
@@ -151,18 +152,20 @@ class FamilyAssetManager:
             if space is None or space.family_id != family_id:
                 raise OctopError(ErrorCode.NOT_FOUND, "family space not found")
             if visibility == "PRIVATE" and space.owner_member_id is None:
-                raise OctopError(
-                    ErrorCode.FAMILY_INVALID,
+                raise HomeMindError(
+                    HomeMindErrorCode.FAMILY_INVALID,
                     "private assets require a member-owned space",
                 )
         elif visibility in {"PRIVATE", "SENSITIVE"}:
-            raise OctopError(
-                ErrorCode.FAMILY_INVALID,
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
                 "private and sensitive assets require a space",
             )
         root = Path(directory).expanduser().resolve()
         if not root.is_dir():
-            raise OctopError(ErrorCode.FAMILY_INVALID, "asset scan path must be a directory")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "asset scan path must be a directory"
+            )
         source = self.repo.upsert_source(
             family_id=family_id,
             space_id=space_id,
@@ -284,7 +287,9 @@ class FamilyAssetManager:
             raise OctopError(ErrorCode.NOT_FOUND, "family asset source not found")
         parsed = urlparse(source.directory_uri)
         if parsed.scheme != "file":
-            raise OctopError(ErrorCode.FAMILY_INVALID, "asset source is not a local directory")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "asset source is not a local directory"
+            )
         directory = url2pathname(unquote(parsed.path))
         return self.scan_directory(
             family_id,

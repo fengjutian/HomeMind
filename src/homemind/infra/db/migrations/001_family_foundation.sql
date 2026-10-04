@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS homemind_family_members (
 
 CREATE INDEX IF NOT EXISTS idx_homemind_family_members_family ON homemind_family_members(family_id);
 
-CREATE TABLE IF NOT EXISTS homemind_homemind_family_memberships (
+CREATE TABLE IF NOT EXISTS homemind_family_memberships (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   membership_id  TEXT NOT NULL UNIQUE,
   family_id      TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS homemind_homemind_family_memberships (
   UNIQUE(family_id, user_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_homemind_homemind_family_memberships_user ON homemind_homemind_family_memberships(user_id);
+CREATE INDEX IF NOT EXISTS idx_homemind_family_memberships_user ON homemind_family_memberships(user_id);
 
 CREATE TABLE IF NOT EXISTS homemind_family_relationships (
   id                 INTEGER PRIMARY KEY AUTOINCREMENT,

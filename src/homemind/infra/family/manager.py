@@ -21,6 +21,7 @@ from homemind.infra.db.repos.families import (
     FamilyRow,
     FamilySpaceRow,
 )
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
 
@@ -66,20 +67,24 @@ def _write(call: Callable[[], T]) -> T:
         if pg_errors is not None and isinstance(exc, pg_errors.UniqueViolation):
             is_unique = True
         if is_unique:
-            raise OctopError(ErrorCode.FAMILY_CONFLICT, "family resource already exists") from exc
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT, "family resource already exists"
+            ) from exc
         raise
 
 
 def _reject_null(changes: dict[str, object], fields: set[str]) -> None:
     if any(field in changes and changes[field] is None for field in fields):
-        raise OctopError(ErrorCode.FAMILY_INVALID, "required family field cannot be null")
+        raise HomeMindError(
+            HomeMindErrorCode.FAMILY_INVALID, "required family field cannot be null"
+        )
 
 
 def _validate_timezone(value: str) -> str:
     try:
         ZoneInfo(value)
     except ZoneInfoNotFoundError as exc:
-        raise OctopError(ErrorCode.FAMILY_INVALID, "invalid family timezone") from exc
+        raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "invalid family timezone") from exc
     return value
 
 
@@ -160,7 +165,9 @@ class FamilyManager:
     ) -> FamilyMemberRow:
         self.require_manager(family_id, user)
         if role is MemberRole.OWNER:
-            raise OctopError(ErrorCode.FAMILY_INVALID, "family can have only one owner")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "family can have only one owner"
+            )
         if user_id is not None and not self.repo.user_exists(user_id):
             raise OctopError(ErrorCode.NOT_FOUND, "linked user not found")
         return _write(
@@ -183,7 +190,9 @@ class FamilyManager:
         if member.role == MemberRole.OWNER:
             raise OctopError(ErrorCode.FORBIDDEN, "family owner cannot be changed")
         if changes.get("role") == MemberRole.OWNER:
-            raise OctopError(ErrorCode.FAMILY_INVALID, "family can have only one owner")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "family can have only one owner"
+            )
         if isinstance(changes.get("role"), MemberRole):
             changes["role"] = changes["role"].value
         if "display_name" in changes:
@@ -202,8 +211,8 @@ class FamilyManager:
             space.space_type == SpaceType.PRIVATE and space.owner_member_id == member_id
             for space in self.repo.list_spaces(family_id)
         ):
-            raise OctopError(
-                ErrorCode.FAMILY_INVALID,
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
                 "private spaces must be reassigned before deleting their owner",
             )
         self.repo.delete_member(member_id)
@@ -219,7 +228,9 @@ class FamilyManager:
     ) -> FamilyRelationshipRow:
         self.require_manager(family_id, user)
         if from_member_id == to_member_id:
-            raise OctopError(ErrorCode.FAMILY_INVALID, "relationship members must differ")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "relationship members must differ"
+            )
         self._require_member(family_id, from_member_id)
         self._require_member(family_id, to_member_id)
         return _write(
@@ -251,7 +262,9 @@ class FamilyManager:
         if owner_member_id is not None:
             self._require_member(family_id, owner_member_id)
         if space_type is SpaceType.PRIVATE and owner_member_id is None:
-            raise OctopError(ErrorCode.FAMILY_INVALID, "private space requires an owner")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "private space requires an owner"
+            )
         return _write(
             lambda: self.repo.create_space(
                 family_id,
@@ -277,7 +290,9 @@ class FamilyManager:
         if owner_member_id is not None:
             self._require_member(family_id, str(owner_member_id))
         if space_type == SpaceType.PRIVATE and owner_member_id is None:
-            raise OctopError(ErrorCode.FAMILY_INVALID, "private space requires an owner")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "private space requires an owner"
+            )
         if "name" in changes:
             changes["name"] = str(changes["name"]).strip()
         row = _write(lambda: self.repo.update_space(space_id, **changes))

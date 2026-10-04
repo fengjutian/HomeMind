@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from typing import Any
 
 import httpx
+from fastapi import FastAPI
 
 from octop.api.app import build_app
 from octop.config import DatabaseConfig, load_config
@@ -41,6 +42,7 @@ async def octop_client(
     fake_agent: Any | None = None,
     patch_llm: bool = True,
     bind_database: bool = True,
+    app_factory: Callable[[OctopServer], FastAPI] = build_app,
 ) -> AsyncIterator[tuple[httpx.AsyncClient, OctopServer]]:
     """Start OctopServer, yield ``(httpx client, server)``, then stop.
 
@@ -60,7 +62,7 @@ async def octop_client(
         if srv.app_runtime is not None:
             await srv.app_runtime.proactive_scheduler.shutdown()
             srv.app_runtime.proactive_scheduler.suspend()
-        app = build_app(srv)
+        app = app_factory(srv)
         try:
             async with httpx.AsyncClient(
                 transport=httpx.ASGITransport(app=app),

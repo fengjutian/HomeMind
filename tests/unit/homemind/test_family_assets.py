@@ -4,26 +4,21 @@ from pathlib import Path
 
 from PIL import Image
 
-from octop.infra.db.pool import SqlitePool
+from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
 from homemind.infra.db.repos.families import FamilyRepo
 from homemind.infra.db.repos.family_assets import FamilyAssetRepo
 from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.manager import FamilyManager, MemberRole, SpaceType
+from octop.infra.db.migrate import run_migrations
+from octop.infra.db.pool import SqlitePool
 from octop.infra.users.identity import Role, User
 
 
 def _repos(tmp_path: Path) -> tuple[FamilyRepo, FamilyAssetRepo]:
     pool = SqlitePool(tmp_path / "octop.db")
+    run_migrations(pool)
+    run_homemind_migrations(pool)
     with pool.connect() as conn:
-        root = Path(__file__).resolve().parents[3]
-        conn.executescript(
-            (root / "src/octop/infra/db/migrations/001_initial.sql").read_text(encoding="utf-8")
-        )
-        conn.executescript(
-            (root / "src/homemind/infra/db/migrations/001_family_foundation.sql").read_text(
-                encoding="utf-8"
-            )
-        )
         conn.execute(
             "INSERT INTO users(id, username, password_hash, role, disabled, locale, created_at) "
             "VALUES (1, 'owner', 'x', 'user', 0, 'zh', 1), "

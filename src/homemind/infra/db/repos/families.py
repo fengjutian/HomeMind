@@ -177,7 +177,7 @@ class FamilyRepo:
                 (member_id, family_id, owner_user_id, owner_display_name, ts, ts),
             )
             conn.execute(
-                "INSERT INTO homemind_homemind_family_memberships(membership_id, family_id, member_id, user_id, "
+                "INSERT INTO homemind_family_memberships(membership_id, family_id, member_id, user_id, "
                 "role, status, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, 'OWNER', 'ACTIVE', ?, ?)",
                 (new_ulid(), family_id, member_id, owner_user_id, ts, ts),
@@ -202,7 +202,7 @@ class FamilyRepo:
     def list_for_user(self, user_id: int) -> list[FamilyRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT f.* FROM homemind_families f JOIN homemind_homemind_family_memberships m "
+                "SELECT f.* FROM homemind_families f JOIN homemind_family_memberships m "
                 "ON m.family_id = f.family_id WHERE m.user_id = ? AND m.status = 'ACTIVE' "
                 "ORDER BY f.created_at, f.id",
                 (user_id,),
@@ -228,7 +228,7 @@ class FamilyRepo:
     def get_membership(self, family_id: str, user_id: int) -> DbRow | None:
         with self._db.connect() as conn:
             return conn.execute(
-                "SELECT * FROM homemind_homemind_family_memberships WHERE family_id = ? AND user_id = ? "
+                "SELECT * FROM homemind_family_memberships WHERE family_id = ? AND user_id = ? "
                 "AND status = 'ACTIVE'",
                 (family_id, user_id),
             ).fetchone()
@@ -259,7 +259,7 @@ class FamilyRepo:
             )
             if user_id is not None:
                 conn.execute(
-                    "INSERT INTO homemind_homemind_family_memberships(membership_id, family_id, member_id, "
+                    "INSERT INTO homemind_family_memberships(membership_id, family_id, member_id, "
                     "user_id, role, status, created_at, updated_at) "
                     "VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?)",
                     (new_ulid(), family_id, member_id, user_id, role, ts, ts),
@@ -303,7 +303,7 @@ class FamilyRepo:
                     membership_fields.append("updated_at = ?")
                     membership_params.extend((now_ts(), member_id))
                     conn.execute(
-                        f"UPDATE homemind_homemind_family_memberships SET {', '.join(membership_fields)} "
+                        f"UPDATE homemind_family_memberships SET {', '.join(membership_fields)} "
                         "WHERE member_id = ?",
                         membership_params,
                     )

@@ -63,10 +63,11 @@ def run_migrations(db: DatabasePool) -> None:
         if version <= current:
             continue
         sql = path.read_text(encoding="utf-8")
-        with db.transaction() as conn:
-            if db.dialect == "postgresql":
+        if db.dialect == "postgresql":
+            with db.transaction() as conn:
                 for statement in _split_sql(sql):
                     conn.execute(statement)
-            else:
+        else:
+            with db.connect() as conn:
                 conn.executescript(sql)
         current = version

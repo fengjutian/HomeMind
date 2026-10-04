@@ -4,10 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from octop.infra.db.migrate import run_migrations
-from octop.infra.db.pool import SqlitePool
+from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
 from homemind.infra.db.repos.families import FamilyRepo
-from octop.infra.errors import ErrorCode, OctopError
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.manager import (
     FamilyManager,
     MemberRole,
@@ -15,6 +14,9 @@ from homemind.infra.family.manager import (
     RelationshipType,
     SpaceType,
 )
+from octop.infra.db.migrate import run_migrations
+from octop.infra.db.pool import SqlitePool
+from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import Role, User
 
 
@@ -22,6 +24,7 @@ from octop.infra.users.identity import Role, User
 def repo(tmp_path: Path) -> FamilyRepo:
     pool = SqlitePool(tmp_path / "octop.db")
     run_migrations(pool)
+    run_homemind_migrations(pool)
     with pool.transaction() as conn:
         conn.execute(
             "INSERT INTO users(id, username, password_hash, role, disabled, locale, created_at) "
@@ -225,20 +228,20 @@ def test_duplicate_space_returns_stable_conflict(repo: FamilyRepo, owner: User) 
         owner, name="My Family", timezone="Asia/Shanghai", locale="zh"
     )
 
-    with pytest.raises(OctopError) as exc_info:
+    with pytest.raises(HomeMindError) as exc_info:
         manager.create_space(
             family.id, owner, name="Shared", space_type=SpaceType.SHARED
         )
 
-    assert exc_info.value.code is ErrorCode.FAMILY_CONFLICT
+    assert exc_info.value.code is HomeMindErrorCode.FAMILY_CONFLICT
 
 
 def test_invalid_family_timezone_is_rejected(repo: FamilyRepo, owner: User) -> None:
     manager = FamilyManager(repo)
 
-    with pytest.raises(OctopError) as exc_info:
+    with pytest.raises(HomeMindError) as exc_info:
         manager.create_family(
             owner, name="My Family", timezone="Invalid/Timezone", locale="zh"
         )
 
-    assert exc_info.value.code is ErrorCode.FAMILY_INVALID
+    assert exc_info.value.code is HomeMindErrorCode.FAMILY_INVALID

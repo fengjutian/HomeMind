@@ -1,20 +1,33 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
 
+from homemind.api.app import build_app as build_homemind_app
 from octop.infra.server import OctopServer
+from tests.support.app import octop_client
+from tests.support.auth import auth_header, bootstrap_admin
+
+
+@pytest.fixture
+async def homemind_env(
+    tmp_octop_home: Path,
+) -> AsyncIterator[tuple[httpx.AsyncClient, OctopServer, dict[str, str]]]:
+    async with octop_client(tmp_octop_home, app_factory=build_homemind_app) as (client, srv):
+        await bootstrap_admin(client, tmp_octop_home)
+        yield client, srv, await auth_header(client)
 
 
 @pytest.mark.asyncio
 async def test_family_foundation_api(
-    env: tuple[httpx.AsyncClient, OctopServer, dict[str, str]],
+    homemind_env: tuple[httpx.AsyncClient, OctopServer, dict[str, str]],
     tmp_path: Path,
 ) -> None:
-    client, _, auth = env
+    client, _, auth = homemind_env
 
     response = await client.post(
         "/api/families",
