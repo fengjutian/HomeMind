@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 from dataclasses import dataclass
 
 from octop.infra.db.pool import DatabasePool
@@ -139,7 +140,9 @@ class PhotoIntelligenceRepo:
             raise RuntimeError("face reference upsert failed")
         return FaceReferenceRow.from_row(row)
 
-    def list_face_references(self, family_id: str) -> list[FaceReferenceRow]:
+    def list_face_references(
+        self, family_id: str
+    ) -> builtins.list[FaceReferenceRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM homemind_family_face_references WHERE family_id = ? "

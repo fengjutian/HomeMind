@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 
 from homemind.infra.family.photo_providers import (
+    NominatimReverseGeocodingProvider,
     OpenAICompatibleEmbeddingProvider,
     OpenAICompatibleVisionProvider,
 )
@@ -74,3 +75,16 @@ def test_openai_compatible_embedding_adapter() -> None:
         ).embed_text("京都")
 
     assert vector == [0.5, 0.25]
+
+
+def test_nominatim_reverse_geocoder() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "nominatim.openstreetmap.org"
+        assert request.url.params["lat"] == "35.0"
+        assert request.headers["User-Agent"].startswith("HomeMind/")
+        return httpx.Response(200, json={"display_name": "京都市，日本"})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        location = NominatimReverseGeocodingProvider(client=client).reverse(35.0, 135.0)
+
+    assert location == "京都市，日本"

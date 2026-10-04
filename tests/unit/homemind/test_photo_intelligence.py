@@ -11,6 +11,7 @@ from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.photo_intelligence import (
     DetectedFace,
+    FaceReference,
     PhotoIntelligenceManager,
     VisionResult,
 )
@@ -50,6 +51,21 @@ class FakeGeocoder:
 
     def reverse(self, latitude: float, longitude: float) -> str:
         return "日本京都"
+
+
+class FakeFaceRecognition:
+    name = "fake-face-recognition"
+
+    def __init__(self, member_id: str) -> None:
+        self.member_id = member_id
+
+    def recognize(
+        self, image_path: Path, references: list[FaceReference]
+    ) -> list[DetectedFace]:
+        assert image_path.is_file()
+        assert references[0].member_id == self.member_id
+        assert references[0].image_path.is_file()
+        return [DetectedFace(0.95, self.member_id, "Owner")]
 
 
 def _setup(tmp_path: Path):
@@ -135,3 +151,24 @@ def test_perceptual_hash_finds_near_duplicate_images(tmp_path: Path) -> None:
     matches = manager.similar(family.id, scan.asset_ids[0], user, max_distance=0)
 
     assert matches == [(scan.asset_ids[1], 0)]
+
+
+def test_face_reference_is_used_for_member_recognition(tmp_path: Path) -> None:
+    services, family, member, user, assets, manager = _setup(tmp_path)
+    source = tmp_path / "photos"
+    source.mkdir()
+    Image.new("RGB", (16, 16), "blue").save(source / "reference.png")
+    Image.new("RGB", (16, 16), "green").save(source / "target.png")
+    scan = assets.scan_directory(family.id, user, directory=str(source))
+    rows = {assets.get(family.id, item, user).name: item for item in scan.asset_ids}
+    manager.set_face_reference(family.id, member.id, rows["reference.png"], user)
+
+    analyzed = manager.analyze(
+        family.id,
+        rows["target.png"],
+        user,
+        face_recognition=FakeFaceRecognition(member.id),
+    )
+
+    assert services.photo_intelligence_repo.list_face_references(family.id)[0].member_id == member.id
+    assert member.id in analyzed.faces_json

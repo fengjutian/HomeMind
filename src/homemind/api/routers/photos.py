@@ -16,9 +16,9 @@ from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.photo_intelligence import PhotoIntelligenceManager
 from homemind.infra.family.photo_providers import (
+    NominatimReverseGeocodingProvider,
     OpenAICompatibleEmbeddingProvider,
     OpenAICompatibleVisionProvider,
-    NominatimReverseGeocodingProvider,
     require_provider,
 )
 from octop.api.deps import current_user, get_server

@@ -1472,7 +1472,7 @@ function ConnectorConfigDrawer({
                 {cliInfo.error ??
                   t(
                     "connectors.cliMissingHint",
-                    "主机尚未安装 CLI。可点击「安装 CLI」，或在 Octop 主机终端手动执行下方命令。",
+                    "主机尚未安装 CLI。可点击「安装 CLI」，或在 HomeMind 主机终端手动执行下方命令。",
                   )}
               </div>
             )}

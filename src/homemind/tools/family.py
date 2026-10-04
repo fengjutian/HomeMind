@@ -20,6 +20,7 @@ from homemind.infra.family.filesystem import FamilyFilesystemManager
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.photo_intelligence import PhotoIntelligenceManager
 from homemind.infra.family.photo_providers import (
+    NominatimReverseGeocodingProvider,
     OpenAICompatibleEmbeddingProvider,
     OpenAICompatibleVisionProvider,
     require_provider,
@@ -467,6 +468,8 @@ def build_family_tools(
         vision_model: str,
         embedding_provider_id: int | None = None,
         embedding_model: str | None = None,
+        reverse_geocode: bool = False,
+        recognize_faces: bool = False,
     ) -> str:
         try:
             vision_row = require_provider(providers.get(vision_provider_id))
@@ -489,8 +492,28 @@ def build_family_tools(
                 _current_user(user_repo),
                 vision=vision,
                 embedding=embedding,
+                geocoder=NominatimReverseGeocodingProvider()
+                if reverse_geocode
+                else None,
+                face_recognition=vision if recognize_faces else None,
             )
             return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
+    def family_set_face_reference(
+        family_id: str, member_id: str, asset_id: str
+    ) -> str:
+        try:
+            photos.set_face_reference(
+                family_id,
+                member_id,
+                asset_id,
+                _current_user(user_repo),
+            )
+            return _ok(
+                {"member_id": member_id, "asset_id": asset_id, "registered": True}
+            )
         except Exception as exc:
             return _error(exc)
 
@@ -560,6 +583,11 @@ def build_family_tools(
             "family.analyze_photo",
             family_analyze_photo,
             "Describe and embed a photo with configured Octop providers.",
+        ),
+        (
+            "family.set_face_reference",
+            family_set_face_reference,
+            "Register an indexed photo as a family member face reference.",
         ),
         (
             "family.find_similar_photos",
