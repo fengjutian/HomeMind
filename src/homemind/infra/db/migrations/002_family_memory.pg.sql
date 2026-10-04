@@ -168,4 +168,15 @@ CREATE TABLE IF NOT EXISTS homemind_family_photo_intelligence (
 CREATE INDEX IF NOT EXISTS idx_homemind_family_photo_intelligence_family
   ON homemind_family_photo_intelligence(family_id, analyzed_at);
 
+CREATE TABLE IF NOT EXISTS homemind_family_face_references (
+  asset_id   TEXT PRIMARY KEY REFERENCES homemind_family_assets(asset_id) ON DELETE CASCADE,
+  member_id  TEXT NOT NULL REFERENCES homemind_family_members(member_id) ON DELETE CASCADE,
+  family_id  TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
+  created_by BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at BIGINT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_family_face_references_member
+  ON homemind_family_face_references(family_id, member_id);
+
 UPDATE _homemind_schema_version SET version = 2;

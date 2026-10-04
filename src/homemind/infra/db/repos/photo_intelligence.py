@@ -41,6 +41,25 @@ class PhotoIntelligenceRow:
         )
 
 
+@dataclass(frozen=True)
+class FaceReferenceRow:
+    asset_id: str
+    member_id: str
+    family_id: str
+    created_by: int
+    created_at: int
+
+    @classmethod
+    def from_row(cls, row: DbRow) -> FaceReferenceRow:
+        return cls(
+            asset_id=str(row["asset_id"]),
+            member_id=str(row["member_id"]),
+            family_id=str(row["family_id"]),
+            created_by=int(row["created_by"]),
+            created_at=int(row["created_at"]),
+        )
+
+
 class PhotoIntelligenceRepo:
     def __init__(self, db: DatabasePool) -> None:
         self._db = db
@@ -93,3 +112,46 @@ class PhotoIntelligenceRepo:
                 (family_id,),
             ).fetchall()
         return map_rows(rows, PhotoIntelligenceRow)
+
+    def set_face_reference(
+        self,
+        *,
+        asset_id: str,
+        member_id: str,
+        family_id: str,
+        created_by: int,
+    ) -> FaceReferenceRow:
+        with self._db.transaction() as conn:
+            conn.execute(
+                "INSERT INTO homemind_family_face_references(asset_id, member_id, family_id, "
+                "created_by, created_at) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(asset_id) DO UPDATE SET member_id = excluded.member_id, "
+                "family_id = excluded.family_id, created_by = excluded.created_by, "
+                "created_at = excluded.created_at",
+                (asset_id, member_id, family_id, created_by, now_ts()),
+            )
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM homemind_family_face_references WHERE asset_id = ?",
+                (asset_id,),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError("face reference upsert failed")
+        return FaceReferenceRow.from_row(row)
+
+    def list_face_references(self, family_id: str) -> list[FaceReferenceRow]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_face_references WHERE family_id = ? "
+                "ORDER BY member_id, created_at, asset_id",
+                (family_id,),
+            ).fetchall()
+        return map_rows(rows, FaceReferenceRow)
+
+    def delete_face_reference(self, asset_id: str) -> bool:
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                "DELETE FROM homemind_family_face_references WHERE asset_id = ?",
+                (asset_id,),
+            )
+        return int(cursor.rowcount or 0) > 0

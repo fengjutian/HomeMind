@@ -18,6 +18,7 @@ from homemind.infra.family.photo_intelligence import PhotoIntelligenceManager
 from homemind.infra.family.photo_providers import (
     OpenAICompatibleEmbeddingProvider,
     OpenAICompatibleVisionProvider,
+    NominatimReverseGeocodingProvider,
     require_provider,
 )
 from octop.api.deps import current_user, get_server
@@ -52,6 +53,12 @@ class ProviderAnalysisBody(BaseModel):
     vision_model: str = Field(min_length=1, max_length=200)
     embedding_provider_id: int | None = None
     embedding_model: str | None = Field(default=None, min_length=1, max_length=200)
+    reverse_geocode: bool = False
+    recognize_faces: bool = False
+
+
+class FaceReferenceBody(BaseModel):
+    member_id: str
 
 
 class SemanticSearchBody(BaseModel):
@@ -150,8 +157,40 @@ async def analyze_with_provider(
         user,
         vision=vision,
         embedding=embedding,
+        geocoder=NominatimReverseGeocodingProvider()
+        if body.reverse_geocode
+        else None,
+        face_recognition=vision if body.recognize_faces else None,
     )
     return _response(row)
+
+
+@router.put(
+    "/{family_id}/photos/{asset_id}/face-reference",
+    status_code=204,
+    summary="Register a member face reference photo",
+)
+async def set_face_reference(
+    family_id: str,
+    asset_id: str,
+    body: FaceReferenceBody,
+    server: Server,
+    user: CurrentUser,
+) -> None:
+    _manager(server).set_face_reference(
+        family_id, body.member_id, asset_id, user
+    )
+
+
+@router.delete(
+    "/{family_id}/photos/{asset_id}/face-reference",
+    status_code=204,
+    summary="Remove a member face reference photo",
+)
+async def delete_face_reference(
+    family_id: str, asset_id: str, server: Server, user: CurrentUser
+) -> None:
+    _manager(server).delete_face_reference(family_id, asset_id, user)
 
 
 @router.post(

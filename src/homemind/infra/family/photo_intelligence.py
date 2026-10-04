@@ -46,6 +46,12 @@ class PhotoSearchResult:
     location_name: str | None
 
 
+@dataclass(frozen=True)
+class FaceReference:
+    member_id: str
+    image_path: Path
+
+
 class VisionProvider(Protocol):
     name: str
 
@@ -64,6 +70,14 @@ class ReverseGeocodingProvider(Protocol):
     name: str
 
     def reverse(self, latitude: float, longitude: float) -> str | None: ...
+
+
+class FaceRecognitionProvider(Protocol):
+    name: str
+
+    def recognize(
+        self, image_path: Path, references: list[FaceReference]
+    ) -> list[DetectedFace]: ...
 
 
 class PhotoReranker(Protocol):
@@ -94,12 +108,24 @@ class PhotoIntelligenceManager:
         vision: VisionProvider | None = None,
         embedding: EmbeddingProvider | None = None,
         geocoder: ReverseGeocodingProvider | None = None,
+        face_recognition: FaceRecognitionProvider | None = None,
     ) -> PhotoIntelligenceRow:
         asset = self.assets.get(family_id, asset_id, user)
         if asset.asset_type != "PHOTO":
             raise ValueError("photo intelligence requires a photo asset")
         path = self._local_path(asset.uri)
         vision_result = vision.analyze(path) if vision else VisionResult("", [], [], [])
+        if face_recognition is not None:
+            self.family.require_manager(family_id, user)
+            recognized = face_recognition.recognize(
+                path, self._face_reference_paths(family_id, user)
+            )
+            vision_result = VisionResult(
+                vision_result.description,
+                vision_result.objects,
+                vision_result.scenes,
+                recognized,
+            )
         self._validate_faces(family_id, vision_result.faces)
         metadata = self.assets.photo_metadata(family_id, asset_id, user)
         location_name = None
@@ -130,6 +156,34 @@ class PhotoIntelligenceManager:
         )
         self._link_matching_events(family_id, asset_id, asset.captured_at, location_name)
         return row
+
+    def set_face_reference(
+        self,
+        family_id: str,
+        member_id: str,
+        asset_id: str,
+        user: User,
+    ) -> None:
+        self.family.require_manager(family_id, user)
+        member = self.family.repo.get_member(member_id)
+        if member is None or member.family_id != family_id:
+            raise ValueError("family member not found")
+        asset = self.assets.get(family_id, asset_id, user)
+        if asset.asset_type != "PHOTO":
+            raise ValueError("face reference must be a photo")
+        self.repo.set_face_reference(
+            asset_id=asset_id,
+            member_id=member_id,
+            family_id=family_id,
+            created_by=user.id,
+        )
+
+    def delete_face_reference(
+        self, family_id: str, asset_id: str, user: User
+    ) -> bool:
+        self.family.require_manager(family_id, user)
+        asset = self.assets.get(family_id, asset_id, user)
+        return self.repo.delete_face_reference(asset.id)
 
     def search(
         self,
@@ -227,6 +281,15 @@ class PhotoIntelligenceManager:
             member = self.family.repo.get_member(face.member_id)
             if member is None or member.family_id != family_id:
                 raise ValueError("vision provider returned an invalid family member")
+
+    def _face_reference_paths(
+        self, family_id: str, user: User
+    ) -> list[FaceReference]:
+        references: list[FaceReference] = []
+        for row in self.repo.list_face_references(family_id):
+            asset = self.assets.get(family_id, row.asset_id, user)
+            references.append(FaceReference(row.member_id, self._local_path(asset.uri)))
+        return references
 
     @staticmethod
     def _local_path(uri: str) -> Path:

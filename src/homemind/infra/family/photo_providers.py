@@ -11,7 +11,11 @@ from typing import Any
 
 import httpx
 
-from homemind.infra.family.photo_intelligence import DetectedFace, VisionResult
+from homemind.infra.family.photo_intelligence import (
+    DetectedFace,
+    FaceReference,
+    VisionResult,
+)
 from octop.infra.agents.providers.opencode_session import ensure_opencode_session_header
 from octop.infra.agents.providers.probe import provider_headers
 from octop.infra.db.repos.providers import ProviderRow
@@ -78,6 +82,57 @@ class OpenAICompatibleVisionProvider:
             ],
         )
 
+    def recognize(
+        self, image_path: Path, references: list[FaceReference]
+    ) -> list[DetectedFace]:
+        if not references:
+            return []
+        if len(references) > 20:
+            raise ValueError("face recognition supports at most 20 reference photos")
+        content: list[dict[str, object]] = [
+            {
+                "type": "text",
+                "text": (
+                    "The first image is the target. Remaining images are labeled family "
+                    "member references. Return JSON only as {\"faces\": [{\"confidence\": "
+                    "0.0, \"member_id\": null, \"label\": null}]}. Use only an exact "
+                    "provided member_id when identity is visually supported."
+                ),
+            },
+            {"type": "image_url", "image_url": {"url": _data_url(image_path)}},
+        ]
+        for reference in references:
+            content.extend(
+                [
+                    {"type": "text", "text": f"reference member_id={reference.member_id}"},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": _data_url(reference.image_path)},
+                    },
+                ]
+            )
+        data = self._post(
+            "chat/completions",
+            {
+                "model": self._model,
+                "temperature": 0,
+                "messages": [{"role": "user", "content": content}],
+            },
+        )
+        choices = data.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise RuntimeError("face recognition response has no choices")
+        parsed = _json_object(str(choices[0].get("message", {}).get("content") or ""))
+        return [
+            DetectedFace(
+                confidence=float(item.get("confidence") or 0),
+                member_id=str(item["member_id"]) if item.get("member_id") else None,
+                label=str(item["label"]) if item.get("label") else None,
+            )
+            for item in parsed.get("faces", [])
+            if isinstance(item, dict)
+        ]
+
     def _post(self, endpoint: str, payload: dict[str, object]) -> dict[str, Any]:
         if self._client is not None:
             response = self._client.post(
@@ -133,6 +188,45 @@ class OpenAICompatibleEmbeddingProvider:
         if not isinstance(vector, list) or not vector:
             raise RuntimeError("embedding provider response has no vector")
         return [float(item) for item in vector]
+
+
+class NominatimReverseGeocodingProvider:
+    name = "openstreetmap-nominatim"
+
+    def __init__(
+        self, *, language: str = "zh-CN", client: httpx.Client | None = None
+    ) -> None:
+        self._language = language
+        self._client = client
+
+    def reverse(self, latitude: float, longitude: float) -> str | None:
+        params = {
+            "format": "jsonv2",
+            "lat": str(latitude),
+            "lon": str(longitude),
+            "accept-language": self._language,
+            "zoom": "16",
+        }
+        headers = {"User-Agent": "HomeMind/0.1 reverse-geocoder"}
+        if self._client is not None:
+            response = self._client.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params=params,
+                headers=headers,
+            )
+        else:
+            with httpx.Client(timeout=30.0) as client:
+                response = client.get(
+                    "https://nominatim.openstreetmap.org/reverse",
+                    params=params,
+                    headers=headers,
+                )
+        response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, dict):
+            raise RuntimeError("reverse geocoder response is not a JSON object")
+        display_name = data.get("display_name")
+        return str(display_name) if display_name else None
 
 
 def require_provider(provider: ProviderRow | None) -> ProviderRow:
