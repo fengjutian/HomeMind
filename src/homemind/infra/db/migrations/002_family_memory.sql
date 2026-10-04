@@ -60,4 +60,55 @@ CREATE TABLE IF NOT EXISTS homemind_family_devices (
 CREATE INDEX IF NOT EXISTS idx_homemind_family_devices_family
   ON homemind_family_devices(family_id, status);
 
+CREATE TABLE IF NOT EXISTS homemind_family_transactions (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  transaction_id TEXT NOT NULL UNIQUE,
+  family_id      TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
+  requested_by   INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  action         TEXT NOT NULL,
+  payload_json   TEXT NOT NULL,
+  status         TEXT NOT NULL,
+  result_json    TEXT,
+  error          TEXT,
+  created_at     INTEGER NOT NULL,
+  updated_at     INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_family_transactions_family
+  ON homemind_family_transactions(family_id, status, created_at);
+
+CREATE TABLE IF NOT EXISTS homemind_family_approvals (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  approval_id    TEXT NOT NULL UNIQUE,
+  transaction_id TEXT NOT NULL UNIQUE REFERENCES homemind_family_transactions(transaction_id)
+                   ON DELETE CASCADE,
+  family_id      TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
+  status         TEXT NOT NULL DEFAULT 'PENDING',
+  requested_by   INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  decided_by     INTEGER REFERENCES users(id) ON DELETE RESTRICT,
+  reason         TEXT,
+  created_at     INTEGER NOT NULL,
+  decided_at     INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_family_approvals_family
+  ON homemind_family_approvals(family_id, status, created_at);
+
+CREATE TABLE IF NOT EXISTS homemind_family_audit_log (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  audit_id       TEXT NOT NULL UNIQUE,
+  family_id      TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  transaction_id TEXT REFERENCES homemind_family_transactions(transaction_id) ON DELETE SET NULL,
+  action         TEXT NOT NULL,
+  target         TEXT,
+  result         TEXT NOT NULL,
+  approval       TEXT,
+  detail_json    TEXT NOT NULL DEFAULT '{}',
+  created_at     INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_family_audit_family
+  ON homemind_family_audit_log(family_id, created_at);
+
 UPDATE _homemind_schema_version SET version = 2;

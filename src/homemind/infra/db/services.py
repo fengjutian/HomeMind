@@ -9,6 +9,7 @@ from homemind.infra.db.repos.family_assets import FamilyAssetRepo
 from homemind.infra.db.repos.family_context import FamilyContextRepo
 from homemind.infra.db.repos.family_devices import FamilyDeviceRepo
 from homemind.infra.db.repos.family_tasks import FamilyTaskRepo
+from homemind.infra.db.repos.family_transactions import FamilyTransactionRepo
 from octop.infra.db.pool import DatabasePool
 
 
@@ -20,6 +21,7 @@ class HomeMindServices:
     family_context_repo: FamilyContextRepo
     family_device_repo: FamilyDeviceRepo
     family_task_repo: FamilyTaskRepo
+    family_transaction_repo: FamilyTransactionRepo
 
     @classmethod
     def from_pool(cls, db: DatabasePool) -> HomeMindServices:
@@ -30,4 +32,5 @@ class HomeMindServices:
             family_context_repo=FamilyContextRepo(db),
             family_device_repo=FamilyDeviceRepo(db),
             family_task_repo=FamilyTaskRepo(db),
+            family_transaction_repo=FamilyTransactionRepo(db),
         )

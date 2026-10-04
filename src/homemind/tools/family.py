@@ -15,8 +15,9 @@ from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.context import FamilyContextManager
-from homemind.infra.family.manager import FamilyManager, PermissionEffect
+from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.tasks import FamilyTaskManager, TaskStatus
+from homemind.infra.family.transactions import FamilyTransactionManager
 from octop.infra.db.pool import DatabasePool
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.users.identity import User
@@ -60,6 +61,13 @@ def build_family_tools(
     context = FamilyContextManager(families, services.family_context_repo)
     assets = FamilyAssetManager(services.family_repo, services.family_asset_repo)
     tasks = FamilyTaskManager(families, services.family_task_repo)
+    transactions = FamilyTransactionManager(
+        families,
+        context,
+        tasks,
+        services.family_transaction_repo,
+        user_repo,
+    )
     devices = services.family_device_repo
 
     def family_list_members(family_id: str) -> str:
@@ -99,22 +107,24 @@ def build_family_tools(
     ) -> str:
         try:
             user = _current_user(user_repo)
-            _require_permission(families, family_id, user, "memory.create")
-            row = context.create_memory(
+            transaction, approval = transactions.plan(
                 family_id,
                 user,
-                subject_type=subject_type,
-                subject_id=subject_id,
-                content=content,
-                memory_type=memory_type,
-                importance=0.5,
-                confidence=0.5,
-                visibility="FAMILY",
-                source_type="AGENT",
-                source_id=None,
-                expires_at=None,
+                action="memory.create",
+                payload={
+                    "subject_type": subject_type,
+                    "subject_id": subject_id,
+                    "content": content,
+                    "memory_type": memory_type,
+                    "importance": 0.5,
+                    "confidence": 0.5,
+                    "visibility": "FAMILY",
+                    "source_type": "AGENT",
+                    "source_id": None,
+                    "expires_at": None,
+                },
             )
-            return _ok(asdict(row))
+            return _transaction_result(transaction, approval)
         except Exception as exc:
             return _error(exc)
 
@@ -167,19 +177,21 @@ def build_family_tools(
     ) -> str:
         try:
             user = _current_user(user_repo)
-            _require_permission(families, family_id, user, "event.create")
-            row = context.create_event(
+            transaction, approval = transactions.plan(
                 family_id,
                 user,
-                title=title,
-                event_type=event_type,
-                start_at=start_at,
-                end_at=end_at,
-                location=location,
-                description="",
-                metadata={},
+                action="event.create",
+                payload={
+                    "title": title,
+                    "event_type": event_type,
+                    "start_at": start_at,
+                    "end_at": end_at,
+                    "location": location,
+                    "description": "",
+                    "metadata": {},
+                },
             )
-            return _ok(asdict(row))
+            return _transaction_result(transaction, approval)
         except Exception as exc:
             return _error(exc)
 
@@ -204,16 +216,18 @@ def build_family_tools(
     ) -> str:
         try:
             user = _current_user(user_repo)
-            _require_permission(families, family_id, user, "task.create")
-            row = tasks.create(
+            transaction, approval = transactions.plan(
                 family_id,
                 user,
-                title=title,
-                description=description,
-                assigned_member_id=assigned_member_id,
-                due_at=due_at,
+                action="task.create",
+                payload={
+                    "title": title,
+                    "description": description,
+                    "assigned_member_id": assigned_member_id,
+                    "due_at": due_at,
+                },
             )
-            return _ok(asdict(row))
+            return _transaction_result(transaction, approval)
         except Exception as exc:
             return _error(exc)
 
@@ -256,22 +270,15 @@ def build_family_tools(
     ]
 
 
-def _require_permission(
-    families: FamilyManager,
-    family_id: str,
-    user: User,
-    action: str,
-) -> None:
-    membership = families.repo.get_membership(family_id, user.id)
-    if membership is None:
-        raise ValueError("family membership required")
-    effect = families.evaluate_permission(
-        family_id,
-        user,
-        subject_member_id=str(membership["member_id"]),
-        action=action,
-    )
-    if effect is PermissionEffect.REQUIRE_CONFIRMATION:
-        raise ValueError(f"approval required for {action}")
-    if effect is not PermissionEffect.ALLOW:
-        raise ValueError(f"permission denied for {action}")
+def _transaction_result(transaction: Any, approval: Any | None) -> str:
+    result: dict[str, Any] = {
+        "transaction_id": transaction.id,
+        "status": transaction.status,
+    }
+    if transaction.result_json:
+        result["result"] = json.loads(transaction.result_json)
+    if transaction.error:
+        result["error"] = transaction.error
+    if approval is not None:
+        result["approval_id"] = approval.id
+    return _ok(result)
