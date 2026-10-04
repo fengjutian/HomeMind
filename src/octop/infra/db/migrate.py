@@ -1777,8 +1777,6 @@ def _apply_sqlite_migration(db: DatabasePool, version: int, path: Path) -> None:
     Version 16 adds ``agents.kind`` so team hosts can be listed.
     Version 17 adds sticky ``conversation_mode`` and ``pending_plan_path`` on threads.
     Version 18 adds ``user_role`` templates and non-FK role id/name snapshots.
-    Version 19 adds per-user Octop bridge connections.
-    Version 20 adds the HomeMind family foundation tables.
     """
     if version == 2:
         if _table_exists(db, "cron_jobs"):
@@ -1951,16 +1949,3 @@ def run_migrations(db: DatabasePool) -> None:
     _ensure_sso_provider_kind_schema(db)
     _ensure_user_role_schema(db)
     _ensure_bridge_connections_schema(db)
-    _ensure_family_foundation_schema(db)
-
-
-def _ensure_family_foundation_schema(db: DatabasePool) -> None:
-    """Create v20 family tables when a restored schema skipped the migration file."""
-    suffix = ".pg.sql" if db.dialect == "postgresql" else ".sql"
-    path = _MIGRATIONS_DIR / f"020_family_foundation{suffix}"
-    sql = path.read_text(encoding="utf-8")
-    sql = re.sub(r"UPDATE _schema_version SET version = 20;\s*$", "", sql)
-    with db.connect() as conn:
-        conn.executescript(sql)
-    if _table_exists(db, "family_assets"):
-        _ensure_column(db, "family_assets", "source_id", "TEXT")

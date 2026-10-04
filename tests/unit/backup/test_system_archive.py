@@ -1178,7 +1178,7 @@ def test_restore_repairs_old_physical_schema_with_current_watermark(tmp_path: Pa
             "SELECT instance_id, shared FROM connectors WHERE instance_id = 'instance-1'"
         ).fetchone()
 
-    assert result["schema_version"] == 20
+    assert result["schema_version"] == 19
     assert "shared" in columns
     assert connector is not None
     assert connector["shared"] == 0

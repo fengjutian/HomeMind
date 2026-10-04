@@ -167,23 +167,23 @@ class FamilyRepo:
         ts = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO families(family_id, name, avatar, owner_user_id, timezone, "
+                "INSERT INTO homemind_families(family_id, name, avatar, owner_user_id, timezone, "
                 "locale, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (family_id, name, avatar, owner_user_id, timezone, locale, ts, ts),
             )
             conn.execute(
-                "INSERT INTO family_members(member_id, family_id, user_id, display_name, role, "
+                "INSERT INTO homemind_family_members(member_id, family_id, user_id, display_name, role, "
                 "status, created_at, updated_at) VALUES (?, ?, ?, ?, 'OWNER', 'ACTIVE', ?, ?)",
                 (member_id, family_id, owner_user_id, owner_display_name, ts, ts),
             )
             conn.execute(
-                "INSERT INTO family_memberships(membership_id, family_id, member_id, user_id, "
+                "INSERT INTO homemind_homemind_family_memberships(membership_id, family_id, member_id, user_id, "
                 "role, status, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, 'OWNER', 'ACTIVE', ?, ?)",
                 (new_ulid(), family_id, member_id, owner_user_id, ts, ts),
             )
             conn.execute(
-                "INSERT INTO family_spaces(space_id, family_id, name, space_type, created_at, "
+                "INSERT INTO homemind_family_spaces(space_id, family_id, name, space_type, created_at, "
                 "updated_at) VALUES (?, ?, 'Shared', 'SHARED', ?, ?)",
                 (new_ulid(), family_id, ts, ts),
             )
@@ -195,14 +195,14 @@ class FamilyRepo:
     def get_family(self, family_id: str) -> FamilyRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM families WHERE family_id = ?", (family_id,)
+                "SELECT * FROM homemind_families WHERE family_id = ?", (family_id,)
             ).fetchone()
         return FamilyRow.from_row(row) if row else None
 
     def list_for_user(self, user_id: int) -> list[FamilyRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT f.* FROM families f JOIN family_memberships m "
+                "SELECT f.* FROM homemind_families f JOIN homemind_homemind_family_memberships m "
                 "ON m.family_id = f.family_id WHERE m.user_id = ? AND m.status = 'ACTIVE' "
                 "ORDER BY f.created_at, f.id",
                 (user_id,),
@@ -216,19 +216,19 @@ class FamilyRepo:
             params.extend((now_ts(), family_id))
             with self._db.transaction() as conn:
                 conn.execute(
-                    f"UPDATE families SET {', '.join(fields)} WHERE family_id = ?", params
+                    f"UPDATE homemind_families SET {', '.join(fields)} WHERE family_id = ?", params
                 )
         return self.get_family(family_id)
 
     def delete_family(self, family_id: str) -> bool:
         with self._db.transaction() as conn:
-            cursor = conn.execute("DELETE FROM families WHERE family_id = ?", (family_id,))
+            cursor = conn.execute("DELETE FROM homemind_families WHERE family_id = ?", (family_id,))
         return int(cursor.rowcount or 0) > 0
 
     def get_membership(self, family_id: str, user_id: int) -> DbRow | None:
         with self._db.connect() as conn:
             return conn.execute(
-                "SELECT * FROM family_memberships WHERE family_id = ? AND user_id = ? "
+                "SELECT * FROM homemind_homemind_family_memberships WHERE family_id = ? AND user_id = ? "
                 "AND status = 'ACTIVE'",
                 (family_id, user_id),
             ).fetchone()
@@ -252,14 +252,14 @@ class FamilyRepo:
         ts = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO family_members(member_id, family_id, user_id, display_name, role, "
+                "INSERT INTO homemind_family_members(member_id, family_id, user_id, display_name, role, "
                 "avatar, birthday, status, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)",
                 (member_id, family_id, user_id, display_name, role, avatar, birthday, ts, ts),
             )
             if user_id is not None:
                 conn.execute(
-                    "INSERT INTO family_memberships(membership_id, family_id, member_id, "
+                    "INSERT INTO homemind_homemind_family_memberships(membership_id, family_id, member_id, "
                     "user_id, role, status, created_at, updated_at) "
                     "VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?)",
                     (new_ulid(), family_id, member_id, user_id, role, ts, ts),
@@ -272,14 +272,14 @@ class FamilyRepo:
     def get_member(self, member_id: str) -> FamilyMemberRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_members WHERE member_id = ?", (member_id,)
+                "SELECT * FROM homemind_family_members WHERE member_id = ?", (member_id,)
             ).fetchone()
         return FamilyMemberRow.from_row(row) if row else None
 
     def list_members(self, family_id: str) -> list[FamilyMemberRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM family_members WHERE family_id = ? ORDER BY created_at, id",
+                "SELECT * FROM homemind_family_members WHERE family_id = ? ORDER BY created_at, id",
                 (family_id,),
             ).fetchall()
         return map_rows(rows, FamilyMemberRow)
@@ -291,7 +291,7 @@ class FamilyRepo:
             params.extend((now_ts(), member_id))
             with self._db.transaction() as conn:
                 conn.execute(
-                    f"UPDATE family_members SET {', '.join(fields)} WHERE member_id = ?", params
+                    f"UPDATE homemind_family_members SET {', '.join(fields)} WHERE member_id = ?", params
                 )
                 membership_values = {
                     key: values[key] for key in ("role", "status") if key in values
@@ -303,7 +303,7 @@ class FamilyRepo:
                     membership_fields.append("updated_at = ?")
                     membership_params.extend((now_ts(), member_id))
                     conn.execute(
-                        f"UPDATE family_memberships SET {', '.join(membership_fields)} "
+                        f"UPDATE homemind_homemind_family_memberships SET {', '.join(membership_fields)} "
                         "WHERE member_id = ?",
                         membership_params,
                     )
@@ -312,7 +312,7 @@ class FamilyRepo:
     def delete_member(self, member_id: str) -> bool:
         with self._db.transaction() as conn:
             cursor = conn.execute(
-                "DELETE FROM family_members WHERE member_id = ?", (member_id,)
+                "DELETE FROM homemind_family_members WHERE member_id = ?", (member_id,)
             )
         return int(cursor.rowcount or 0) > 0
 
@@ -323,7 +323,7 @@ class FamilyRepo:
         ts = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO family_relationships(relationship_id, family_id, from_member_id, "
+                "INSERT INTO homemind_family_relationships(relationship_id, family_id, from_member_id, "
                 "to_member_id, relationship_type, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
@@ -341,7 +341,7 @@ class FamilyRepo:
     def _required_relationship(self, relationship_id: str) -> FamilyRelationshipRow:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_relationships WHERE relationship_id = ?",
+                "SELECT * FROM homemind_family_relationships WHERE relationship_id = ?",
                 (relationship_id,),
             ).fetchone()
         if row is None:
@@ -351,7 +351,7 @@ class FamilyRepo:
     def get_relationship(self, relationship_id: str) -> FamilyRelationshipRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_relationships WHERE relationship_id = ?",
+                "SELECT * FROM homemind_family_relationships WHERE relationship_id = ?",
                 (relationship_id,),
             ).fetchone()
         return FamilyRelationshipRow.from_row(row) if row else None
@@ -359,7 +359,7 @@ class FamilyRepo:
     def delete_relationship(self, relationship_id: str) -> bool:
         with self._db.transaction() as conn:
             cursor = conn.execute(
-                "DELETE FROM family_relationships WHERE relationship_id = ?",
+                "DELETE FROM homemind_family_relationships WHERE relationship_id = ?",
                 (relationship_id,),
             )
         return int(cursor.rowcount or 0) > 0
@@ -367,7 +367,7 @@ class FamilyRepo:
     def list_relationships(self, family_id: str) -> list[FamilyRelationshipRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM family_relationships WHERE family_id = ? ORDER BY created_at, id",
+                "SELECT * FROM homemind_family_relationships WHERE family_id = ? ORDER BY created_at, id",
                 (family_id,),
             ).fetchall()
         return map_rows(rows, FamilyRelationshipRow)
@@ -379,13 +379,13 @@ class FamilyRepo:
         ts = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO family_spaces(space_id, family_id, name, space_type, "
+                "INSERT INTO homemind_family_spaces(space_id, family_id, name, space_type, "
                 "owner_member_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (space_id, family_id, name, space_type, owner_member_id, ts, ts),
             )
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_spaces WHERE space_id = ?", (space_id,)
+                "SELECT * FROM homemind_family_spaces WHERE space_id = ?", (space_id,)
             ).fetchone()
         if row is None:
             raise RuntimeError("family space insert failed")
@@ -394,7 +394,7 @@ class FamilyRepo:
     def list_spaces(self, family_id: str) -> list[FamilySpaceRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM family_spaces WHERE family_id = ? ORDER BY created_at, id",
+                "SELECT * FROM homemind_family_spaces WHERE family_id = ? ORDER BY created_at, id",
                 (family_id,),
             ).fetchall()
         return map_rows(rows, FamilySpaceRow)
@@ -402,7 +402,7 @@ class FamilyRepo:
     def get_space(self, space_id: str) -> FamilySpaceRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_spaces WHERE space_id = ?", (space_id,)
+                "SELECT * FROM homemind_family_spaces WHERE space_id = ?", (space_id,)
             ).fetchone()
         return FamilySpaceRow.from_row(row) if row else None
 
@@ -413,13 +413,13 @@ class FamilyRepo:
             params.extend((now_ts(), space_id))
             with self._db.transaction() as conn:
                 conn.execute(
-                    f"UPDATE family_spaces SET {', '.join(fields)} WHERE space_id = ?", params
+                    f"UPDATE homemind_family_spaces SET {', '.join(fields)} WHERE space_id = ?", params
                 )
         return self.get_space(space_id)
 
     def delete_space(self, space_id: str) -> bool:
         with self._db.transaction() as conn:
-            cursor = conn.execute("DELETE FROM family_spaces WHERE space_id = ?", (space_id,))
+            cursor = conn.execute("DELETE FROM homemind_family_spaces WHERE space_id = ?", (space_id,))
         return int(cursor.rowcount or 0) > 0
 
     def create_permission(
@@ -437,7 +437,7 @@ class FamilyRepo:
         ts = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO family_permissions(permission_id, family_id, subject_member_id, "
+                "INSERT INTO homemind_family_permissions(permission_id, family_id, subject_member_id, "
                 "space_id, action, effect, expires_at, created_by, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
@@ -455,7 +455,7 @@ class FamilyRepo:
             )
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_permissions WHERE permission_id = ?", (permission_id,)
+                "SELECT * FROM homemind_family_permissions WHERE permission_id = ?", (permission_id,)
             ).fetchone()
         if row is None:
             raise RuntimeError("family permission insert failed")
@@ -464,7 +464,7 @@ class FamilyRepo:
     def list_permissions(self, family_id: str) -> list[FamilyPermissionRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM family_permissions WHERE family_id = ? ORDER BY created_at, id",
+                "SELECT * FROM homemind_family_permissions WHERE family_id = ? ORDER BY created_at, id",
                 (family_id,),
             ).fetchall()
         return map_rows(rows, FamilyPermissionRow)
@@ -472,7 +472,7 @@ class FamilyRepo:
     def get_permission(self, permission_id: str) -> FamilyPermissionRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_permissions WHERE permission_id = ?", (permission_id,)
+                "SELECT * FROM homemind_family_permissions WHERE permission_id = ?", (permission_id,)
             ).fetchone()
         return FamilyPermissionRow.from_row(row) if row else None
 
@@ -483,7 +483,7 @@ class FamilyRepo:
             params.extend((now_ts(), permission_id))
             with self._db.transaction() as conn:
                 conn.execute(
-                    f"UPDATE family_permissions SET {', '.join(fields)} "
+                    f"UPDATE homemind_family_permissions SET {', '.join(fields)} "
                     "WHERE permission_id = ?",
                     params,
                 )
@@ -492,6 +492,6 @@ class FamilyRepo:
     def delete_permission(self, permission_id: str) -> bool:
         with self._db.transaction() as conn:
             cursor = conn.execute(
-                "DELETE FROM family_permissions WHERE permission_id = ?", (permission_id,)
+                "DELETE FROM homemind_family_permissions WHERE permission_id = ?", (permission_id,)
             )
         return int(cursor.rowcount or 0) > 0

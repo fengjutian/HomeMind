@@ -6,7 +6,10 @@ import asyncio
 import logging
 import sys
 from contextlib import suppress
+from collections.abc import Callable
 from typing import Any
+
+from fastapi import FastAPI
 
 from octop.infra.server import OctopServer
 
@@ -62,11 +65,12 @@ async def run_foreground(
     log_level: str | None,
     ssl_certfile: str | None,
     ssl_keyfile: str | None,
+    app_factory: Callable[[OctopServer], FastAPI] | None = None,
 ) -> None:
     """Boot the domain server, serve the HTTP API, then shut down cleanly."""
     import uvicorn
 
-    from octop.api.app import build_app
+    from octop.api.app import build_app as build_octop_app
     from octop.infra.setup.tls.http_companion import build_http_companion_app
     from octop.infra.setup.tls.listeners import build_listen_plan
     from octop.infra.setup.tls.store import resolve_tls_paths
@@ -97,7 +101,7 @@ async def run_foreground(
         )
         reload = False
 
-    app = build_app(srv)
+    app = (app_factory or build_octop_app)(srv)
     servers: list[uvicorn.Server] = []
 
     if plan.dual_listeners:

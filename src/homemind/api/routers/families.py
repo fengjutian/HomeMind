@@ -11,14 +11,16 @@ from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from octop.api.deps import current_user, get_server
-from octop.infra.family.assets import FamilyAssetManager
-from octop.infra.family.manager import (
+from homemind.infra.family.assets import FamilyAssetManager
+from homemind.infra.family.manager import (
     FamilyManager,
     MemberRole,
     PermissionEffect,
     RelationshipType,
     SpaceType,
 )
+from homemind.infra.db.migrate import run_migrations
+from homemind.infra.db.services import HomeMindServices
 from octop.infra.server import OctopServer
 from octop.infra.users.identity import User
 
@@ -225,12 +227,15 @@ class FamilyAssetSourceResponse(_RowModel):
 
 def _manager(server: OctopServer) -> FamilyManager:
     assert server.services is not None
-    return FamilyManager(server.services.family_repo)
+    run_migrations(server.services.db)
+    return FamilyManager(HomeMindServices.from_pool(server.services.db).family_repo)
 
 
 def _asset_manager(server: OctopServer) -> FamilyAssetManager:
     assert server.services is not None
-    return FamilyAssetManager(server.services.family_repo, server.services.family_asset_repo)
+    run_migrations(server.services.db)
+    services = HomeMindServices.from_pool(server.services.db)
+    return FamilyAssetManager(services.family_repo, services.family_asset_repo)
 
 
 def _asset_response(row: Any) -> FamilyAssetResponse:

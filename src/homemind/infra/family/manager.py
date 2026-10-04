@@ -13,7 +13,7 @@ try:
 except ImportError:  # pragma: no cover - optional PostgreSQL driver
     pg_errors = None  # type: ignore[assignment]
 
-from octop.infra.db.repos.families import (
+from homemind.infra.db.repos.families import (
     FamilyMemberRow,
     FamilyPermissionRow,
     FamilyRelationshipRow,

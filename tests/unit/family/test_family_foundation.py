@@ -6,9 +6,9 @@ import pytest
 
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
-from octop.infra.db.repos.families import FamilyRepo
+from homemind.infra.db.repos.families import FamilyRepo
 from octop.infra.errors import ErrorCode, OctopError
-from octop.infra.family.manager import (
+from homemind.infra.family.manager import (
     FamilyManager,
     MemberRole,
     PermissionEffect,

@@ -1,0 +1,1 @@
+"""HomeMind API routers."""

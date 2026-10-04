@@ -142,7 +142,7 @@ class FamilyAssetRepo:
         ts = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO family_assets(asset_id, family_id, source_id, space_id, asset_type, "
+                "INSERT INTO homemind_family_assets(asset_id, family_id, source_id, space_id, asset_type, "
                 "name, uri, "
                 "mime_type, size_bytes, content_hash, captured_at, indexed_at, metadata_json, "
                 "created_by, visibility, status, created_at, updated_at) "
@@ -195,7 +195,7 @@ class FamilyAssetRepo:
         ts = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO family_asset_sources(source_id, family_id, space_id, directory_uri, "
+                "INSERT INTO homemind_family_asset_sources(source_id, family_id, space_id, directory_uri, "
                 "recursive, visibility, status, created_by, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?) "
                 "ON CONFLICT(family_id, directory_uri) DO UPDATE SET "
@@ -222,7 +222,7 @@ class FamilyAssetRepo:
     def get_source(self, source_id: str) -> FamilyAssetSourceRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_asset_sources WHERE source_id = ?", (source_id,)
+                "SELECT * FROM homemind_family_asset_sources WHERE source_id = ?", (source_id,)
             ).fetchone()
         return FamilyAssetSourceRow.from_row(row) if row else None
 
@@ -231,7 +231,7 @@ class FamilyAssetRepo:
     ) -> FamilyAssetSourceRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_asset_sources WHERE family_id = ? AND directory_uri = ?",
+                "SELECT * FROM homemind_family_asset_sources WHERE family_id = ? AND directory_uri = ?",
                 (family_id, directory_uri),
             ).fetchone()
         return FamilyAssetSourceRow.from_row(row) if row else None
@@ -239,7 +239,7 @@ class FamilyAssetRepo:
     def list_sources(self, family_id: str) -> list[FamilyAssetSourceRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM family_asset_sources WHERE family_id = ? ORDER BY created_at, id",
+                "SELECT * FROM homemind_family_asset_sources WHERE family_id = ? ORDER BY created_at, id",
                 (family_id,),
             ).fetchall()
         return map_rows(rows, FamilyAssetSourceRow)
@@ -247,7 +247,7 @@ class FamilyAssetRepo:
     def finish_source_scan(self, source_id: str, scanned_at: int) -> None:
         with self._db.transaction() as conn:
             conn.execute(
-                "UPDATE family_asset_sources SET last_scanned_at = ?, status = 'ACTIVE', "
+                "UPDATE homemind_family_asset_sources SET last_scanned_at = ?, status = 'ACTIVE', "
                 "updated_at = ? WHERE source_id = ?",
                 (scanned_at, scanned_at, source_id),
             )
@@ -255,14 +255,14 @@ class FamilyAssetRepo:
     def touch_asset(self, asset_id: str, indexed_at: int) -> None:
         with self._db.transaction() as conn:
             conn.execute(
-                "UPDATE family_assets SET indexed_at = ?, status = 'INDEXED', updated_at = ? "
+                "UPDATE homemind_family_assets SET indexed_at = ?, status = 'INDEXED', updated_at = ? "
                 "WHERE asset_id = ?",
                 (indexed_at, indexed_at, asset_id),
             )
 
     def mark_missing(self, source_id: str, seen_asset_ids: list[str], timestamp: int) -> int:
         sql = (
-            "UPDATE family_assets SET status = 'MISSING', updated_at = ? "
+            "UPDATE homemind_family_assets SET status = 'MISSING', updated_at = ? "
             "WHERE source_id = ? AND status <> 'MISSING'"
         )
         params: list[object] = [timestamp, source_id]
@@ -288,7 +288,7 @@ class FamilyAssetRepo:
     ) -> None:
         with self._db.transaction() as conn:
             conn.execute(
-                "INSERT INTO family_photo_metadata(asset_id, width, height, camera_make, "
+                "INSERT INTO homemind_family_photo_metadata(asset_id, width, height, camera_make, "
                 "camera_model, latitude, longitude, taken_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(asset_id) DO UPDATE SET width = excluded.width, "
                 "height = excluded.height, camera_make = excluded.camera_make, "
@@ -309,14 +309,14 @@ class FamilyAssetRepo:
     def get(self, asset_id: str) -> FamilyAssetRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_assets WHERE asset_id = ?", (asset_id,)
+                "SELECT * FROM homemind_family_assets WHERE asset_id = ?", (asset_id,)
             ).fetchone()
         return FamilyAssetRow.from_row(row) if row else None
 
     def get_by_uri(self, family_id: str, uri: str) -> FamilyAssetRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_assets WHERE family_id = ? AND uri = ?",
+                "SELECT * FROM homemind_family_assets WHERE family_id = ? AND uri = ?",
                 (family_id, uri),
             ).fetchone()
         return FamilyAssetRow.from_row(row) if row else None
@@ -324,7 +324,7 @@ class FamilyAssetRepo:
     def get_photo_metadata(self, asset_id: str) -> PhotoMetadataRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM family_photo_metadata WHERE asset_id = ?", (asset_id,)
+                "SELECT * FROM homemind_family_photo_metadata WHERE asset_id = ?", (asset_id,)
             ).fetchone()
         return PhotoMetadataRow.from_row(row) if row else None
 
@@ -359,7 +359,7 @@ class FamilyAssetRepo:
         params.append(limit)
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM family_assets WHERE "
+                "SELECT * FROM homemind_family_assets WHERE "
                 + " AND ".join(clauses)
                 + " ORDER BY COALESCE(captured_at, created_at) DESC, id DESC LIMIT ?",
                 params,
@@ -369,14 +369,14 @@ class FamilyAssetRepo:
     def duplicate_groups(self, family_id: str) -> list[list[FamilyAssetRow]]:
         with self._db.connect() as conn:
             hashes = conn.execute(
-                "SELECT content_hash FROM family_assets WHERE family_id = ? "
+                "SELECT content_hash FROM homemind_family_assets WHERE family_id = ? "
                 "GROUP BY content_hash HAVING COUNT(*) > 1 ORDER BY content_hash",
                 (family_id,),
             ).fetchall()
             groups = []
             for item in hashes:
                 rows = conn.execute(
-                    "SELECT * FROM family_assets WHERE family_id = ? AND content_hash = ? "
+                    "SELECT * FROM homemind_family_assets WHERE family_id = ? AND content_hash = ? "
                     "ORDER BY id",
                     (family_id, item["content_hash"]),
                 ).fetchall()
@@ -385,6 +385,6 @@ class FamilyAssetRepo:
 
     def delete(self, asset_id: str) -> bool:
         with self._db.transaction() as conn:
-            cursor = conn.execute("DELETE FROM family_assets WHERE asset_id = ?", (asset_id,))
+            cursor = conn.execute("DELETE FROM homemind_family_assets WHERE asset_id = ?", (asset_id,))
             deleted = int(cursor.rowcount or 0) > 0
         return deleted
