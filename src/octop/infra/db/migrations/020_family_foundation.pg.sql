@@ -81,10 +81,16 @@ CREATE TABLE family_permissions (
   expires_at        INTEGER,
   created_by        INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at        INTEGER NOT NULL,
-  updated_at        INTEGER NOT NULL,
-  UNIQUE NULLS NOT DISTINCT(family_id, subject_member_id, space_id, action)
+  updated_at        INTEGER NOT NULL
 );
 CREATE INDEX idx_family_permissions_family ON family_permissions(family_id);
 CREATE INDEX idx_family_permissions_subject ON family_permissions(subject_member_id);
+CREATE UNIQUE INDEX idx_family_permissions_rule
+  ON family_permissions(
+    family_id,
+    COALESCE(subject_member_id, ''),
+    COALESCE(space_id, ''),
+    action
+  );
 
 UPDATE _schema_version SET version = 20;

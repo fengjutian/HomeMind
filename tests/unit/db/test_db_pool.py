@@ -68,6 +68,12 @@ def test_run_migrations_creates_tables(db: SqlitePool):
         "sso_providers",
         "sso_login_states",
         "trajectory_events",
+        "families",
+        "family_members",
+        "family_memberships",
+        "family_relationships",
+        "family_spaces",
+        "family_permissions",
     }
     assert expected.issubset(names)
     assert "knowledge_base_members" not in names
