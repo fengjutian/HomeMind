@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from octop.api.deps import current_user, get_server
@@ -43,6 +43,13 @@ class FamilyCreateBody(BaseModel):
     locale: str = Field(default="zh", pattern="^(zh|en)$")
 
 
+class FamilyUpdateBody(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    avatar: str | None = Field(default=None, max_length=500)
+    timezone: str | None = Field(default=None, min_length=1, max_length=100)
+    locale: str | None = Field(default=None, pattern="^(zh|en)$")
+
+
 class FamilyMemberResponse(_RowModel):
     id: str
     family_id: str
@@ -62,6 +69,14 @@ class FamilyMemberCreateBody(BaseModel):
     user_id: int | None = None
     avatar: str | None = Field(default=None, max_length=500)
     birthday: str | None = Field(default=None, max_length=10, description="ISO date (YYYY-MM-DD).")
+
+
+class FamilyMemberUpdateBody(BaseModel):
+    display_name: str | None = Field(default=None, min_length=1, max_length=100)
+    role: MemberRole | None = None
+    avatar: str | None = Field(default=None, max_length=500)
+    birthday: str | None = Field(default=None, max_length=10)
+    status: Literal["ACTIVE", "INACTIVE"] | None = None
 
 
 class FamilyRelationshipResponse(_RowModel):
@@ -96,6 +111,12 @@ class FamilySpaceCreateBody(BaseModel):
     owner_member_id: str | None = None
 
 
+class FamilySpaceUpdateBody(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    space_type: SpaceType | None = None
+    owner_member_id: str | None = None
+
+
 class FamilyPermissionResponse(_RowModel):
     id: str
     family_id: str
@@ -117,6 +138,14 @@ class FamilyPermissionCreateBody(BaseModel):
     action: str = Field(min_length=1, max_length=100, examples=["photo.read"])
     effect: PermissionEffect
     expires_at: int | None = Field(default=None, description="Optional Unix timestamp.")
+
+
+class FamilyPermissionUpdateBody(BaseModel):
+    subject_member_id: str | None = None
+    space_id: str | None = None
+    action: str | None = Field(default=None, min_length=1, max_length=100)
+    effect: PermissionEffect | None = None
+    expires_at: int | None = None
 
 
 class FamilyPermissionEvaluateBody(BaseModel):
@@ -153,6 +182,21 @@ async def get_family(family_id: str, server: Server, user: CurrentUser) -> objec
     return _manager(server).require_access(family_id, user)
 
 
+@router.patch("/{family_id}", response_model=FamilyResponse, summary="Update a family")
+async def update_family(
+    family_id: str, body: FamilyUpdateBody, server: Server, user: CurrentUser
+) -> object:
+    return _manager(server).update_family(
+        family_id, user, body.model_dump(exclude_unset=True)
+    )
+
+
+@router.delete("/{family_id}", status_code=204, summary="Delete a family")
+async def delete_family(family_id: str, server: Server, user: CurrentUser) -> Response:
+    _manager(server).delete_family(family_id, user)
+    return Response(status_code=204)
+
+
 @router.post(
     "/{family_id}/members",
     response_model=FamilyMemberResponse,
@@ -172,6 +216,33 @@ async def list_members(family_id: str, server: Server, user: CurrentUser) -> obj
     manager = _manager(server)
     manager.require_access(family_id, user)
     return manager.repo.list_members(family_id)
+
+
+@router.patch(
+    "/{family_id}/members/{member_id}",
+    response_model=FamilyMemberResponse,
+    summary="Update a family member",
+)
+async def update_member(
+    family_id: str,
+    member_id: str,
+    body: FamilyMemberUpdateBody,
+    server: Server,
+    user: CurrentUser,
+) -> object:
+    return _manager(server).update_member(
+        family_id, member_id, user, body.model_dump(exclude_unset=True)
+    )
+
+
+@router.delete(
+    "/{family_id}/members/{member_id}", status_code=204, summary="Delete a family member"
+)
+async def delete_member(
+    family_id: str, member_id: str, server: Server, user: CurrentUser
+) -> Response:
+    _manager(server).delete_member(family_id, member_id, user)
+    return Response(status_code=204)
 
 
 @router.post(
@@ -197,6 +268,18 @@ async def list_relationships(family_id: str, server: Server, user: CurrentUser) 
     return manager.repo.list_relationships(family_id)
 
 
+@router.delete(
+    "/{family_id}/relationships/{relationship_id}",
+    status_code=204,
+    summary="Delete a family relationship",
+)
+async def delete_relationship(
+    family_id: str, relationship_id: str, server: Server, user: CurrentUser
+) -> Response:
+    _manager(server).delete_relationship(family_id, relationship_id, user)
+    return Response(status_code=204)
+
+
 @router.post(
     "/{family_id}/spaces",
     response_model=FamilySpaceResponse,
@@ -216,6 +299,33 @@ async def list_spaces(family_id: str, server: Server, user: CurrentUser) -> obje
     manager = _manager(server)
     manager.require_access(family_id, user)
     return manager.repo.list_spaces(family_id)
+
+
+@router.patch(
+    "/{family_id}/spaces/{space_id}",
+    response_model=FamilySpaceResponse,
+    summary="Update a family space",
+)
+async def update_space(
+    family_id: str,
+    space_id: str,
+    body: FamilySpaceUpdateBody,
+    server: Server,
+    user: CurrentUser,
+) -> object:
+    return _manager(server).update_space(
+        family_id, space_id, user, body.model_dump(exclude_unset=True)
+    )
+
+
+@router.delete(
+    "/{family_id}/spaces/{space_id}", status_code=204, summary="Delete a family space"
+)
+async def delete_space(
+    family_id: str, space_id: str, server: Server, user: CurrentUser
+) -> Response:
+    _manager(server).delete_space(family_id, space_id, user)
+    return Response(status_code=204)
 
 
 @router.post(
@@ -239,6 +349,35 @@ async def list_permissions(family_id: str, server: Server, user: CurrentUser) ->
     manager = _manager(server)
     manager.require_access(family_id, user)
     return manager.repo.list_permissions(family_id)
+
+
+@router.patch(
+    "/{family_id}/permissions/{permission_id}",
+    response_model=FamilyPermissionResponse,
+    summary="Update a family permission rule",
+)
+async def update_permission(
+    family_id: str,
+    permission_id: str,
+    body: FamilyPermissionUpdateBody,
+    server: Server,
+    user: CurrentUser,
+) -> object:
+    return _manager(server).update_permission(
+        family_id, permission_id, user, body.model_dump(exclude_unset=True)
+    )
+
+
+@router.delete(
+    "/{family_id}/permissions/{permission_id}",
+    status_code=204,
+    summary="Delete a family permission rule",
+)
+async def delete_permission(
+    family_id: str, permission_id: str, server: Server, user: CurrentUser
+) -> Response:
+    _manager(server).delete_permission(family_id, permission_id, user)
+    return Response(status_code=204)
 
 
 @router.post(

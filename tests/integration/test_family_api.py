@@ -89,3 +89,27 @@ async def test_family_foundation_api(
     )
     assert response.status_code == 200
     assert response.json() == {"effect": "REQUIRE_CONFIRMATION"}
+
+    response = await client.patch(
+        f"/api/families/{family_id}/members/{child['id']}",
+        headers=auth,
+        json={"display_name": "Teen", "role": "MEMBER"},
+    )
+    assert response.status_code == 200
+    assert response.json()["display_name"] == "Teen"
+
+    response = await client.patch(
+        f"/api/families/{family_id}",
+        headers=auth,
+        json={"name": "Our Family"},
+    )
+    assert response.status_code == 200
+    assert response.json()["name"] == "Our Family"
+
+    response = await client.post(
+        f"/api/families/{family_id}/spaces",
+        headers=auth,
+        json={"name": "Shared", "space_type": "SHARED"},
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "FAMILY_CONFLICT"

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from octop.infra.db.pool import DatabasePool
-from octop.infra.db.repos._base import DbRow, map_rows, now_ts
+from octop.infra.db.repos._base import DbRow, map_rows, now_ts, optional_updates
 from octop.infra.utils.ulid import new_ulid
 
 
@@ -209,6 +209,22 @@ class FamilyRepo:
             ).fetchall()
         return map_rows(rows, FamilyRow)
 
+    def update_family(self, family_id: str, **values: object) -> FamilyRow | None:
+        fields, params = optional_updates(list(values.items()))
+        if fields:
+            fields.append("updated_at = ?")
+            params.extend((now_ts(), family_id))
+            with self._db.transaction() as conn:
+                conn.execute(
+                    f"UPDATE families SET {', '.join(fields)} WHERE family_id = ?", params
+                )
+        return self.get_family(family_id)
+
+    def delete_family(self, family_id: str) -> bool:
+        with self._db.transaction() as conn:
+            cursor = conn.execute("DELETE FROM families WHERE family_id = ?", (family_id,))
+        return int(cursor.rowcount or 0) > 0
+
     def get_membership(self, family_id: str, user_id: int) -> DbRow | None:
         with self._db.connect() as conn:
             return conn.execute(
@@ -216,6 +232,11 @@ class FamilyRepo:
                 "AND status = 'ACTIVE'",
                 (family_id, user_id),
             ).fetchone()
+
+    def user_exists(self, user_id: int) -> bool:
+        with self._db.connect() as conn:
+            row = conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone()
+        return row is not None
 
     def create_member(
         self,
@@ -263,6 +284,38 @@ class FamilyRepo:
             ).fetchall()
         return map_rows(rows, FamilyMemberRow)
 
+    def update_member(self, member_id: str, **values: object) -> FamilyMemberRow | None:
+        fields, params = optional_updates(list(values.items()))
+        if fields:
+            fields.append("updated_at = ?")
+            params.extend((now_ts(), member_id))
+            with self._db.transaction() as conn:
+                conn.execute(
+                    f"UPDATE family_members SET {', '.join(fields)} WHERE member_id = ?", params
+                )
+                membership_values = {
+                    key: values[key] for key in ("role", "status") if key in values
+                }
+                if membership_values:
+                    membership_fields, membership_params = optional_updates(
+                        list(membership_values.items())
+                    )
+                    membership_fields.append("updated_at = ?")
+                    membership_params.extend((now_ts(), member_id))
+                    conn.execute(
+                        f"UPDATE family_memberships SET {', '.join(membership_fields)} "
+                        "WHERE member_id = ?",
+                        membership_params,
+                    )
+        return self.get_member(member_id)
+
+    def delete_member(self, member_id: str) -> bool:
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                "DELETE FROM family_members WHERE member_id = ?", (member_id,)
+            )
+        return int(cursor.rowcount or 0) > 0
+
     def create_relationship(
         self, family_id: str, *, from_member_id: str, to_member_id: str, relationship_type: str
     ) -> FamilyRelationshipRow:
@@ -294,6 +347,22 @@ class FamilyRepo:
         if row is None:
             raise RuntimeError("family relationship insert failed")
         return FamilyRelationshipRow.from_row(row)
+
+    def get_relationship(self, relationship_id: str) -> FamilyRelationshipRow | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM family_relationships WHERE relationship_id = ?",
+                (relationship_id,),
+            ).fetchone()
+        return FamilyRelationshipRow.from_row(row) if row else None
+
+    def delete_relationship(self, relationship_id: str) -> bool:
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                "DELETE FROM family_relationships WHERE relationship_id = ?",
+                (relationship_id,),
+            )
+        return int(cursor.rowcount or 0) > 0
 
     def list_relationships(self, family_id: str) -> list[FamilyRelationshipRow]:
         with self._db.connect() as conn:
@@ -329,6 +398,29 @@ class FamilyRepo:
                 (family_id,),
             ).fetchall()
         return map_rows(rows, FamilySpaceRow)
+
+    def get_space(self, space_id: str) -> FamilySpaceRow | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM family_spaces WHERE space_id = ?", (space_id,)
+            ).fetchone()
+        return FamilySpaceRow.from_row(row) if row else None
+
+    def update_space(self, space_id: str, **values: object) -> FamilySpaceRow | None:
+        fields, params = optional_updates(list(values.items()))
+        if fields:
+            fields.append("updated_at = ?")
+            params.extend((now_ts(), space_id))
+            with self._db.transaction() as conn:
+                conn.execute(
+                    f"UPDATE family_spaces SET {', '.join(fields)} WHERE space_id = ?", params
+                )
+        return self.get_space(space_id)
+
+    def delete_space(self, space_id: str) -> bool:
+        with self._db.transaction() as conn:
+            cursor = conn.execute("DELETE FROM family_spaces WHERE space_id = ?", (space_id,))
+        return int(cursor.rowcount or 0) > 0
 
     def create_permission(
         self,
@@ -376,3 +468,30 @@ class FamilyRepo:
                 (family_id,),
             ).fetchall()
         return map_rows(rows, FamilyPermissionRow)
+
+    def get_permission(self, permission_id: str) -> FamilyPermissionRow | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM family_permissions WHERE permission_id = ?", (permission_id,)
+            ).fetchone()
+        return FamilyPermissionRow.from_row(row) if row else None
+
+    def update_permission(self, permission_id: str, **values: object) -> FamilyPermissionRow | None:
+        fields, params = optional_updates(list(values.items()))
+        if fields:
+            fields.append("updated_at = ?")
+            params.extend((now_ts(), permission_id))
+            with self._db.transaction() as conn:
+                conn.execute(
+                    f"UPDATE family_permissions SET {', '.join(fields)} "
+                    "WHERE permission_id = ?",
+                    params,
+                )
+        return self.get_permission(permission_id)
+
+    def delete_permission(self, permission_id: str) -> bool:
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                "DELETE FROM family_permissions WHERE permission_id = ?", (permission_id,)
+            )
+        return int(cursor.rowcount or 0) > 0

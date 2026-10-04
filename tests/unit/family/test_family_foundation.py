@@ -143,3 +143,91 @@ def test_related_members_must_belong_to_same_family(repo: FamilyRepo, owner: Use
         )
 
     assert exc_info.value.code is ErrorCode.NOT_FOUND
+
+
+def test_update_and_delete_family_resources(repo: FamilyRepo, owner: User) -> None:
+    manager = FamilyManager(repo)
+    family = manager.create_family(
+        owner, name="My Family", timezone="Asia/Shanghai", locale="zh"
+    )
+    owner_member = repo.list_members(family.id)[0]
+    child = manager.create_member(
+        family.id, owner, display_name="Child", role=MemberRole.CHILD
+    )
+    relationship = manager.create_relationship(
+        family.id,
+        owner,
+        from_member_id=owner_member.id,
+        to_member_id=child.id,
+        relationship_type=RelationshipType.PARENT,
+    )
+    space = manager.create_space(
+        family.id,
+        owner,
+        name="Child private",
+        space_type=SpaceType.PRIVATE,
+        owner_member_id=child.id,
+    )
+    permission = manager.create_permission(
+        family.id,
+        owner,
+        subject_member_id=child.id,
+        space_id=space.id,
+        action="photo.delete",
+        effect=PermissionEffect.REQUIRE_CONFIRMATION,
+        expires_at=None,
+    )
+
+    updated_family = manager.update_family(family.id, owner, {"name": "Our Family"})
+    updated_child = manager.update_member(
+        family.id, child.id, owner, {"display_name": "Teen", "role": MemberRole.MEMBER}
+    )
+    updated_space = manager.update_space(
+        family.id, space.id, owner, {"name": "Teen private"}
+    )
+    updated_permission = manager.update_permission(
+        family.id,
+        permission.id,
+        owner,
+        {"effect": PermissionEffect.DENY},
+    )
+
+    assert updated_family.name == "Our Family"
+    assert (updated_child.display_name, updated_child.role) == ("Teen", "MEMBER")
+    assert updated_space.name == "Teen private"
+    assert updated_permission.effect == "DENY"
+
+    manager.delete_permission(family.id, permission.id, owner)
+    manager.delete_relationship(family.id, relationship.id, owner)
+    manager.delete_space(family.id, space.id, owner)
+    manager.delete_member(family.id, child.id, owner)
+    assert repo.list_permissions(family.id) == []
+    assert repo.list_relationships(family.id) == []
+    assert [member.id for member in repo.list_members(family.id)] == [owner_member.id]
+
+
+def test_owner_member_is_protected(repo: FamilyRepo, owner: User) -> None:
+    manager = FamilyManager(repo)
+    family = manager.create_family(
+        owner, name="My Family", timezone="Asia/Shanghai", locale="zh"
+    )
+    owner_member = repo.list_members(family.id)[0]
+
+    with pytest.raises(OctopError) as exc_info:
+        manager.delete_member(family.id, owner_member.id, owner)
+
+    assert exc_info.value.code is ErrorCode.FORBIDDEN
+
+
+def test_duplicate_space_returns_stable_conflict(repo: FamilyRepo, owner: User) -> None:
+    manager = FamilyManager(repo)
+    family = manager.create_family(
+        owner, name="My Family", timezone="Asia/Shanghai", locale="zh"
+    )
+
+    with pytest.raises(OctopError) as exc_info:
+        manager.create_space(
+            family.id, owner, name="Shared", space_type=SpaceType.SHARED
+        )
+
+    assert exc_info.value.code is ErrorCode.FAMILY_CONFLICT
