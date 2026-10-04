@@ -181,7 +181,7 @@ class FamilyAssetManager:
         skipped = 0
         errors: list[str] = []
         for path in candidates:
-            if path.is_symlink() or not path.is_file():
+            if ".homemind-trash" in path.parts or path.is_symlink() or not path.is_file():
                 skipped += 1
                 continue
             try:

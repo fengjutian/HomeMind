@@ -15,6 +15,7 @@ from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.context import FamilyContextManager
+from homemind.infra.family.filesystem import FamilyFilesystemManager
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.search import FamilySearchManager, SearchKind
 from homemind.infra.family.tasks import FamilyTaskManager, TaskStatus
@@ -63,12 +64,16 @@ def build_family_tools(
     assets = FamilyAssetManager(services.family_repo, services.family_asset_repo)
     search = FamilySearchManager(families, context, assets)
     tasks = FamilyTaskManager(families, services.family_task_repo)
+    filesystem = FamilyFilesystemManager(
+        families, services.family_asset_repo, services.family_transaction_repo
+    )
     transactions = FamilyTransactionManager(
         families,
         context,
         tasks,
         services.family_transaction_repo,
         user_repo,
+        filesystem,
     )
     devices = services.family_device_repo
 
@@ -273,6 +278,95 @@ def build_family_tools(
         except Exception as exc:
             return _error(exc)
 
+    def filesystem_list(family_id: str, source_id: str, path: str = ".") -> str:
+        try:
+            rows = filesystem.list(
+                family_id, _current_user(user_repo), source_id=source_id, path=path
+            )
+            return _ok([asdict(row) for row in rows])
+        except Exception as exc:
+            return _error(exc)
+
+    def filesystem_search(
+        family_id: str,
+        source_id: str,
+        query: str,
+        path: str = ".",
+        limit: int = 100,
+    ) -> str:
+        try:
+            rows = filesystem.search(
+                family_id,
+                _current_user(user_repo),
+                source_id=source_id,
+                query=query,
+                path=path,
+                limit=limit,
+            )
+            return _ok([asdict(row) for row in rows])
+        except Exception as exc:
+            return _error(exc)
+
+    def filesystem_read(
+        family_id: str,
+        source_id: str,
+        path: str,
+        max_bytes: int = 1024 * 1024,
+    ) -> str:
+        try:
+            content = filesystem.read(
+                family_id,
+                _current_user(user_repo),
+                source_id=source_id,
+                path=path,
+                max_bytes=max_bytes,
+            )
+            return _ok({"path": path, "content": content})
+        except Exception as exc:
+            return _error(exc)
+
+    def filesystem_mutation(
+        action: str,
+        family_id: str,
+        source_id: str,
+        path: str,
+        destination: str | None = None,
+    ) -> str:
+        try:
+            payload: dict[str, Any] = {"source_id": source_id, "path": path}
+            if destination is not None:
+                payload["destination"] = destination
+            transaction, approval = transactions.plan(
+                family_id, _current_user(user_repo), action=action, payload=payload
+            )
+            return _transaction_result(transaction, approval)
+        except Exception as exc:
+            return _error(exc)
+
+    def filesystem_copy(
+        family_id: str, source_id: str, path: str, destination: str
+    ) -> str:
+        return filesystem_mutation(
+            "filesystem.copy", family_id, source_id, path, destination
+        )
+
+    def filesystem_move(
+        family_id: str, source_id: str, path: str, destination: str
+    ) -> str:
+        return filesystem_mutation(
+            "filesystem.move", family_id, source_id, path, destination
+        )
+
+    def filesystem_rename(
+        family_id: str, source_id: str, path: str, destination: str
+    ) -> str:
+        return filesystem_mutation(
+            "filesystem.rename", family_id, source_id, path, destination
+        )
+
+    def filesystem_delete(family_id: str, source_id: str, path: str) -> str:
+        return filesystem_mutation("filesystem.delete", family_id, source_id, path)
+
     specs: list[tuple[str, Callable[..., str], str]] = [
         ("family.list_members", family_list_members, "List members of a family."),
         ("family.get_member", family_get_member, "Get one family member."),
@@ -291,6 +385,13 @@ def build_family_tools(
             family_search,
             "Search family members, events, memories, and indexed assets.",
         ),
+        ("filesystem.list", filesystem_list, "List a registered family source safely."),
+        ("filesystem.search", filesystem_search, "Search a registered family source safely."),
+        ("filesystem.read", filesystem_read, "Read a bounded UTF-8 file from a registered family source."),
+        ("filesystem.copy", filesystem_copy, "Copy a file after permission evaluation."),
+        ("filesystem.move", filesystem_move, "Move a file after permission evaluation."),
+        ("filesystem.rename", filesystem_rename, "Rename a file after permission evaluation."),
+        ("filesystem.delete", filesystem_delete, "Move a file to recoverable HomeMind trash after approval."),
     ]
     return [
         StructuredTool.from_function(func=func, name=name, description=description)

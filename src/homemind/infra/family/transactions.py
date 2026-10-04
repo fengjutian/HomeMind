@@ -15,6 +15,7 @@ from homemind.infra.db.repos.family_transactions import (
 )
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.context import FamilyContextManager
+from homemind.infra.family.filesystem import FamilyFilesystemManager
 from homemind.infra.family.manager import FamilyManager, PermissionEffect
 from homemind.infra.family.tasks import FamilyTaskManager
 from octop.infra.db.repos.users import UserRepo
@@ -40,12 +41,14 @@ class FamilyTransactionManager:
         tasks: FamilyTaskManager,
         repo: FamilyTransactionRepo,
         user_repo: UserRepo,
+        filesystem: FamilyFilesystemManager | None = None,
     ) -> None:
         self.family = family
         self.context = context
         self.tasks = tasks
         self.repo = repo
         self.user_repo = user_repo
+        self.filesystem = filesystem
 
     def plan(
         self, family_id: str, user: User, *, action: str, payload: dict[str, Any]
@@ -66,6 +69,10 @@ class FamilyTransactionManager:
             subject_member_id=str(membership["member_id"]),
             action=action,
         )
+        if action in {"filesystem.move", "filesystem.rename", "filesystem.delete"} and (
+            effect is PermissionEffect.ALLOW
+        ):
+            effect = PermissionEffect.REQUIRE_CONFIRMATION
         if effect is PermissionEffect.DENY:
             transaction = self.repo.set_transaction(transaction.id, TransactionStatus.DENIED)
             self._audit(transaction, user.id, "DENIED", approval="DENY")
@@ -167,13 +174,22 @@ class FamilyTransactionManager:
                 result = self.context.create_event(transaction.family_id, requester, **payload)
             elif transaction.action == "memory.create":
                 result = self.context.create_memory(transaction.family_id, requester, **payload)
+            elif transaction.action.startswith("filesystem.") and self.filesystem is not None:
+                result = self.filesystem.execute(
+                    transaction.family_id,
+                    requester,
+                    action=transaction.action,
+                    transaction_id=transaction.id,
+                    payload=payload,
+                )
             else:
                 raise ValueError(f"unsupported family transaction action: {transaction.action}")
             result_json = json.dumps(asdict(result), ensure_ascii=False, default=str)
             transaction = self.repo.set_transaction(
                 transaction.id, TransactionStatus.COMPLETED, result_json=result_json
             )
-            self._audit(transaction, requester.id, "SUCCESS", target=result.id)
+            target = getattr(result, "id", None) or getattr(result, "destination_path", None)
+            self._audit(transaction, requester.id, "SUCCESS", target=target)
             return transaction
         except Exception as exc:
             transaction = self.repo.set_transaction(
