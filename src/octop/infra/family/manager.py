@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import time
 import sqlite3
+import time
 from enum import StrEnum
 from typing import Callable, TypeVar
 

@@ -121,11 +121,15 @@ family `OWNER` or `ADMIN` role; a server administrator may also manage any famil
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
 | `GET` / `POST` | `/families` | user | List memberships or create a family; creation also creates the owner member and shared space |
-| `GET` | `/families/{id}` | member | Family metadata |
+| `GET` / `PATCH` / `DELETE` | `/families/{id}` | member / manager / owner | Read, update, or delete a family |
 | `GET` / `POST` | `/families/{id}/members` | member / manager | List or add members; `user_id` is optional |
+| `PATCH` / `DELETE` | `/families/{id}/members/{member_id}` | manager | Update or remove a non-owner member |
 | `GET` / `POST` | `/families/{id}/relationships` | member / manager | Directed member relationships such as `PARENT` or `SPOUSE` |
+| `DELETE` | `/families/{id}/relationships/{relationship_id}` | manager | Remove a relationship |
 | `GET` / `POST` | `/families/{id}/spaces` | member / manager | Shared, private, and archive spaces |
+| `PATCH` / `DELETE` | `/families/{id}/spaces/{space_id}` | manager | Update or remove a space |
 | `GET` / `POST` | `/families/{id}/permissions` | member / manager | Family permission rules (`ALLOW`, `DENY`, `REQUIRE_CONFIRMATION`) |
+| `PATCH` / `DELETE` | `/families/{id}/permissions/{permission_id}` | manager | Update or remove a permission rule |
 | `POST` | `/families/{id}/permissions/evaluate` | member | Resolve a member/action/space tuple; unmatched requests default to `DENY` |
 
 ## Agents
@@ -514,6 +518,8 @@ dashboard mirrors every code under `apiErrors.*` in
 | `SETUP_REQUIRED` | 409 | Initial admin not yet created (or wizard not finished) |
 | `FORBIDDEN` | 403 | Authenticated but not allowed |
 | `NOT_FOUND` | 404 | No such row / route |
+| `FAMILY_INVALID` | 400 | Family structure or mutation is invalid |
+| `FAMILY_CONFLICT` | 409 | A family member, space, relationship, or permission rule already exists |
 | `USER_DISABLED` | 403 | Account flag flipped off |
 | `USERNAME_TAKEN` | 409 | Conflict on `users.username` |
 | `AGENT_NOT_FOUND` | 404 | Agent row missing or owned by another user |

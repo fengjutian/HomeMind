@@ -113,3 +113,8 @@ async def test_family_foundation_api(
     )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "FAMILY_CONFLICT"
+
+    response = await client.delete(f"/api/families/{family_id}", headers=auth)
+    assert response.status_code == 204
+    response = await client.get(f"/api/families/{family_id}", headers=auth)
+    assert response.status_code == 404
