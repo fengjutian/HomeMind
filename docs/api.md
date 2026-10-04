@@ -113,6 +113,21 @@ does not set these headers itself.
 | `POST`   | `/users/{id}/unlock-login` | admin | `204` (clears the lockout) |
 | `DELETE` | `/users/{id}` | admin | `204` |
 
+## Families
+
+Family routes are scoped to active family memberships. Structural changes require the
+family `OWNER` or `ADMIN` role; a server administrator may also manage any family.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| `GET` / `POST` | `/families` | user | List memberships or create a family; creation also creates the owner member and shared space |
+| `GET` | `/families/{id}` | member | Family metadata |
+| `GET` / `POST` | `/families/{id}/members` | member / manager | List or add members; `user_id` is optional |
+| `GET` / `POST` | `/families/{id}/relationships` | member / manager | Directed member relationships such as `PARENT` or `SPOUSE` |
+| `GET` / `POST` | `/families/{id}/spaces` | member / manager | Shared, private, and archive spaces |
+| `GET` / `POST` | `/families/{id}/permissions` | member / manager | Family permission rules (`ALLOW`, `DENY`, `REQUIRE_CONFIRMATION`) |
+| `POST` | `/families/{id}/permissions/evaluate` | member | Resolve a member/action/space tuple; unmatched requests default to `DENY` |
+
 ## Agents
 
 | Method | Path | Auth | Notes |

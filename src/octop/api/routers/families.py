@@ -119,6 +119,16 @@ class FamilyPermissionCreateBody(BaseModel):
     expires_at: int | None = Field(default=None, description="Optional Unix timestamp.")
 
 
+class FamilyPermissionEvaluateBody(BaseModel):
+    subject_member_id: str
+    action: str = Field(min_length=1, max_length=100)
+    space_id: str | None = None
+
+
+class FamilyPermissionDecision(BaseModel):
+    effect: PermissionEffect
+
+
 def _manager(server: OctopServer) -> FamilyManager:
     assert server.services is not None
     return FamilyManager(server.services.family_repo)
@@ -229,3 +239,20 @@ async def list_permissions(family_id: str, server: Server, user: CurrentUser) ->
     manager = _manager(server)
     manager.require_access(family_id, user)
     return manager.repo.list_permissions(family_id)
+
+
+@router.post(
+    "/{family_id}/permissions/evaluate",
+    response_model=FamilyPermissionDecision,
+    summary="Evaluate a family permission",
+)
+async def evaluate_permission(
+    family_id: str,
+    body: FamilyPermissionEvaluateBody,
+    server: Server,
+    user: CurrentUser,
+) -> FamilyPermissionDecision:
+    effect = _manager(server).evaluate_permission(
+        family_id, user, **body.model_dump()
+    )
+    return FamilyPermissionDecision(effect=effect)

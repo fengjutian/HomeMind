@@ -93,6 +93,25 @@ def test_manager_builds_family_structure(repo: FamilyRepo, owner: User) -> None:
     assert private_space.owner_member_id == child.id
     assert permission.effect == "REQUIRE_CONFIRMATION"
     assert repo.get_membership(family.id, 2) is not None
+    assert (
+        manager.evaluate_permission(
+            family.id,
+            owner,
+            subject_member_id=child.id,
+            space_id=private_space.id,
+            action="photo.delete",
+        )
+        is PermissionEffect.REQUIRE_CONFIRMATION
+    )
+    assert (
+        manager.evaluate_permission(
+            family.id,
+            owner,
+            subject_member_id=child.id,
+            action="photo.read",
+        )
+        is PermissionEffect.DENY
+    )
 
 
 def test_non_member_cannot_read_family(repo: FamilyRepo, owner: User) -> None:

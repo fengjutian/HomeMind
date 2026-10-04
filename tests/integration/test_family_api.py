@@ -77,3 +77,15 @@ async def test_family_foundation_api(
     )
     assert response.status_code == 201
     assert response.json()["effect"] == "REQUIRE_CONFIRMATION"
+
+    response = await client.post(
+        f"/api/families/{family_id}/permissions/evaluate",
+        headers=auth,
+        json={
+            "subject_member_id": child["id"],
+            "space_id": space["id"],
+            "action": "photo.delete",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json() == {"effect": "REQUIRE_CONFIRMATION"}

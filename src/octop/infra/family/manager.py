@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from enum import StrEnum
 
 from octop.infra.db.repos.families import (
@@ -178,6 +179,44 @@ class FamilyManager:
             expires_at=expires_at,
             created_by=user.id,
         )
+
+    def evaluate_permission(
+        self,
+        family_id: str,
+        user: User,
+        *,
+        subject_member_id: str,
+        action: str,
+        space_id: str | None = None,
+        now: int | None = None,
+    ) -> PermissionEffect:
+        self.require_access(family_id, user)
+        self._require_member(family_id, subject_member_id)
+        timestamp = int(time.time()) if now is None else now
+        candidates = [
+            permission
+            for permission in self.repo.list_permissions(family_id)
+            if permission.action == action
+            and permission.subject_member_id in {None, subject_member_id}
+            and permission.space_id in {None, space_id}
+            and (permission.expires_at is None or permission.expires_at > timestamp)
+        ]
+        if not candidates:
+            return PermissionEffect.DENY
+        priority = {
+            PermissionEffect.ALLOW.value: 0,
+            PermissionEffect.REQUIRE_CONFIRMATION.value: 1,
+            PermissionEffect.DENY.value: 2,
+        }
+        candidates.sort(
+            key=lambda permission: (
+                int(permission.subject_member_id is not None)
+                + int(permission.space_id is not None),
+                priority[permission.effect],
+            ),
+            reverse=True,
+        )
+        return PermissionEffect(candidates[0].effect)
 
     def _require_member(self, family_id: str, member_id: str) -> FamilyMemberRow:
         member = self.repo.get_member(member_id)
