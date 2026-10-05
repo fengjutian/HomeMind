@@ -17,6 +17,7 @@ import {
 } from "antd";
 import { Plus, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import PageShell from "../../layouts/PageShell";
 
 import {
   homeMindFamilyApi,
@@ -27,8 +28,9 @@ import {
   type FamilyTask,
   type HomeMindFamily,
 } from "../../api/modules/homeMindFamily";
+import styles from "./index.module.less";
 
-const { Paragraph, Text, Title } = Typography;
+const { Text, Title } = Typography;
 
 export default function FamilyPage() {
   const { t } = useTranslation();
@@ -51,7 +53,7 @@ export default function FamilyPage() {
       setFamilyId((current) =>
         current && rows.some((row) => row.id === current)
           ? current
-          : (rows[0]?.id ?? ""),
+          : rows[0]?.id ?? "",
       );
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
@@ -103,26 +105,49 @@ export default function FamilyPage() {
   };
 
   if (loading && families.length === 0) {
-    return <Spin fullscreen />;
+    return (
+      <PageShell
+        title={t("family.title", "家庭中心")}
+        subtitle={t("family.subtitle", "管理家庭成员、相册、任务与共同记忆")}
+      >
+        <div className={styles.loading}>
+          <Spin />
+        </div>
+      </PageShell>
+    );
   }
 
   if (families.length === 0) {
     return (
-      <Card style={{ maxWidth: 560, margin: "48px auto" }}>
-        <Empty description={t("family.empty", "还没有家庭空间")} />
-        <Form layout="vertical" onFinish={createFamily}>
-          <Form.Item
-            name="name"
-            label={t("family.name", "家庭名称")}
-            rules={[{ required: true }]}
-          >
-            <Input placeholder={t("family.namePlaceholder", "例如：幸福之家")} />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" loading={creatingFamily} block>
-            {t("family.create", "创建家庭")}
-          </Button>
-        </Form>
-      </Card>
+      <PageShell
+        title={t("family.title", "家庭中心")}
+        subtitle={t("family.subtitle", "管理家庭成员、相册、任务与共同记忆")}
+      >
+        <div className={styles.emptyWrap}>
+          <Card className={styles.emptyCard}>
+            <Empty description={t("family.empty", "还没有家庭空间")} />
+            <Form layout="vertical" onFinish={createFamily}>
+              <Form.Item
+                name="name"
+                label={t("family.name", "家庭名称")}
+                rules={[{ required: true }]}
+              >
+                <Input
+                  placeholder={t("family.namePlaceholder", "例如：幸福之家")}
+                />
+              </Form.Item>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={creatingFamily}
+                block
+              >
+                {t("family.create", "创建家庭")}
+              </Button>
+            </Form>
+          </Card>
+        </div>
+      </PageShell>
     );
   }
 
@@ -132,6 +157,7 @@ export default function FamilyPage() {
     description?: (row: T) => React.ReactNode,
   ) => (
     <List
+      className={styles.dataList}
       dataSource={rows}
       locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
       renderItem={(row) => (
@@ -143,53 +169,68 @@ export default function FamilyPage() {
   );
 
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto", paddingBottom: 32 }}>
-      <Space
-        align="start"
-        style={{ width: "100%", justifyContent: "space-between" }}
-      >
-        <div>
-          <Title level={2} style={{ marginBottom: 4 }}>
-            {t("family.title", "家庭中心")}
-          </Title>
-          <Paragraph type="secondary">
-            {t("family.subtitle", "管理家庭成员、相册、任务与共同记忆")}
-          </Paragraph>
-        </div>
+    <PageShell.FillTabs
+      title={t("family.title", "家庭中心")}
+      subtitle={t("family.subtitle", "管理家庭成员、相册、任务与共同记忆")}
+      actions={
         <Select
           value={familyId}
-          style={{ minWidth: 180 }}
+          className={styles.familySelect}
           options={families.map((family) => ({
             value: family.id,
             label: family.name,
           }))}
           onChange={setFamilyId}
         />
-      </Space>
-
+      }
+    >
       <Tabs
+        className={styles.tabs}
         items={[
           {
             key: "home",
             label: t("family.tabs.home", "首页"),
             children: (
-              <>
-                <Title level={3}>{activeFamily?.name}</Title>
-                <Space wrap size={16}>
-                  <Card><Statistic title={t("family.members", "成员")} value={members.length} /></Card>
-                  <Card><Statistic title={t("family.albums", "相册")} value={albums.length} /></Card>
-                  <Card><Statistic title={t("family.tasks", "任务")} value={tasks.length} /></Card>
-                  <Card><Statistic title={t("family.memories", "记忆")} value={memories.length} /></Card>
-                </Space>
-              </>
+              <div className={styles.overview}>
+                <Title level={4} className={styles.familyName}>
+                  {activeFamily?.name}
+                </Title>
+                <div className={styles.statsGrid}>
+                  <Card className={styles.statCard}>
+                    <Statistic
+                      title={t("family.members", "成员")}
+                      value={members.length}
+                    />
+                  </Card>
+                  <Card className={styles.statCard}>
+                    <Statistic
+                      title={t("family.albums", "相册")}
+                      value={albums.length}
+                    />
+                  </Card>
+                  <Card className={styles.statCard}>
+                    <Statistic
+                      title={t("family.tasks", "任务")}
+                      value={tasks.length}
+                    />
+                  </Card>
+                  <Card className={styles.statCard}>
+                    <Statistic
+                      title={t("family.memories", "记忆")}
+                      value={memories.length}
+                    />
+                  </Card>
+                </div>
+              </div>
             ),
           },
           {
             key: "members",
             label: t("family.tabs.members", "成员"),
             children: (
-              <Card>
+              <Card className={styles.panelCard}>
                 <Form
+                  className={styles.quickForm}
                   layout="inline"
                   onFinish={async (values: { display_name: string }) => {
                     await homeMindFamilyApi.createMember(familyId, {
@@ -202,11 +243,21 @@ export default function FamilyPage() {
                   <Form.Item name="display_name" rules={[{ required: true }]}>
                     <Input placeholder={t("family.memberName", "成员姓名")} />
                   </Form.Item>
-                  <Button icon={<Plus size={16} />} type="primary" htmlType="submit">
+                  <Button
+                    icon={<Plus size={16} />}
+                    type="primary"
+                    htmlType="submit"
+                  >
                     {t("common.add", "添加")}
                   </Button>
                 </Form>
-                {listCard(members, (row) => row.display_name, (row) => <Tag>{row.role}</Tag>)}
+                {listCard(
+                  members,
+                  (row) => row.display_name,
+                  (row) => (
+                    <Tag>{row.role}</Tag>
+                  ),
+                )}
               </Card>
             ),
           },
@@ -214,8 +265,9 @@ export default function FamilyPage() {
             key: "albums",
             label: t("family.tabs.albums", "相册"),
             children: (
-              <Card>
+              <Card className={styles.panelCard}>
                 <Form
+                  className={styles.quickForm}
                   layout="inline"
                   onFinish={async (values: { name: string }) => {
                     await homeMindFamilyApi.createAlbum(familyId, values);
@@ -225,11 +277,19 @@ export default function FamilyPage() {
                   <Form.Item name="name" rules={[{ required: true }]}>
                     <Input placeholder={t("family.albumName", "相册名称")} />
                   </Form.Item>
-                  <Button icon={<Plus size={16} />} type="primary" htmlType="submit">
+                  <Button
+                    icon={<Plus size={16} />}
+                    type="primary"
+                    htmlType="submit"
+                  >
                     {t("common.create", "创建")}
                   </Button>
                 </Form>
-                {listCard(albums, (row) => row.name, (row) => row.description)}
+                {listCard(
+                  albums,
+                  (row) => row.name,
+                  (row) => row.description,
+                )}
               </Card>
             ),
           },
@@ -237,8 +297,9 @@ export default function FamilyPage() {
             key: "tasks",
             label: t("family.tabs.tasks", "任务"),
             children: (
-              <Card>
+              <Card className={styles.panelCard}>
                 <Form
+                  className={styles.quickForm}
                   layout="inline"
                   onFinish={async (values: { title: string }) => {
                     await homeMindFamilyApi.createTask(familyId, values);
@@ -246,13 +307,25 @@ export default function FamilyPage() {
                   }}
                 >
                   <Form.Item name="title" rules={[{ required: true }]}>
-                    <Input placeholder={t("family.taskTitle", "要完成的事情")} />
+                    <Input
+                      placeholder={t("family.taskTitle", "要完成的事情")}
+                    />
                   </Form.Item>
-                  <Button icon={<Plus size={16} />} type="primary" htmlType="submit">
+                  <Button
+                    icon={<Plus size={16} />}
+                    type="primary"
+                    htmlType="submit"
+                  >
                     {t("common.create", "创建")}
                   </Button>
                 </Form>
-                {listCard(tasks, (row) => row.title, (row) => <Tag>{row.status}</Tag>)}
+                {listCard(
+                  tasks,
+                  (row) => row.title,
+                  (row) => (
+                    <Tag>{row.status}</Tag>
+                  ),
+                )}
               </Card>
             ),
           },
@@ -260,22 +333,45 @@ export default function FamilyPage() {
             key: "memories",
             label: t("family.tabs.memories", "家庭记忆"),
             children: (
-              <Card>
+              <Card className={styles.panelCard}>
                 <Form
+                  className={styles.quickForm}
                   layout="inline"
                   onFinish={async (values: { content: string }) => {
-                    await homeMindFamilyApi.createMemory(familyId, values.content);
+                    await homeMindFamilyApi.createMemory(
+                      familyId,
+                      values.content,
+                    );
                     await loadFamilyData();
                   }}
                 >
-                  <Form.Item name="content" rules={[{ required: true }]} style={{ flex: 1 }}>
-                    <Input placeholder={t("family.memoryContent", "记录一件家庭共同记忆")} />
+                  <Form.Item
+                    name="content"
+                    rules={[{ required: true }]}
+                    style={{ flex: 1 }}
+                  >
+                    <Input
+                      placeholder={t(
+                        "family.memoryContent",
+                        "记录一件家庭共同记忆",
+                      )}
+                    />
                   </Form.Item>
-                  <Button icon={<Plus size={16} />} type="primary" htmlType="submit">
+                  <Button
+                    icon={<Plus size={16} />}
+                    type="primary"
+                    htmlType="submit"
+                  >
                     {t("common.add", "添加")}
                   </Button>
                 </Form>
-                {listCard(memories, (row) => row.content, (row) => <Tag>{row.memory_type}</Tag>)}
+                {listCard(
+                  memories,
+                  (row) => row.content,
+                  (row) => (
+                    <Tag>{row.memory_type}</Tag>
+                  ),
+                )}
               </Card>
             ),
           },
@@ -283,23 +379,32 @@ export default function FamilyPage() {
             key: "search",
             label: t("family.tabs.search", "统一搜索"),
             children: (
-              <Card>
+              <Card className={styles.panelCard}>
                 <Input.Search
                   enterButton={<Search size={16} />}
-                  placeholder={t("family.searchPlaceholder", "搜索成员、事件、记忆和资产")}
-                  onSearch={async (query) => setResults(await homeMindFamilyApi.search(familyId, query))}
+                  placeholder={t(
+                    "family.searchPlaceholder",
+                    "搜索成员、事件、记忆和资产",
+                  )}
+                  onSearch={async (query) =>
+                    setResults(await homeMindFamilyApi.search(familyId, query))
+                  }
                 />
-                {listCard(results, (row) => row.title, (row) => (
-                  <Space direction="vertical" size={2}>
-                    <Tag>{row.kind}</Tag>
-                    <Text type="secondary">{row.snippet}</Text>
-                  </Space>
-                ))}
+                {listCard(
+                  results,
+                  (row) => row.title,
+                  (row) => (
+                    <Space direction="vertical" size={2}>
+                      <Tag>{row.kind}</Tag>
+                      <Text type="secondary">{row.snippet}</Text>
+                    </Space>
+                  ),
+                )}
               </Card>
             ),
           },
         ]}
       />
-    </div>
+    </PageShell.FillTabs>
   );
 }

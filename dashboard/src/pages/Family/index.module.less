@@ -1,0 +1,90 @@
+.loading,
+.emptyWrap {
+  min-height: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyCard {
+  width: min(100%, 520px);
+}
+
+.familySelect {
+  width: 224px;
+}
+
+.tabs {
+  height: 100%;
+}
+
+.overview {
+  max-width: 1120px;
+}
+
+.familyName {
+  margin: 4px 0 20px !important;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.statCard {
+  border-color: var(--fn-border-secondary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.panelCard {
+  max-width: 960px;
+  border-color: var(--fn-border-secondary);
+}
+
+.quickForm {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--fn-border-secondary);
+}
+
+.dataList {
+  :global(.octop-list-item),
+  :global(.ant-list-item) {
+    padding-inline: 4px;
+  }
+}
+
+@media (max-width: 900px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .familySelect {
+    width: 148px;
+  }
+
+  .loading,
+  .emptyWrap {
+    min-height: 280px;
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .quickForm {
+    display: flex;
+    gap: 8px;
+
+    :global(.octop-form-item),
+    :global(.ant-form-item) {
+      flex: 1;
+      min-width: 0;
+      margin-inline-end: 0;
+    }
+  }
+}
