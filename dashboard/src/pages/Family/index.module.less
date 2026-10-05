@@ -26,6 +26,15 @@
   :global(.ant-tabs-nav-list) {
     flex-direction: row !important;
   }
+
+  :global(.octop-tabs-tab:nth-child(n + 6)),
+  :global(.ant-tabs-tab:nth-child(n + 6)) {
+    display: none;
+  }
+}
+
+.moreTabActive {
+  color: var(--fn-color-primary) !important;
 }
 
 .taskFilter {
@@ -78,6 +87,30 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.albumThumbnailPlaceholder {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--fn-text-tertiary);
+  background: var(--fn-bg-layout);
+}
+
+.assetThumbnail {
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.duplicateAsset {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
 }
 
 .assetPicker {
@@ -145,6 +178,12 @@
 
 .photoToolbar {
   width: 100%;
+  margin-bottom: 12px;
+}
+
+.selectedPhotoPreview {
+  display: grid;
+  gap: 8px;
   margin-bottom: 12px;
 }
 

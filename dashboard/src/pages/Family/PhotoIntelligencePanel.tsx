@@ -25,6 +25,7 @@ import {
   type PhotoProvider,
   type SimilarPhoto,
 } from "../../api/modules/homeMindFamily";
+import FamilyAssetPreview from "./FamilyAssetPreview";
 import styles from "./index.module.less";
 
 interface PhotoIntelligencePanelProps {
@@ -136,9 +137,17 @@ export default function PhotoIntelligencePanel({
           </Button>
         </Space>
         {selected && (
-          <Typography.Paragraph type="secondary" copyable>
-            {selected.uri}
-          </Typography.Paragraph>
+          <div className={styles.selectedPhotoPreview}>
+            <FamilyAssetPreview
+              familyId={familyId}
+              asset={selected}
+              size={240}
+              showName={false}
+            />
+            <Typography.Paragraph type="secondary" copyable>
+              {selected.uri}
+            </Typography.Paragraph>
+          </div>
         )}
         {analysis && (
           <div className={styles.analysisCard}>
@@ -226,7 +235,13 @@ export default function PhotoIntelligencePanel({
             return (
               <List.Item>
                 <List.Item.Meta
-                  title={photo?.name ?? item.asset_id}
+                  title={
+                    photo ? (
+                      <FamilyAssetPreview familyId={familyId} asset={photo} />
+                    ) : (
+                      item.asset_id
+                    )
+                  }
                   description={`${t("family.hammingDistance", "差异距离")}: ${
                     item.hamming_distance
                   }`}

@@ -4,9 +4,9 @@ import {
   Button,
   Card,
   DatePicker,
+  Dropdown,
   Empty,
   Form,
-  Image,
   Input,
   List,
   Modal,
@@ -19,13 +19,21 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { Pencil, Plus, Search, Settings, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  Pencil,
+  Plus,
+  Search,
+  Settings,
+  Trash2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useServerTimezone } from "../../hooks/useServerTimezone";
 import PageShell from "../../layouts/PageShell";
 import { formatServerDateTime } from "../../utils/formatMessageTime";
 import AccessPanel from "./AccessPanel";
 import AssetsPanel from "./AssetsPanel";
+import FamilyAssetPreview from "./FamilyAssetPreview";
 import FileManagerPanel from "./FileManagerPanel";
 import GovernancePanel from "./GovernancePanel";
 import PhotoIntelligencePanel from "./PhotoIntelligencePanel";
@@ -47,43 +55,15 @@ import styles from "./index.module.less";
 
 const { Text, Title } = Typography;
 
-function AlbumAsset({
-  familyId,
-  asset,
-}: {
-  familyId: string;
-  asset: FamilyAsset;
-}) {
-  const [src, setSrc] = useState<string>();
-
-  useEffect(() => {
-    if (asset.asset_type !== "PHOTO") return;
-    let objectUrl: string | undefined;
-    let cancelled = false;
-    void homeMindFamilyApi
-      .getAssetContent(familyId, asset.id)
-      .then((blob) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSrc(objectUrl);
-      })
-      .catch(() => {
-        if (!cancelled) setSrc(undefined);
-      });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [asset.asset_type, asset.id, familyId]);
-
-  if (asset.asset_type !== "PHOTO") return <>{asset.name}</>;
-  return (
-    <Space>
-      <Image width={56} height={56} src={src} alt={asset.name} />
-      <Text>{asset.name}</Text>
-    </Space>
-  );
-}
+const MORE_TAB_KEYS = new Set([
+  "memories",
+  "assets",
+  "access",
+  "photos",
+  "files",
+  "governance",
+  "search",
+]);
 
 export default function FamilyPage() {
   const { t } = useTranslation();
@@ -103,6 +83,7 @@ export default function FamilyPage() {
   );
   const [results, setResults] = useState<FamilySearchResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("home");
   const [creatingFamily, setCreatingFamily] = useState(false);
   const [familyEditorOpen, setFamilyEditorOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
@@ -294,6 +275,60 @@ export default function FamilyPage() {
         <Tabs
           className={styles.tabs}
           tabPosition="top"
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          tabBarExtraContent={
+            <Dropdown
+              trigger={["click"]}
+              menu={{
+                selectedKeys: MORE_TAB_KEYS.has(activeTab) ? [activeTab] : [],
+                onClick: ({ key }) => setActiveTab(key),
+                items: [
+                  {
+                    key: "memories",
+                    label: t("family.tabs.memories", "家庭记忆"),
+                  },
+                  {
+                    key: "assets",
+                    label: t("family.tabs.assets", "家庭资产"),
+                  },
+                  {
+                    key: "photos",
+                    label: t("family.tabs.photos", "照片智能"),
+                  },
+                  {
+                    key: "files",
+                    label: t("family.tabs.files", "家庭文件"),
+                  },
+                  { type: "divider" },
+                  {
+                    key: "access",
+                    label: t("family.tabs.access", "空间与权限"),
+                  },
+                  {
+                    key: "governance",
+                    label: t("family.tabs.governance", "审批与审计"),
+                  },
+                  {
+                    key: "search",
+                    label: t("family.tabs.search", "统一搜索"),
+                  },
+                ],
+              }}
+            >
+              <Button
+                type="text"
+                className={
+                  MORE_TAB_KEYS.has(activeTab)
+                    ? styles.moreTabActive
+                    : undefined
+                }
+              >
+                {t("family.tabs.more", "更多")}
+                <ChevronDown size={14} />
+              </Button>
+            </Dropdown>
+          }
           items={[
             {
               key: "home",
@@ -609,7 +644,7 @@ export default function FamilyPage() {
                                   ]}
                                 >
                                   {asset ? (
-                                    <AlbumAsset
+                                    <FamilyAssetPreview
                                       familyId={familyId}
                                       asset={asset}
                                     />
@@ -830,7 +865,20 @@ export default function FamilyPage() {
                   />
                   {listCard(
                     results,
-                    (row) => row.title,
+                    (row) =>
+                      row.kind === "ASSET" &&
+                      row.metadata.asset_type === "PHOTO" ? (
+                        <FamilyAssetPreview
+                          familyId={familyId}
+                          asset={{
+                            id: row.id,
+                            name: row.title,
+                            asset_type: "PHOTO",
+                          }}
+                        />
+                      ) : (
+                        row.title
+                      ),
                     (row) => (
                       <Space direction="vertical" size={2}>
                         <Tag>{row.kind}</Tag>

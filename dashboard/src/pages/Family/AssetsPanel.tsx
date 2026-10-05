@@ -27,6 +27,7 @@ import {
 } from "../../api/modules/homeMindFamily";
 import { formatServerDateTime } from "../../utils/formatMessageTime";
 import { useServerTimezone } from "../../hooks/useServerTimezone";
+import FamilyAssetPreview from "./FamilyAssetPreview";
 import styles from "./index.module.less";
 
 interface AssetsPanelProps {
@@ -294,7 +295,7 @@ export default function AssetsPanel({
               ]}
             >
               <List.Item.Meta
-                title={asset.name}
+                title={<FamilyAssetPreview familyId={familyId} asset={asset} />}
                 description={
                   <Space wrap>
                     <Tag>{asset.asset_type}</Tag>
@@ -331,8 +332,11 @@ export default function AssetsPanel({
               <List.Item.Meta
                 title={`${t("family.duplicateGroup", "重复组")} ${index + 1}`}
                 description={group.map((asset) => (
-                  <div key={asset.id}>
-                    {asset.name} · {asset.uri}
+                  <div key={asset.id} className={styles.duplicateAsset}>
+                    <FamilyAssetPreview familyId={familyId} asset={asset} />
+                    <Typography.Text type="secondary" ellipsis>
+                      {asset.uri}
+                    </Typography.Text>
                   </div>
                 ))}
               />
