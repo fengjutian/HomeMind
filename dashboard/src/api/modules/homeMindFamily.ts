@@ -253,12 +253,24 @@ export const homeMindFamilyApi = {
   },
   scanAssets: (
     familyId: string,
-    body: { directory: string; space_id?: string; recursive: boolean; visibility: string },
-  ) => request<FamilyAssetScanResult>(`${root}/${familyId}/assets/scan`, json(body)),
+    body: {
+      directory: string;
+      space_id?: string;
+      recursive: boolean;
+      visibility: string;
+    },
+  ) =>
+    request<FamilyAssetScanResult>(
+      `${root}/${familyId}/assets/scan`,
+      json(body),
+    ),
   listAssetSources: (familyId: string) =>
     request<FamilyAssetSource[]>(`${root}/${familyId}/asset-sources`),
   rescanAssetSource: (familyId: string, sourceId: string) =>
-    request<FamilyAssetScanResult>(`${root}/${familyId}/asset-sources/${sourceId}/scan`, json({})),
+    request<FamilyAssetScanResult>(
+      `${root}/${familyId}/asset-sources/${sourceId}/scan`,
+      json({}),
+    ),
   listDuplicateAssets: (familyId: string) =>
     request<FamilyAsset[][]>(`${root}/${familyId}/assets/duplicates`),
   deleteAssetIndex: (familyId: string, assetId: string) =>

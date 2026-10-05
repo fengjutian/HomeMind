@@ -789,18 +789,18 @@ export default function FamilyPage() {
                 </Card>
               ),
             },
-          {
-            key: "assets",
-            label: t("family.tabs.assets", "家庭资产"),
-            children: <AssetsPanel familyId={familyId} />,
-          },
-          {
-            key: "access",
-            label: t("family.tabs.access", "空间与权限"),
-            children: <AccessPanel familyId={familyId} members={members} />,
-          },
-          {
-            key: "search",
+            {
+              key: "assets",
+              label: t("family.tabs.assets", "家庭资产"),
+              children: <AssetsPanel familyId={familyId} />,
+            },
+            {
+              key: "access",
+              label: t("family.tabs.access", "空间与权限"),
+              children: <AccessPanel familyId={familyId} members={members} />,
+            },
+            {
+              key: "search",
               label: t("family.tabs.search", "统一搜索"),
               children: (
                 <Card className={styles.panelCard}>
