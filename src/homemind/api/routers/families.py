@@ -8,6 +8,7 @@ from functools import partial
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Response
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from homemind.infra.db.migrate import run_migrations
@@ -583,6 +584,26 @@ async def get_asset(
     family_id: str, asset_id: str, server: Server, user: CurrentUser
 ) -> FamilyAssetResponse:
     return _asset_response(_asset_manager(server).get(family_id, asset_id, user))
+
+
+@router.get(
+    "/{family_id}/assets/{asset_id}/content",
+    response_class=FileResponse,
+    summary="View or download family asset content",
+    description="Returns a local indexed asset after checking family access permissions.",
+)
+async def get_asset_content(
+    family_id: str, asset_id: str, server: Server, user: CurrentUser
+) -> FileResponse:
+    manager = _asset_manager(server)
+    asset = manager.get(family_id, asset_id, user)
+    path = manager.local_content_path(family_id, asset_id, user)
+    return FileResponse(
+        path,
+        media_type=asset.mime_type or "application/octet-stream",
+        filename=asset.name,
+        content_disposition_type="inline",
+    )
 
 
 @router.get(

@@ -1,4 +1,4 @@
-import { request } from "../request";
+import { request, requestBlob } from "../request";
 
 export interface HomeMindFamily {
   id: string;
@@ -350,6 +350,8 @@ export const homeMindFamilyApi = {
     request<FamilyAsset[][]>(`${root}/${familyId}/assets/duplicates`),
   deleteAssetIndex: (familyId: string, assetId: string) =>
     request<void>(`${root}/${familyId}/assets/${assetId}`, mutate("DELETE")),
+  getAssetContent: (familyId: string, assetId: string) =>
+    requestBlob(`${root}/${familyId}/assets/${assetId}/content`),
   analyzePhotoLocal: (familyId: string, assetId: string) =>
     request<PhotoIntelligence>(
       `${root}/${familyId}/photos/${assetId}/analyze-local`,

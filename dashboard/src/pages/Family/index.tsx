@@ -6,6 +6,7 @@ import {
   DatePicker,
   Empty,
   Form,
+  Image,
   Input,
   List,
   Modal,
@@ -45,6 +46,44 @@ import {
 import styles from "./index.module.less";
 
 const { Text, Title } = Typography;
+
+function AlbumAsset({
+  familyId,
+  asset,
+}: {
+  familyId: string;
+  asset: FamilyAsset;
+}) {
+  const [src, setSrc] = useState<string>();
+
+  useEffect(() => {
+    if (asset.asset_type !== "PHOTO") return;
+    let objectUrl: string | undefined;
+    let cancelled = false;
+    void homeMindFamilyApi
+      .getAssetContent(familyId, asset.id)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setSrc(undefined);
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [asset.asset_type, asset.id, familyId]);
+
+  if (asset.asset_type !== "PHOTO") return <>{asset.name}</>;
+  return (
+    <Space>
+      <Image width={56} height={56} src={src} alt={asset.name} />
+      <Text>{asset.name}</Text>
+    </Space>
+  );
+}
 
 export default function FamilyPage() {
   const { t } = useTranslation();
@@ -254,6 +293,7 @@ export default function FamilyPage() {
       >
         <Tabs
           className={styles.tabs}
+          tabPosition="top"
           items={[
             {
               key: "home",
@@ -568,7 +608,14 @@ export default function FamilyPage() {
                                     />,
                                   ]}
                                 >
-                                  {asset?.name ?? assetId}
+                                  {asset ? (
+                                    <AlbumAsset
+                                      familyId={familyId}
+                                      asset={asset}
+                                    />
+                                  ) : (
+                                    assetId
+                                  )}
                                 </List.Item>
                               );
                             }}

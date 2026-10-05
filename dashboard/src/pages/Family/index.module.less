@@ -16,6 +16,16 @@
 
 .tabs {
   height: 100%;
+
+  :global(.octop-tabs-nav),
+  :global(.ant-tabs-nav) {
+    width: 100%;
+  }
+
+  :global(.octop-tabs-nav-list),
+  :global(.ant-tabs-nav-list) {
+    flex-direction: row !important;
+  }
 }
 
 .taskFilter {

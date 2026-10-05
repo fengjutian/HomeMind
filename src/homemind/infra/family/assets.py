@@ -14,13 +14,13 @@ from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 from zoneinfo import ZoneInfo
 
+from homemind.infra.db.repos.families import FamilyRepo
 from homemind.infra.db.repos.family_assets import (
     FamilyAssetRepo,
     FamilyAssetRow,
     FamilyAssetSourceRow,
     PhotoMetadataRow,
 )
-from homemind.infra.db.repos.families import FamilyRepo
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.manager import FamilyManager, PermissionEffect
 from octop.infra.db.repos._base import now_ts
@@ -338,6 +338,22 @@ class FamilyAssetManager:
     ) -> PhotoMetadataRow | None:
         self.get(family_id, asset_id, user)
         return self.repo.get_photo_metadata(asset_id)
+
+    def local_content_path(self, family_id: str, asset_id: str, user: User) -> Path:
+        asset = self.get(family_id, asset_id, user)
+        parsed = urlparse(asset.uri)
+        if parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "asset content is not stored in a local file",
+            )
+        raw_path = url2pathname(unquote(parsed.path))
+        if os.name == "nt" and raw_path.startswith("\\") and raw_path[2:3] == ":":
+            raw_path = raw_path[1:]
+        path = Path(raw_path)
+        if asset.status != "INDEXED" or not path.is_file():
+            raise OctopError(ErrorCode.NOT_FOUND, "family asset content not found")
+        return path
 
     def duplicate_groups(
         self, family_id: str, user: User
