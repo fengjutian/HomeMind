@@ -186,9 +186,14 @@ async def mutate_file(
     }
     if body.destination is not None:
         payload["destination"] = body.destination
-    transaction, approval = _transactions(server).plan(
-        family_id, user, action=body.action, payload=payload
+    call = partial(
+        _transactions(server).plan,
+        family_id,
+        user,
+        action=body.action,
+        payload=payload,
     )
+    transaction, approval = await asyncio.to_thread(call)
     return FilesystemMutationResponse(
         transaction=TransactionResponse.model_validate(transaction),
         approval=(ApprovalResponse.model_validate(approval) if approval is not None else None),

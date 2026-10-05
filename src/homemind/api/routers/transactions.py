@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from functools import partial
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -114,7 +116,8 @@ async def approve(
     server: Server,
     user: CurrentUser,
 ) -> object:
-    return _manager(server).approve(family_id, approval_id, user, body.reason)
+    call = partial(_manager(server).approve, family_id, approval_id, user, body.reason)
+    return await asyncio.to_thread(call)
 
 
 @router.post(
