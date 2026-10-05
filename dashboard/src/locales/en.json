@@ -127,12 +127,19 @@
       "assets": "Assets",
       "access": "Spaces & permissions",
       "photos": "Photo intelligence",
+      "media": "Media",
       "governance": "Approvals & audit",
       "files": "Family files",
       "memories": "Family memories",
       "search": "Search",
       "more": "More"
-    }
+    },
+    "mediaAll": "All",
+    "mediaVideos": "Videos",
+    "mediaAudio": "Audio",
+    "searchMedia": "Search media files",
+    "noMedia": "No media yet. Scan a server directory in Family Assets first.",
+    "playMedia": "Play"
   },
   "layout": {
     "collapsePanel": "Collapse panel",

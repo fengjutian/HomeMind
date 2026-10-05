@@ -36,6 +36,7 @@ import AssetsPanel from "./AssetsPanel";
 import FamilyAssetPreview from "./FamilyAssetPreview";
 import FileManagerPanel from "./FileManagerPanel";
 import GovernancePanel from "./GovernancePanel";
+import MediaPanel from "./MediaPanel";
 import PhotoIntelligencePanel from "./PhotoIntelligencePanel";
 import TaskPanel from "./TaskPanel";
 
@@ -60,6 +61,7 @@ const MORE_TAB_KEYS = new Set([
   "assets",
   "access",
   "photos",
+  "media",
   "files",
   "governance",
   "search",
@@ -295,6 +297,10 @@ export default function FamilyPage() {
                   {
                     key: "photos",
                     label: t("family.tabs.photos", "照片智能"),
+                  },
+                  {
+                    key: "media",
+                    label: t("family.tabs.media", "影音"),
                   },
                   {
                     key: "files",
@@ -835,6 +841,11 @@ export default function FamilyPage() {
               children: (
                 <PhotoIntelligencePanel familyId={familyId} members={members} />
               ),
+            },
+            {
+              key: "media",
+              label: t("family.tabs.media", "影音"),
+              children: <MediaPanel familyId={familyId} />,
             },
             {
               key: "files",

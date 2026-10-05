@@ -1,0 +1,30 @@
+.routeProgress {
+  position: absolute;
+  z-index: 1000;
+  top: 0;
+  left: 0;
+  width: 35%;
+  height: 2px;
+  pointer-events: none;
+  background: var(--fn-primary, #008577);
+  box-shadow: 0 0 8px
+    color-mix(in srgb, var(--fn-primary, #008577) 55%, transparent);
+  animation: route-progress 1s ease-in-out infinite;
+}
+
+@keyframes route-progress {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(385%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .routeProgress {
+    width: 100%;
+    animation: none;
+  }
+}

@@ -41,6 +41,8 @@ export default function SidebarCollapsedIconNav({
             <button
               type="button"
               onClick={() => onNavigate(item.path)}
+              onFocus={() => prefetchRoute(item.path)}
+              onPointerDown={() => prefetchRoute(item.path)}
               style={{
                 display: "flex",
                 alignItems: "center",

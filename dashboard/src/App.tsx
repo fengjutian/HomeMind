@@ -159,10 +159,9 @@ function ThemedApp() {
 
 function App() {
   return (
-    // `useTransitions` off: with router transitions on, React keeps the old
-    // page mounted while a lazy route chunk downloads and never renders the
-    // Suspense fallback, so a nav click looks like it did nothing.
-    <BrowserRouter useTransitions={false}>
+    // Keep the current module visible while the next lazy route chunk loads.
+    // MainLayout renders an immediate progress cue during the transition.
+    <BrowserRouter useTransitions>
       <GlobalErrorBoundary>
         <GlobalStyle />
         <ThemeProvider>

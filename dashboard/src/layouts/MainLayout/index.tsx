@@ -26,6 +26,7 @@ import RequirePermission from "../../components/RequirePermission";
 import { routeNeedsPermission } from "../../utils/permissions";
 import { useLayoutMode } from "../../context/LayoutModeContext";
 import { useDashboardPushToast } from "../../hooks/useDashboardPushToast";
+import styles from "./index.module.less";
 
 const Chat = lazy(() => import("../../pages/Chat"));
 const WorkbenchPage = lazy(() => import("../../pages/Control/Workbench"));
@@ -71,6 +72,11 @@ export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(() => getSavedCollapsed());
   const [chatSidebarOpen, setChatSidebarOpen] = useChatSidebarOpen();
   const [workbenchMounted, setWorkbenchMounted] = useState(() => onWorkbench);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPendingPath(null);
+  }, [currentPath]);
 
   useEffect(() => {
     if (onWorkbench) {
@@ -222,6 +228,7 @@ export default function MainLayout() {
               selectedKey={selectedKey}
               collapsed={collapsed}
               onToggle={toggleCollapsed}
+              onNavigationStart={setPendingPath}
               isMobile={isMobile}
             />
             {!isMobile && (
@@ -250,6 +257,7 @@ export default function MainLayout() {
           {/* Right column: mobile header (if any) + page content */}
           <div
             style={{
+              position: "relative",
               flex: 1,
               minWidth: 0,
               minHeight: 0,
@@ -258,6 +266,12 @@ export default function MainLayout() {
               overflow: "hidden",
             }}
           >
+            {pendingPath && pendingPath !== currentPath ? (
+              <div
+                className={styles.routeProgress}
+                aria-hidden="true"
+              />
+            ) : null}
             {isMobile &&
               !(
                 SELF_HEADER_PATHS.has(currentPath) ||

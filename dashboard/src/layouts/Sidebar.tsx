@@ -117,6 +117,7 @@ interface SidebarProps {
   selectedKey: string;
   collapsed: boolean;
   onToggle: () => void;
+  onNavigationStart?: (path: string) => void;
   isMobile?: boolean;
 }
 
@@ -167,6 +168,8 @@ function NavItemButton({
         type="button"
         className={styles.navItemMain}
         onClick={() => onNavigate(item.path)}
+        onFocus={() => prefetchRoute(item.path)}
+        onPointerDown={() => prefetchRoute(item.path)}
         style={{
           color: active
             ? "var(--fn-sidebar-item-active-text)"
@@ -380,6 +383,7 @@ export default function Sidebar({
   selectedKey,
   collapsed,
   onToggle,
+  onNavigationStart,
   isMobile,
 }: SidebarProps) {
   const navigate = useNavigate();
@@ -460,6 +464,7 @@ export default function Sidebar({
       if (isMobile) onToggle();
       return;
     }
+    onNavigationStart?.(path);
     navigate(path);
     if (isMobile) onToggle();
   };
