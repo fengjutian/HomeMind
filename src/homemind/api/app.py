@@ -57,4 +57,11 @@ def build_app(server: OctopServer) -> FastAPI:
         prefix="/api/homemind/families",
         tags=["homemind-photos"],
     )
+    # Octop installs its dashboard catch-all while building the base app. Keep
+    # that fallback behind HomeMind's routes so it cannot swallow API GETs.
+    for route in app.routes:
+        if getattr(route, "name", None) == "spa_fallback":
+            app.routes.remove(route)
+            app.routes.append(route)
+            break
     return app

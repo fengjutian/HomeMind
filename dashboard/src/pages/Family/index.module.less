@@ -55,6 +55,26 @@
   }
 }
 
+.inlineSelect {
+  min-width: 148px;
+}
+
+.albumGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.assetPicker {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.modalFooter {
+  width: 100%;
+  justify-content: space-between;
+}
+
 @media (max-width: 900px) {
   .statsGrid {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
@@ -86,5 +106,9 @@
       min-width: 0;
       margin-inline-end: 0;
     }
+  }
+
+  .albumGrid {
+    grid-template-columns: 1fr;
   }
 }
