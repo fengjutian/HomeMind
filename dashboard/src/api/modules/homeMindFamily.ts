@@ -141,6 +141,62 @@ export interface FamilyAssetScanResult {
   errors: string[];
 }
 
+export interface PhotoIntelligence {
+  asset_id: string;
+  family_id: string;
+  description: string;
+  objects: string[];
+  scenes: string[];
+  faces: Array<Record<string, unknown>>;
+  location_name: string | null;
+  perceptual_hash: string | null;
+  has_embedding: boolean;
+  analyzed_at: number;
+}
+
+export interface SimilarPhoto {
+  asset_id: string;
+  hamming_distance: number;
+}
+
+export interface FamilyApproval {
+  id: string;
+  transaction_id: string;
+  family_id: string;
+  status: string;
+  requested_by: number;
+  decided_by: number | null;
+  reason: string | null;
+  created_at: number;
+  decided_at: number | null;
+}
+
+export interface FamilyTransaction {
+  id: string;
+  family_id: string;
+  requested_by: number;
+  action: string;
+  payload_json: string;
+  status: string;
+  result_json: string | null;
+  error: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface FamilyAudit {
+  id: string;
+  family_id: string;
+  user_id: number;
+  transaction_id: string | null;
+  action: string;
+  target: string | null;
+  result: string;
+  approval: string | null;
+  detail_json: string;
+  created_at: number;
+}
+
 const root = "/homemind/families";
 const json = (body: unknown): RequestInit => ({
   method: "POST",
@@ -275,6 +331,61 @@ export const homeMindFamilyApi = {
     request<FamilyAsset[][]>(`${root}/${familyId}/assets/duplicates`),
   deleteAssetIndex: (familyId: string, assetId: string) =>
     request<void>(`${root}/${familyId}/assets/${assetId}`, mutate("DELETE")),
+  analyzePhotoLocal: (familyId: string, assetId: string) =>
+    request<PhotoIntelligence>(
+      `${root}/${familyId}/photos/${assetId}/analyze-local`,
+      json({}),
+    ),
+  analyzePhoto: (
+    familyId: string,
+    assetId: string,
+    body: {
+      vision_provider_id: number;
+      vision_model: string;
+      embedding_provider_id?: number;
+      embedding_model?: string;
+      reverse_geocode: boolean;
+      recognize_faces: boolean;
+    },
+  ) =>
+    request<PhotoIntelligence>(
+      `${root}/${familyId}/photos/${assetId}/analyze`,
+      json(body),
+    ),
+  setFaceReference: (familyId: string, assetId: string, memberId: string) =>
+    request<void>(`${root}/${familyId}/photos/${assetId}/face-reference`, {
+      method: "PUT",
+      body: JSON.stringify({ member_id: memberId }),
+    }),
+  deleteFaceReference: (familyId: string, assetId: string) =>
+    request<void>(
+      `${root}/${familyId}/photos/${assetId}/face-reference`,
+      mutate("DELETE"),
+    ),
+  listSimilarPhotos: (familyId: string, assetId: string, maxDistance = 8) =>
+    request<SimilarPhoto[]>(
+      `${root}/${familyId}/photos/${assetId}/similar?max_distance=${maxDistance}`,
+    ),
+  listApprovals: (familyId: string, status: string) =>
+    request<FamilyApproval[]>(
+      `${root}/${familyId}/approvals?status=${encodeURIComponent(status)}`,
+    ),
+  decideApproval: (
+    familyId: string,
+    approvalId: string,
+    decision: "approve" | "reject",
+    reason?: string,
+  ) =>
+    request<FamilyTransaction>(
+      `${root}/${familyId}/approvals/${approvalId}/${decision}`,
+      json({ reason }),
+    ),
+  getTransaction: (familyId: string, transactionId: string) =>
+    request<FamilyTransaction>(
+      `${root}/${familyId}/transactions/${transactionId}`,
+    ),
+  listAudit: (familyId: string) =>
+    request<FamilyAudit[]>(`${root}/${familyId}/audit-log`),
   listTasks: (familyId: string) =>
     request<FamilyTask[]>(`${root}/${familyId}/tasks`),
   createTask: (
