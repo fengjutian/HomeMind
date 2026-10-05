@@ -36,7 +36,6 @@ import AssetsPanel from "./AssetsPanel";
 import FamilyAssetPreview from "./FamilyAssetPreview";
 import FileManagerPanel from "./FileManagerPanel";
 import GovernancePanel from "./GovernancePanel";
-import MediaPanel from "./MediaPanel";
 import PhotoIntelligencePanel from "./PhotoIntelligencePanel";
 import TaskPanel from "./TaskPanel";
 
@@ -61,7 +60,6 @@ const MORE_TAB_KEYS = new Set([
   "assets",
   "access",
   "photos",
-  "media",
   "files",
   "governance",
   "search",
@@ -297,10 +295,6 @@ export default function FamilyPage() {
                   {
                     key: "photos",
                     label: t("family.tabs.photos", "照片智能"),
-                  },
-                  {
-                    key: "media",
-                    label: t("family.tabs.media", "影音"),
                   },
                   {
                     key: "files",
@@ -553,7 +547,7 @@ export default function FamilyPage() {
             },
             {
               key: "albums",
-              label: t("family.tabs.albums", "相册"),
+              label: t("family.tabs.albums", "相册与影音"),
               children: (
                 <Card className={styles.panelCard}>
                   <Form
@@ -596,7 +590,7 @@ export default function FamilyPage() {
                             className={styles.assetPicker}
                             placeholder={t(
                               "family.addIndexedAsset",
-                              "添加已索引照片或文件",
+                              "添加已索引照片、视频或音频",
                             )}
                             showSearch
                             optionFilterProp="label"
@@ -841,11 +835,6 @@ export default function FamilyPage() {
               children: (
                 <PhotoIntelligencePanel familyId={familyId} members={members} />
               ),
-            },
-            {
-              key: "media",
-              label: t("family.tabs.media", "影音"),
-              children: <MediaPanel familyId={familyId} />,
             },
             {
               key: "files",

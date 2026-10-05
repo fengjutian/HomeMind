@@ -121,25 +121,18 @@
     "tabs": {
       "home": "首页",
       "members": "成员",
-      "albums": "相册",
+      "albums": "相册与影音",
       "tasks": "任务",
       "events": "家庭日程",
       "assets": "家庭资产",
       "access": "空间与权限",
       "photos": "照片智能",
-      "media": "影音",
       "governance": "审批与审计",
       "files": "家庭文件",
       "memories": "家庭记忆",
       "search": "统一搜索",
       "more": "更多"
-    },
-    "mediaAll": "全部",
-    "mediaVideos": "视频",
-    "mediaAudio": "音频",
-    "searchMedia": "搜索影音文件",
-    "noMedia": "暂无影音，请先在家庭资产中扫描服务器目录",
-    "playMedia": "播放"
+    }
   },
   "layout": {
     "collapsePanel": "收起面板",
