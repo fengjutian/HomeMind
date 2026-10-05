@@ -456,6 +456,22 @@ export const homeMindFamilyApi = {
       due_at?: number;
     },
   ) => request<FamilyTask>(`${root}/${familyId}/tasks`, json(body)),
+  updateTask: (
+    familyId: string,
+    taskId: string,
+    body: Partial<
+      Pick<
+        FamilyTask,
+        "title" | "description" | "status" | "assigned_member_id" | "due_at"
+      >
+    >,
+  ) =>
+    request<FamilyTask>(
+      `${root}/${familyId}/tasks/${taskId}`,
+      mutate("PATCH", body),
+    ),
+  deleteTask: (familyId: string, taskId: string) =>
+    request<void>(`${root}/${familyId}/tasks/${taskId}`, mutate("DELETE")),
   listEvents: (familyId: string) =>
     request<FamilyEvent[]>(`${root}/${familyId}/events`),
   createEvent: (

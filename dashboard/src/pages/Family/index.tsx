@@ -6,6 +6,7 @@ import {
   DatePicker,
   Empty,
   Form,
+  Grid,
   Input,
   List,
   Modal,
@@ -28,6 +29,7 @@ import AssetsPanel from "./AssetsPanel";
 import FileManagerPanel from "./FileManagerPanel";
 import GovernancePanel from "./GovernancePanel";
 import PhotoIntelligencePanel from "./PhotoIntelligencePanel";
+import TaskPanel from "./TaskPanel";
 
 import {
   homeMindFamilyApi,
@@ -47,6 +49,7 @@ const { Text, Title } = Typography;
 
 export default function FamilyPage() {
   const { t } = useTranslation();
+  const screens = Grid.useBreakpoint();
   const serverTimezone = useServerTimezone();
   const { message } = App.useApp();
   const [families, setFamilies] = useState<HomeMindFamily[]>([]);
@@ -253,6 +256,7 @@ export default function FamilyPage() {
       >
         <Tabs
           className={styles.tabs}
+          tabPosition={screens.md ? "left" : "top"}
           items={[
             {
               key: "home",
@@ -583,79 +587,13 @@ export default function FamilyPage() {
               key: "tasks",
               label: t("family.tabs.tasks", "任务"),
               children: (
-                <Card className={styles.panelCard}>
-                  <Form
-                    className={styles.quickForm}
-                    layout="inline"
-                    onFinish={async (values: {
-                      title: string;
-                      description?: string;
-                      assigned_member_id?: string;
-                      due_at?: { unix: () => number };
-                    }) => {
-                      await homeMindFamilyApi.createTask(familyId, {
-                        ...values,
-                        due_at: values.due_at?.unix(),
-                      });
-                      await loadFamilyData();
-                    }}
-                  >
-                    <Form.Item name="title" rules={[{ required: true }]}>
-                      <Input
-                        placeholder={t("family.taskTitle", "要完成的事情")}
-                      />
-                    </Form.Item>
-                    <Form.Item name="description">
-                      <Input placeholder={t("family.description", "说明")} />
-                    </Form.Item>
-                    <Form.Item name="assigned_member_id">
-                      <Select
-                        allowClear
-                        className={styles.inlineSelect}
-                        placeholder={t("family.assignee", "负责人")}
-                        options={members.map((member) => ({
-                          value: member.id,
-                          label: member.display_name,
-                        }))}
-                      />
-                    </Form.Item>
-                    <Form.Item name="due_at">
-                      <DatePicker
-                        showTime
-                        placeholder={t("family.dueAt", "截止时间")}
-                      />
-                    </Form.Item>
-                    <Button
-                      icon={<Plus size={16} />}
-                      type="primary"
-                      htmlType="submit"
-                    >
-                      {t("common.create", "创建")}
-                    </Button>
-                  </Form>
-                  {listCard(
-                    tasks,
-                    (row) => row.title,
-                    (row) => (
-                      <Space wrap>
-                        <Tag>{row.status}</Tag>
-                        {row.assigned_member_id && (
-                          <Text type="secondary">
-                            {memberName(row.assigned_member_id)}
-                          </Text>
-                        )}
-                        {row.due_at && (
-                          <Text type="secondary">
-                            {formatServerDateTime(row.due_at, serverTimezone)}
-                          </Text>
-                        )}
-                        {row.description && (
-                          <Text type="secondary">{row.description}</Text>
-                        )}
-                      </Space>
-                    ),
-                  )}
-                </Card>
+                <TaskPanel
+                  familyId={familyId}
+                  members={members}
+                  tasks={tasks}
+                  timezone={serverTimezone}
+                  reload={loadFamilyData}
+                />
               ),
             },
             {

@@ -93,3 +93,29 @@ class FamilyTaskRepo:
         with self._db.connect() as conn:
             rows = conn.execute(sql, params).fetchall()
         return map_rows(rows, FamilyTaskRow)
+
+    def update(self, task_id: str, **values: object) -> FamilyTaskRow | None:
+        allowed = {
+            "title",
+            "description",
+            "status",
+            "assigned_member_id",
+            "due_at",
+        }
+        fields = [key for key in values if key in allowed]
+        if fields:
+            params = [values[key] for key in fields]
+            params.extend((now_ts(), task_id))
+            with self._db.transaction() as conn:
+                conn.execute(
+                    f"UPDATE homemind_family_tasks SET "
+                    f"{', '.join(f'{key} = ?' for key in fields)}, updated_at = ? "
+                    "WHERE task_id = ?",
+                    params,
+                )
+        return self.get(task_id)
+
+    def delete(self, task_id: str) -> bool:
+        with self._db.transaction() as conn:
+            cursor = conn.execute("DELETE FROM homemind_family_tasks WHERE task_id = ?", (task_id,))
+        return bool(cursor.rowcount > 0)

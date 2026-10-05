@@ -16,6 +16,15 @@
 
 .tabs {
   height: 100%;
+
+  :global(.ant-tabs-nav) {
+    min-width: 152px;
+  }
+}
+
+.taskFilter {
+  width: 180px;
+  margin-bottom: 12px;
 }
 
 .overview {
@@ -236,5 +245,9 @@
 
   .fileToolbar {
     grid-template-columns: 1fr;
+  }
+
+  .tabs :global(.ant-tabs-nav) {
+    min-width: 0;
   }
 }

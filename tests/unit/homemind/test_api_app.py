@@ -12,6 +12,7 @@ def test_homemind_app_registers_family_routes() -> None:
     assert "/api/homemind/families/{family_id}/members" in paths
     assert "/api/homemind/families/{family_id}/albums" in paths
     assert "/api/homemind/families/{family_id}/tasks" in paths
+    assert "/api/homemind/families/{family_id}/tasks/{task_id}" in paths
     assert "/api/homemind/families/{family_id}/memories" in paths
     assert "/api/homemind/families/{family_id}/search" in paths
     assert "/api/homemind/families/{family_id}/filesystem" in paths

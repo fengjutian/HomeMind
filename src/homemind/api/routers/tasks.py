@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from homemind.infra.db.migrate import run_migrations
@@ -23,6 +23,14 @@ CurrentUser = Annotated[User, Depends(current_user)]
 class TaskCreateBody(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=5000)
+    assigned_member_id: str | None = None
+    due_at: int | None = None
+
+
+class TaskUpdateBody(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
+    status: TaskStatus | None = None
     assigned_member_id: str | None = None
     due_at: int | None = None
 
@@ -73,3 +81,28 @@ async def list_tasks(
     status: Annotated[TaskStatus | None, Query()] = None,
 ) -> object:
     return _manager(server).list(family_id, user, status=status)
+
+
+@router.patch(
+    "/{family_id}/tasks/{task_id}",
+    response_model=TaskResponse,
+    summary="Update a family task",
+)
+async def update_task(
+    family_id: str,
+    task_id: str,
+    body: TaskUpdateBody,
+    server: Server,
+    user: CurrentUser,
+) -> object:
+    return _manager(server).update(family_id, task_id, user, body.model_dump(exclude_unset=True))
+
+
+@router.delete(
+    "/{family_id}/tasks/{task_id}",
+    status_code=204,
+    summary="Delete a family task",
+)
+async def delete_task(family_id: str, task_id: str, server: Server, user: CurrentUser) -> Response:
+    _manager(server).delete(family_id, task_id, user)
+    return Response(status_code=204)
