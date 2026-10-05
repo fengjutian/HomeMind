@@ -23,6 +23,8 @@ import { useTranslation } from "react-i18next";
 import { useServerTimezone } from "../../hooks/useServerTimezone";
 import PageShell from "../../layouts/PageShell";
 import { formatServerDateTime } from "../../utils/formatMessageTime";
+import AccessPanel from "./AccessPanel";
+import AssetsPanel from "./AssetsPanel";
 
 import {
   homeMindFamilyApi,
@@ -787,8 +789,18 @@ export default function FamilyPage() {
                 </Card>
               ),
             },
-            {
-              key: "search",
+          {
+            key: "assets",
+            label: t("family.tabs.assets", "家庭资产"),
+            children: <AssetsPanel familyId={familyId} />,
+          },
+          {
+            key: "access",
+            label: t("family.tabs.access", "空间与权限"),
+            children: <AccessPanel familyId={familyId} members={members} />,
+          },
+          {
+            key: "search",
               label: t("family.tabs.search", "统一搜索"),
               children: (
                 <Card className={styles.panelCard}>
