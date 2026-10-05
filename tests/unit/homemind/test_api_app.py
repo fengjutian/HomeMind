@@ -14,6 +14,10 @@ def test_homemind_app_registers_family_routes() -> None:
     assert "/api/homemind/families/{family_id}/tasks" in paths
     assert "/api/homemind/families/{family_id}/memories" in paths
     assert "/api/homemind/families/{family_id}/search" in paths
+    assert "/api/homemind/families/{family_id}/filesystem" in paths
+    assert "/api/homemind/families/{family_id}/filesystem/search" in paths
+    assert "/api/homemind/families/{family_id}/filesystem/read" in paths
+    assert "/api/homemind/families/{family_id}/filesystem/actions" in paths
 
 
 def test_homemind_routes_precede_dashboard_fallback() -> None:

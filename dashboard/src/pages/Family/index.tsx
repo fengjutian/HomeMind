@@ -25,6 +25,7 @@ import PageShell from "../../layouts/PageShell";
 import { formatServerDateTime } from "../../utils/formatMessageTime";
 import AccessPanel from "./AccessPanel";
 import AssetsPanel from "./AssetsPanel";
+import FileManagerPanel from "./FileManagerPanel";
 import GovernancePanel from "./GovernancePanel";
 import PhotoIntelligencePanel from "./PhotoIntelligencePanel";
 
@@ -129,6 +130,11 @@ export default function FamilyPage() {
       setLoading(false);
     }
   }, [familyId, message]);
+
+  const refreshAssets = useCallback(async () => {
+    if (!familyId) return;
+    setAssets(await homeMindFamilyApi.listAssets(familyId));
+  }, [familyId]);
 
   useEffect(() => void loadFamilies(), [loadFamilies]);
   useEffect(() => void loadFamilyData(), [loadFamilyData]);
@@ -794,7 +800,12 @@ export default function FamilyPage() {
             {
               key: "assets",
               label: t("family.tabs.assets", "家庭资产"),
-              children: <AssetsPanel familyId={familyId} />,
+              children: (
+                <AssetsPanel
+                  familyId={familyId}
+                  onAssetsChanged={refreshAssets}
+                />
+              ),
             },
             {
               key: "access",
@@ -807,6 +818,11 @@ export default function FamilyPage() {
               children: (
                 <PhotoIntelligencePanel familyId={familyId} members={members} />
               ),
+            },
+            {
+              key: "files",
+              label: t("family.tabs.files", "家庭文件"),
+              children: <FileManagerPanel familyId={familyId} />,
             },
             {
               key: "governance",

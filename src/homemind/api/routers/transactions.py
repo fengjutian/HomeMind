@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.context import FamilyContextManager
+from homemind.infra.family.filesystem import FamilyFilesystemManager
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.tasks import FamilyTaskManager
 from homemind.infra.family.transactions import FamilyTransactionManager
@@ -79,6 +80,11 @@ def _manager(server: OctopServer) -> FamilyTransactionManager:
         FamilyTaskManager(family, services.family_task_repo),
         services.family_transaction_repo,
         server.services.user_repo,
+        FamilyFilesystemManager(
+            family,
+            services.family_asset_repo,
+            services.family_transaction_repo,
+        ),
     )
 
 
@@ -142,7 +148,5 @@ async def get_transaction(
     response_model=list[AuditResponse],
     summary="List family agent audit records",
 )
-async def list_audit(
-    family_id: str, server: Server, user: CurrentUser
-) -> object:
+async def list_audit(family_id: str, server: Server, user: CurrentUser) -> object:
     return _manager(server).list_audit(family_id, user)

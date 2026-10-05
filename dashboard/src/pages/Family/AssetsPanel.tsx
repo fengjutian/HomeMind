@@ -31,6 +31,7 @@ import styles from "./index.module.less";
 
 interface AssetsPanelProps {
   familyId: string;
+  onAssetsChanged: () => Promise<void>;
 }
 
 const formatBytes = (bytes: number) => {
@@ -40,7 +41,10 @@ const formatBytes = (bytes: number) => {
   return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 };
 
-export default function AssetsPanel({ familyId }: AssetsPanelProps) {
+export default function AssetsPanel({
+  familyId,
+  onAssetsChanged,
+}: AssetsPanelProps) {
   const { t } = useTranslation();
   const { message } = App.useApp();
   const timezone = useServerTimezone();
@@ -102,7 +106,7 @@ export default function AssetsPanel({ familyId }: AssetsPanelProps) {
                 recursive: values.recursive === "true",
               });
               setScanResult(result);
-              await load();
+              await Promise.all([load(), onAssetsChanged()]);
             } finally {
               setScanning(false);
             }
@@ -198,7 +202,7 @@ export default function AssetsPanel({ familyId }: AssetsPanelProps) {
                         source.id,
                       ),
                     );
-                    await load();
+                    await Promise.all([load(), onAssetsChanged()]);
                   }}
                 >
                   {t("family.rescan", "重新扫描")}
@@ -280,7 +284,7 @@ export default function AssetsPanel({ familyId }: AssetsPanelProps) {
                       familyId,
                       asset.id,
                     );
-                    await load();
+                    await Promise.all([load(), onAssetsChanged()]);
                   }}
                 >
                   <Button type="text" danger icon={<Trash2 size={16} />}>

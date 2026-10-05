@@ -149,6 +149,33 @@
   width: 100%;
 }
 
+.fileManagerCard {
+  max-width: 1200px;
+  border-color: var(--fn-border-secondary);
+}
+
+.fileToolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(240px, 2fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sourceSelect {
+  width: 100%;
+}
+
+.fileBreadcrumb {
+  margin-bottom: 8px;
+}
+
+.filePreview {
+  max-height: 60vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--fn-font-mono);
+}
+
 @media (max-width: 900px) {
   .statsGrid {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
@@ -205,5 +232,9 @@
 
   .photoSelect {
     min-width: 100%;
+  }
+
+  .fileToolbar {
+    grid-template-columns: 1fr;
   }
 }

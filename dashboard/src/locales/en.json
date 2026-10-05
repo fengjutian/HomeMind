@@ -88,6 +88,20 @@
     "approved": "Operation approved",
     "rejected": "Operation rejected",
     "auditLog": "Audit log",
+    "fileManager": "Family files",
+    "noAssetSources": "Scan a local directory in Family Assets first",
+    "rootDirectory": "Root",
+    "parentDirectory": "Parent directory",
+    "searchCurrentSource": "Search this source",
+    "previewText": "Preview text",
+    "copy": "Copy",
+    "move": "Move",
+    "rename": "Rename",
+    "safeDeleteConfirm": "The file will be moved to the HomeMind trash. Continue?",
+    "sourcePath": "Source path",
+    "destinationPath": "Destination path",
+    "awaitingApproval": "Operation submitted for family administrator approval",
+    "operationComplete": "Operation completed",
     "tabs": {
       "home": "Home",
       "members": "Members",
@@ -98,6 +112,7 @@
       "access": "Spaces & permissions",
       "photos": "Photo intelligence",
       "governance": "Approvals & audit",
+      "files": "Family files",
       "memories": "Family memories",
       "search": "Search"
     }

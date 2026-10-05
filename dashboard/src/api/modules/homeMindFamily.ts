@@ -204,6 +204,17 @@ export interface PhotoProvider {
   models: Array<{ id: string; name?: string }>;
 }
 
+export interface FamilyFilesystemEntry {
+  path: string;
+  kind: "file" | "directory";
+  size_bytes: number | null;
+}
+
+export interface FilesystemMutationResult {
+  transaction: FamilyTransaction;
+  approval: FamilyApproval | null;
+}
+
 const root = "/homemind/families";
 const json = (body: unknown): RequestInit => ({
   method: "POST",
@@ -394,6 +405,46 @@ export const homeMindFamilyApi = {
     ),
   listAudit: (familyId: string) =>
     request<FamilyAudit[]>(`${root}/${familyId}/audit-log`),
+  listDirectory: (familyId: string, sourceId: string, path = ".") =>
+    request<FamilyFilesystemEntry[]>(
+      `${root}/${familyId}/filesystem?source_id=${encodeURIComponent(
+        sourceId,
+      )}&path=${encodeURIComponent(path)}`,
+    ),
+  searchDirectory: (
+    familyId: string,
+    sourceId: string,
+    query: string,
+    path = ".",
+  ) =>
+    request<FamilyFilesystemEntry[]>(
+      `${root}/${familyId}/filesystem/search?source_id=${encodeURIComponent(
+        sourceId,
+      )}&path=${encodeURIComponent(path)}&query=${encodeURIComponent(query)}`,
+    ),
+  readFile: (familyId: string, sourceId: string, path: string) =>
+    request<{ path: string; content: string }>(
+      `${root}/${familyId}/filesystem/read?source_id=${encodeURIComponent(
+        sourceId,
+      )}&path=${encodeURIComponent(path)}`,
+    ),
+  mutateFile: (
+    familyId: string,
+    body: {
+      action:
+        | "filesystem.copy"
+        | "filesystem.move"
+        | "filesystem.rename"
+        | "filesystem.delete";
+      source_id: string;
+      path: string;
+      destination?: string;
+    },
+  ) =>
+    request<FilesystemMutationResult>(
+      `${root}/${familyId}/filesystem/actions`,
+      json(body),
+    ),
   listTasks: (familyId: string) =>
     request<FamilyTask[]>(`${root}/${familyId}/tasks`),
   createTask: (

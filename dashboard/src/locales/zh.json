@@ -88,6 +88,20 @@
     "approved": "操作已批准",
     "rejected": "操作已拒绝",
     "auditLog": "审计日志",
+    "fileManager": "家庭文件",
+    "noAssetSources": "请先在家庭资产中扫描一个本地目录",
+    "rootDirectory": "根目录",
+    "parentDirectory": "返回上级",
+    "searchCurrentSource": "搜索当前目录源",
+    "previewText": "预览文本",
+    "copy": "复制",
+    "move": "移动",
+    "rename": "重命名",
+    "safeDeleteConfirm": "文件将移入 HomeMind 回收区，是否继续？",
+    "sourcePath": "源路径",
+    "destinationPath": "目标路径",
+    "awaitingApproval": "操作已提交，等待家庭管理员审批",
+    "operationComplete": "操作已完成",
     "tabs": {
       "home": "首页",
       "members": "成员",
@@ -98,6 +112,7 @@
       "access": "空间与权限",
       "photos": "照片智能",
       "governance": "审批与审计",
+      "files": "家庭文件",
       "memories": "家庭记忆",
       "search": "统一搜索"
     }
