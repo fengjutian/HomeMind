@@ -16,8 +16,8 @@ from octop.infra.utils.paths import PathLayout
 
 
 def _run_uvicorn(**kwargs: object) -> None:
-    """Indirection seam for tests; the real implementation runs uvicorn."""
-    from octop.launch import run_foreground_blocking
+    """Run the HomeMind composition root, including downstream API routes."""
+    from homemind.launch import run_foreground_blocking
 
     run_foreground_blocking(**kwargs)
 
