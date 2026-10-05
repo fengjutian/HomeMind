@@ -49,7 +49,7 @@ fi
 echo "starting octop --reload on port ${PORT}"
 (
   cd "$REPO"
-  exec env OCTOP_DESKTOP=1 uv run octop run --reload --host 127.0.0.1 --port "$PORT"
+  exec env OCTOP_DESKTOP=1 uv run homemind run --reload --host 127.0.0.1 --port "$PORT"
 ) &
 octop_pid=$!
 
@@ -66,7 +66,7 @@ done
 
 if ! curl -sf -o /dev/null --max-time 1 "$HEALTH"; then
   echo "Octop 未在 30 秒内就绪（${URL}）。" >&2
-  echo "请查看上方 octop run 的输出；常见原因：端口被占用、依赖缺失，或服务启动失败。" >&2
+  echo "请查看上方 homemind run 的输出；常见原因：端口被占用、依赖缺失，或服务启动失败。" >&2
   exit 1
 fi
 

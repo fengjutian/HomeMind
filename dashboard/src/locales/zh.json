@@ -2,6 +2,32 @@
   "app": {
     "pageTitle": "HomeMind - 懂你、帮你、陪你成长的智能伙伴"
   },
+  "family": {
+    "title": "家庭中心",
+    "subtitle": "管理家庭成员、相册、任务与共同记忆",
+    "empty": "还没有家庭空间",
+    "name": "家庭名称",
+    "namePlaceholder": "例如：幸福之家",
+    "create": "创建家庭",
+    "created": "家庭已创建",
+    "members": "成员",
+    "albums": "相册",
+    "tasks": "任务",
+    "memories": "记忆",
+    "memberName": "成员姓名",
+    "albumName": "相册名称",
+    "taskTitle": "要完成的事情",
+    "memoryContent": "记录一件家庭共同记忆",
+    "searchPlaceholder": "搜索成员、事件、记忆和资产",
+    "tabs": {
+      "home": "首页",
+      "members": "成员",
+      "albums": "相册",
+      "tasks": "任务",
+      "memories": "家庭记忆",
+      "search": "统一搜索"
+    }
+  },
   "layout": {
     "collapsePanel": "收起面板",
     "expandPanel": "展开面板"

@@ -22,4 +22,4 @@ then
   uv pip install --python .venv/bin/python --no-deps --editable "$bridge_dir"
 fi
 # A normal uv run would replace the editable gateway with the locked PyPI release.
-exec uv run --no-sync octop run "$@"
+exec uv run --no-sync homemind run "$@"

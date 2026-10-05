@@ -51,12 +51,12 @@ help:
 	@echo "Development targets:"
 	@echo "  dev              Start frontend + backend dev servers"
 	@echo "  dev-frontend     Start Vite dev server only"
-	@echo "  dev-backend      Start octop run only"
+	@echo "  dev-backend      Start homemind run only"
 	@echo ""
 	@echo "Online-deps targets (local Octop source + PyPI harness components):"
 	@echo "  install-online   Create .venv-online: Octop editable + harness-* from PyPI"
 	@echo "  test-online      pytest against .venv-online (not live)"
-	@echo "  run-online       Start octop run from .venv-online"
+	@echo "  run-online       Start homemind run from .venv-online"
 	@echo ""
 	@echo "Quality targets (ship bar):"
 	@echo "  all              format-all + lint + typecheck + test (backend lint/typecheck/test)"
@@ -160,7 +160,7 @@ dev:
 	@echo "[dev] Starting frontend and backend dev servers (Ctrl-C to stop both)..."
 	@trap 'kill 0' SIGINT; \
 	(cd $(DASHBOARD_DIR) && npm run dev) & \
-	($(RUN) octop run) & \
+	($(RUN) homemind run) & \
 	wait
 
 .PHONY: dev-frontend
@@ -169,7 +169,7 @@ dev-frontend:
 
 .PHONY: dev-backend
 dev-backend:
-	$(RUN) octop run
+	$(RUN) homemind run
 
 # ─── Online-deps dev (local Octop source + PyPI harness components) ───────────
 # Keeps a dedicated .venv-online alongside .venv. Octop itself is installed
@@ -193,7 +193,7 @@ test-online:
 
 .PHONY: run-online
 run-online:
-	$(PY_ONLINE)/octop run
+	$(PY_ONLINE)/homemind run
 
 # ─── Quality (backend) ───────────────────────────────────────────────────────
 

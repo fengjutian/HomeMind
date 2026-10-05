@@ -7,7 +7,6 @@ import BrandLogo from "../components/BrandLogo";
 import AppVersionBadge from "../components/AppVersionBadge";
 import CurrentVersionBadge from "../components/CurrentVersionBadge";
 import { ArrowRightLeft, ChevronDown, X } from "lucide-react";
-import { useTheme } from "../context/ThemeContext";
 import { useLayoutMode } from "../context/LayoutModeContext";
 import { useUserRole } from "../hooks/useUserRole";
 import { useCurrentUser, useSetCurrentUser } from "../hooks/useCurrentUser";
@@ -386,7 +385,6 @@ export default function Sidebar({
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
-  const { isDark } = useTheme();
   const role = useUserRole();
   const user = useCurrentUser();
   const setUser = useSetCurrentUser();

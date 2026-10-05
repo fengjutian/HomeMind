@@ -2,6 +2,32 @@
   "app": {
     "pageTitle": "HomeMind - An intelligent partner that understands you, helps you, and grows with you"
   },
+  "family": {
+    "title": "Family Center",
+    "subtitle": "Manage family members, albums, tasks, and shared memories",
+    "empty": "No family space yet",
+    "name": "Family name",
+    "namePlaceholder": "For example: The Happy Family",
+    "create": "Create family",
+    "created": "Family created",
+    "members": "Members",
+    "albums": "Albums",
+    "tasks": "Tasks",
+    "memories": "Memories",
+    "memberName": "Member name",
+    "albumName": "Album name",
+    "taskTitle": "What needs to be done",
+    "memoryContent": "Record a shared family memory",
+    "searchPlaceholder": "Search members, events, memories, and assets",
+    "tabs": {
+      "home": "Home",
+      "members": "Members",
+      "albums": "Albums",
+      "tasks": "Tasks",
+      "memories": "Family memories",
+      "search": "Search"
+    }
+  },
   "layout": {
     "collapsePanel": "Collapse panel",
     "expandPanel": "Expand panel"

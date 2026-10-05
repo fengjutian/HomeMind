@@ -70,6 +70,6 @@ async def list_tasks(
     family_id: str,
     server: Server,
     user: CurrentUser,
-    status: TaskStatus | None = Query(default=None),
+    status: Annotated[TaskStatus | None, Query()] = None,
 ) -> object:
     return _manager(server).list(family_id, user, status=status)
