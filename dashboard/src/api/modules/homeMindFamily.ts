@@ -97,6 +97,50 @@ export interface FamilyAsset {
   status: string;
 }
 
+export interface FamilySpace {
+  id: string;
+  family_id: string;
+  name: string;
+  space_type: string;
+  owner_member_id: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface FamilyPermission {
+  id: string;
+  family_id: string;
+  subject_member_id: string | null;
+  space_id: string | null;
+  action: string;
+  effect: string;
+  expires_at: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface FamilyAssetSource {
+  id: string;
+  family_id: string;
+  space_id: string | null;
+  directory_uri: string;
+  recursive: boolean;
+  visibility: string;
+  status: string;
+  last_scanned_at: number | null;
+}
+
+export interface FamilyAssetScanResult {
+  source_id: string;
+  indexed: number;
+  unchanged: number;
+  skipped: number;
+  failed: number;
+  missing: number;
+  asset_ids: string[];
+  errors: string[];
+}
+
 const root = "/homemind/families";
 const json = (body: unknown): RequestInit => ({
   method: "POST",
@@ -154,6 +198,30 @@ export const homeMindFamilyApi = {
       `${root}/${familyId}/relationships/${relationshipId}`,
       mutate("DELETE"),
     ),
+  listSpaces: (familyId: string) =>
+    request<FamilySpace[]>(`${root}/${familyId}/spaces`),
+  createSpace: (
+    familyId: string,
+    body: { name: string; space_type: string; owner_member_id?: string },
+  ) => request<FamilySpace>(`${root}/${familyId}/spaces`, json(body)),
+  deleteSpace: (familyId: string, spaceId: string) =>
+    request<void>(`${root}/${familyId}/spaces/${spaceId}`, mutate("DELETE")),
+  listPermissions: (familyId: string) =>
+    request<FamilyPermission[]>(`${root}/${familyId}/permissions`),
+  createPermission: (
+    familyId: string,
+    body: {
+      subject_member_id?: string;
+      space_id?: string;
+      action: string;
+      effect: string;
+    },
+  ) => request<FamilyPermission>(`${root}/${familyId}/permissions`, json(body)),
+  deletePermission: (familyId: string, permissionId: string) =>
+    request<void>(
+      `${root}/${familyId}/permissions/${permissionId}`,
+      mutate("DELETE"),
+    ),
   listAlbums: (familyId: string) =>
     request<FamilyAlbum[]>(`${root}/${familyId}/albums`),
   createAlbum: (
@@ -172,8 +240,29 @@ export const homeMindFamilyApi = {
       `${root}/${familyId}/albums/${albumId}/assets/${assetId}`,
       mutate("DELETE"),
     ),
-  listAssets: (familyId: string) =>
-    request<FamilyAsset[]>(`${root}/${familyId}/assets`),
+  listAssets: (
+    familyId: string,
+    filters?: { query?: string; asset_type?: string; space_id?: string },
+  ) => {
+    const params = new URLSearchParams();
+    if (filters?.query) params.set("query", filters.query);
+    if (filters?.asset_type) params.set("asset_type", filters.asset_type);
+    if (filters?.space_id) params.set("space_id", filters.space_id);
+    const suffix = params.size ? `?${params.toString()}` : "";
+    return request<FamilyAsset[]>(`${root}/${familyId}/assets${suffix}`);
+  },
+  scanAssets: (
+    familyId: string,
+    body: { directory: string; space_id?: string; recursive: boolean; visibility: string },
+  ) => request<FamilyAssetScanResult>(`${root}/${familyId}/assets/scan`, json(body)),
+  listAssetSources: (familyId: string) =>
+    request<FamilyAssetSource[]>(`${root}/${familyId}/asset-sources`),
+  rescanAssetSource: (familyId: string, sourceId: string) =>
+    request<FamilyAssetScanResult>(`${root}/${familyId}/asset-sources/${sourceId}/scan`, json({})),
+  listDuplicateAssets: (familyId: string) =>
+    request<FamilyAsset[][]>(`${root}/${familyId}/assets/duplicates`),
+  deleteAssetIndex: (familyId: string, assetId: string) =>
+    request<void>(`${root}/${familyId}/assets/${assetId}`, mutate("DELETE")),
   listTasks: (familyId: string) =>
     request<FamilyTask[]>(`${root}/${familyId}/tasks`),
   createTask: (
