@@ -6,7 +6,6 @@ import {
   DatePicker,
   Empty,
   Form,
-  Grid,
   Input,
   List,
   Modal,
@@ -49,7 +48,6 @@ const { Text, Title } = Typography;
 
 export default function FamilyPage() {
   const { t } = useTranslation();
-  const screens = Grid.useBreakpoint();
   const serverTimezone = useServerTimezone();
   const { message } = App.useApp();
   const [families, setFamilies] = useState<HomeMindFamily[]>([]);
@@ -256,7 +254,6 @@ export default function FamilyPage() {
       >
         <Tabs
           className={styles.tabs}
-          tabPosition={screens.md ? "left" : "top"}
           items={[
             {
               key: "home",
