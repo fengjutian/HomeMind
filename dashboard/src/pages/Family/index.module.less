@@ -114,6 +114,41 @@
   background: var(--fn-bg-secondary);
 }
 
+.photoLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 16px;
+
+  .panelCard {
+    max-width: none;
+  }
+}
+
+.photoLayout > :first-child {
+  grid-row: span 2;
+}
+
+.photoToolbar {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.photoSelect {
+  min-width: 260px;
+  flex: 1;
+}
+
+.analysisCard {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--fn-bg-secondary);
+}
+
+.fullWidth {
+  width: 100%;
+}
+
 @media (max-width: 900px) {
   .statsGrid {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
@@ -158,5 +193,17 @@
 
   .scanStats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .photoLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .photoLayout > :first-child {
+    grid-row: auto;
+  }
+
+  .photoSelect {
+    min-width: 100%;
   }
 }

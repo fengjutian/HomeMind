@@ -197,6 +197,13 @@ export interface FamilyAudit {
   created_at: number;
 }
 
+export interface PhotoProvider {
+  id: number;
+  name: string;
+  enabled: boolean;
+  models: Array<{ id: string; name?: string }>;
+}
+
 const root = "/homemind/families";
 const json = (body: unknown): RequestInit => ({
   method: "POST",
@@ -208,6 +215,7 @@ const mutate = (method: "PATCH" | "DELETE", body?: unknown): RequestInit => ({
 });
 
 export const homeMindFamilyApi = {
+  listPhotoProviders: () => request<PhotoProvider[]>("/providers"),
   listFamilies: () => request<HomeMindFamily[]>(root),
   createFamily: (body: { name: string; timezone?: string; locale?: string }) =>
     request<HomeMindFamily>(root, json(body)),

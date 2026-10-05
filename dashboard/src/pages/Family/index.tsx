@@ -25,6 +25,8 @@ import PageShell from "../../layouts/PageShell";
 import { formatServerDateTime } from "../../utils/formatMessageTime";
 import AccessPanel from "./AccessPanel";
 import AssetsPanel from "./AssetsPanel";
+import GovernancePanel from "./GovernancePanel";
+import PhotoIntelligencePanel from "./PhotoIntelligencePanel";
 
 import {
   homeMindFamilyApi,
@@ -798,6 +800,18 @@ export default function FamilyPage() {
               key: "access",
               label: t("family.tabs.access", "空间与权限"),
               children: <AccessPanel familyId={familyId} members={members} />,
+            },
+            {
+              key: "photos",
+              label: t("family.tabs.photos", "照片智能"),
+              children: (
+                <PhotoIntelligencePanel familyId={familyId} members={members} />
+              ),
+            },
+            {
+              key: "governance",
+              label: t("family.tabs.governance", "审批与审计"),
+              children: <GovernancePanel familyId={familyId} />,
             },
             {
               key: "search",
