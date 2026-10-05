@@ -19,6 +19,7 @@ import {
   GraduationCap,
   Shield,
   PanelsTopLeft,
+  HouseHeart,
 } from "lucide-react";
 import type { OctopUser } from "../api/modules/auth";
 import { navAllowed, userCan } from "../utils/permissions";
@@ -50,6 +51,7 @@ export interface NavSection {
 /** Every nav item key the sidebar can show. Keep in sync with `SIDEBAR_NAV_KEYS` in `octop.infra.users.preferences`. */
 export const SIDEBAR_NAV_KEYS = [
   "chat",
+  "family",
   "experts",
   "tasks",
   "token-usage",
@@ -143,6 +145,12 @@ export function buildNavSections(
           path: "/chat",
           icon: <MessageSquareText size={iconSize} strokeWidth={iconStroke} />,
           labelKey: "nav.chat",
+        },
+        {
+          key: "family",
+          path: "/family",
+          icon: <HouseHeart size={iconSize} strokeWidth={iconStroke} />,
+          labelKey: "nav.family",
         },
         {
           key: "experts",
