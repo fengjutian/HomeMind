@@ -3,9 +3,10 @@
 -- SQLite-only optimisation: a contentless FTS5 virtual table that
 -- tokenizes memory content for fast LIKE-free search. Triggers keep
 -- it in sync with the canonical ``homemind_family_memories`` table.
--- PostgreSQL deployments fall back to ``LOWER(content) LIKE ?``
--- in ``FamilyContextRepo.search_memories``; this migration is a no-op
--- there because we use the dialect switch in ``migrate.py``.
+-- PostgreSQL deployments get the equivalent GIN expression index from
+-- ``007_memory_fts5.pg.sql`` and ``FamilyContextRepo.search_memories_fts``
+-- dispatches to the right backend so callers see the same
+-- ``FamilyMemoryRow`` shape on both dialects.
 
 CREATE VIRTUAL TABLE IF NOT EXISTS homemind_family_memory_fts USING fts5(
   memory_id UNINDEXED,

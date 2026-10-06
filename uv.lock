@@ -2465,7 +2465,7 @@ wheels = [
 ]
 
 [[package]]
-name = "octop"
+name = "homemind"
 version = "1.0.2b6"
 source = { editable = "." }
 dependencies = [

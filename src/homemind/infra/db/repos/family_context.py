@@ -241,24 +241,51 @@ class FamilyContextRepo:
         query: str,
         limit: int = 20,
     ) -> list[FamilyMemoryRow]:
-        """FTS5-backed memory search.
+        """Tokenised full-text memory search.
 
-        Returns rows ordered by FTS5 ``bm25`` rank (lower = better match).
-        Falls back to an empty list on dialects without FTS5 support
-        (the FTS virtual table won't exist on PostgreSQL).
+        SQLite uses the FTS5 virtual table created in
+        ``007_memory_fts5.sql``; PostgreSQL uses the GIN expression
+        index on ``to_tsvector('simple', content)`` added in
+        ``007_memory_fts5.pg.sql``. Both paths filter out archived
+        and expired memories, scope to ``family_id``, and rank by the
+        backend's native score (``bm25`` on SQLite, ``ts_rank`` on
+        PostgreSQL). The repo returns ``FamilyMemoryRow`` in both
+        dialects so callers do not branch on ``db.dialect``.
+
+        Returns ``[]`` on any backend error so the manager can fall
+        back to ``search_memories`` (LIKE-based).
         """
+        now = now_ts()
+        if self._db.dialect == "postgresql":
+            sql = (
+                "SELECT m.* FROM homemind_family_memories m "
+                "WHERE m.family_id = ? "
+                "  AND m.status = 'ACTIVE' "
+                "  AND (m.expires_at IS NULL OR m.expires_at > ?) "
+                "  AND to_tsvector('simple', coalesce(m.content, '')) "
+                "      @@ websearch_to_tsquery('simple', ?) "
+                "ORDER BY ts_rank("
+                "  to_tsvector('simple', coalesce(m.content, '')),"
+                "  websearch_to_tsquery('simple', ?)"
+                ") DESC, m.updated_at DESC "
+                "LIMIT ?"
+            )
+            params: tuple[object, ...] = (family_id, now, query, query, limit)
+        else:
+            sql = (
+                "SELECT m.* FROM homemind_family_memories m "
+                "JOIN homemind_family_memory_fts fts "
+                "  ON fts.memory_id = m.memory_id "
+                "WHERE fts.family_id = ? "
+                "  AND m.status = 'ACTIVE' "
+                "  AND (m.expires_at IS NULL OR m.expires_at > ?) "
+                "  AND homemind_family_memory_fts MATCH ? "
+                "ORDER BY fts.rank LIMIT ?"
+            )
+            params = (family_id, now, query, limit)
         try:
             with self._db.connect() as conn:
-                rows = conn.execute(
-                    "SELECT m.* FROM homemind_family_memories m "
-                    "JOIN homemind_family_memory_fts fts "
-                    "  ON fts.memory_id = m.memory_id "
-                    "WHERE fts.family_id = ? "
-                    "  AND m.status = 'ACTIVE' "
-                    "  AND homemind_family_memory_fts MATCH ? "
-                    "ORDER BY fts.rank LIMIT ?",
-                    (family_id, query, limit),
-                ).fetchall()
+                rows = conn.execute(sql, params).fetchall()
         except Exception:  # noqa: BLE001 — graceful degradation
             return []
         return map_rows(rows, FamilyMemoryRow)
