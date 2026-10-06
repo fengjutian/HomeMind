@@ -374,6 +374,7 @@ class AgentManager:
         expert_catalog: ExpertCatalog | None = None,
         plugin_manager: PluginManager | None = None,
         extra_tools_factory: Callable[[], list[Any]] | None = None,
+        extra_middleware_factory: Callable[[], list[Any]] | None = None,
     ) -> None:
         self._repos = repos
         self._paths = paths
@@ -383,6 +384,7 @@ class AgentManager:
         self._expert_catalog = expert_catalog
         self._plugin_manager = plugin_manager
         self._extra_tools_factory = extra_tools_factory
+        self._extra_middleware_factory = extra_middleware_factory
         self._cron_manager: CronManager | None = None
         self._proactive_scheduler: ProactiveCareScheduler | None = None
         self._team_processor: Any | None = None
@@ -3243,6 +3245,8 @@ class AgentManager:
             ),
             OctopUiOffloadMiddleware(),
         ]
+        if self._extra_middleware_factory is not None and not team_host:
+            agent_middleware.extend(self._extra_middleware_factory())
 
         merged_tools: list[Any] = []
         if cron_tools:

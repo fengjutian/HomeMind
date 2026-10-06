@@ -73,9 +73,17 @@ class FamilyApprovalRow:
     reason: str | None
     created_at: int
     decided_at: int | None
+    approval_expires_at: int | None = None
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyApprovalRow:
+        expires = row.get("approval_expires_at") if hasattr(row, "get") else row["approval_expires_at"]  # type: ignore[index]
+        expires_int: int | None = None
+        if expires is not None:
+            try:
+                expires_int = int(expires)
+            except (TypeError, ValueError):
+                expires_int = None
         return cls(
             id=str(row["approval_id"]), transaction_id=str(row["transaction_id"]),
             family_id=str(row["family_id"]), status=str(row["status"]),
@@ -83,6 +91,7 @@ class FamilyApprovalRow:
             decided_by=int(row["decided_by"]) if row["decided_by"] is not None else None,
             reason=row["reason"], created_at=int(row["created_at"]),
             decided_at=int(row["decided_at"]) if row["decided_at"] is not None else None,
+            approval_expires_at=expires_int,
         )
 
 
@@ -160,6 +169,20 @@ class FamilyTransactionRepo:
                 "SELECT * FROM homemind_family_transactions "
                 "WHERE family_id = ? AND idempotency_key = ?",
                 (family_id, idempotency_key),
+            ).fetchone()
+
+    def get_approval_for_transaction(self, transaction_id: str) -> FamilyApprovalRow | None:
+        """Return the (still-pending) approval for ``transaction_id``.
+
+        Used by ``plan``'s idempotency path so a re-plan that lands
+        on ``WAITING_APPROVAL`` returns the same approval row instead
+        of minting a second one.
+        """
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM homemind_family_approvals WHERE transaction_id = ? "
+                "ORDER BY created_at DESC LIMIT 1",
+                (transaction_id,),
             ).fetchone()
         return FamilyTransactionRow.from_row(row) if row else None
 
@@ -310,21 +333,61 @@ class FamilyTransactionRepo:
             lease_expires_at=None,
         )
 
-    def create_approval(self, transaction: FamilyTransactionRow) -> FamilyApprovalRow:
+    def create_approval(
+        self,
+        transaction: FamilyTransactionRow,
+        *,
+        approval_expires_at: int | None = None,
+    ) -> FamilyApprovalRow:
         approval_id, timestamp = new_ulid(), now_ts()
         with self._db.transaction() as conn:
             conn.execute(
                 "INSERT INTO homemind_family_approvals(approval_id, transaction_id, family_id, "
-                "requested_by, created_at) VALUES (?, ?, ?, ?, ?)",
+                "requested_by, created_at, approval_expires_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     approval_id,
                     transaction.id,
                     transaction.family_id,
                     transaction.requested_by,
                     timestamp,
+                    approval_expires_at,
                 ),
             )
         return self.get_approval(approval_id)  # type: ignore[return-value]
+
+    def expire_pending_approvals(self, *, now: int | None = None) -> int:
+        """Mark every ``PENDING`` approval whose ``approval_expires_at``
+        has passed as ``EXPIRED`` and surface the underlying
+        transaction as ``CANCELLED`` so the dashboard stops showing
+        the pending badge.
+
+        Returns the number of approvals transitioned.
+        """
+        timestamp = now_ts() if now is None else now
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                "UPDATE homemind_family_approvals SET status = 'EXPIRED', decided_at = ?, "
+                "reason = 'expired' "
+                "WHERE status = 'PENDING' AND approval_expires_at IS NOT NULL "
+                "  AND approval_expires_at <= ?",
+                (timestamp, timestamp),
+            )
+            transitioned = cursor.rowcount or 0
+            if transitioned:
+                # Cancel the parent transaction so its lifecycle stops
+                # progressing. ``acquire_lease`` refuses to flip a
+                # ``CANCELLED`` row to ``EXECUTING``, so a worker that
+                # raced the sweep cannot resume it.
+                conn.execute(
+                    "UPDATE homemind_family_transactions SET status = 'CANCELLED', "
+                    "cancelled_at = ? WHERE transaction_id IN ("
+                    "  SELECT transaction_id FROM homemind_family_approvals "
+                    "  WHERE status = 'EXPIRED' AND decided_at = ?"
+                    ") AND status IN ('WAITING_APPROVAL', 'PLANNED')",
+                    (timestamp, timestamp),
+                )
+        return int(transitioned)
 
     def get_approval(self, approval_id: str) -> FamilyApprovalRow | None:
         with self._db.connect() as conn:

@@ -327,6 +327,17 @@ class OctopServer:
         """Return product-specific tools; downstream servers may override this hook."""
         return []
 
+    def build_extra_agent_middleware(self) -> list[Any]:
+        """Return product-specific AgentMiddleware instances; downstream
+        servers may override this hook.
+
+        Returned middleware are appended to the per-agent middleware
+        chain after Octop's built-in middleware. ``octop.infra`` does
+        not import this hook's consumers — HomeMind (and any other
+        downstream product) plugs in by overriding the method.
+        """
+        return []
+
     async def start(self) -> None:
         if self._started:
             return
@@ -426,6 +437,7 @@ class OctopServer:
             expert_catalog=self.expert_catalog,
             plugin_manager=self.plugin_manager,
             extra_tools_factory=self.build_extra_agent_tools,
+            extra_middleware_factory=self.build_extra_agent_middleware,
         )
 
         from octop.infra.history.trajectory.live import TrajectoryLiveBus  # noqa: PLC0415

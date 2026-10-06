@@ -12,6 +12,7 @@ from homemind.api.routers import (
     devices,
     families,
     filesystem,
+    memory_candidates,
     observability,
     photos,
     runtime,
@@ -94,6 +95,11 @@ def build_app(server: OctopServer) -> FastAPI:
         filesystem.router,
         prefix="/api/homemind/families",
         tags=["homemind-filesystem"],
+    )
+    app.include_router(
+        memory_candidates.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-memory-candidates"],
     )
     # Octop installs its dashboard catch-all while building the base app. Keep
     # that fallback behind HomeMind's routes so it cannot swallow API GETs.

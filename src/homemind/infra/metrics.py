@@ -40,6 +40,7 @@ class HomeMindMetrics:
     transaction_recover_total: int = 0
     transaction_idempotent_replay_total: int = 0
     transaction_failed_requires_review_total: int = 0
+    transaction_approval_expired_total: int = 0
 
     # memory candidates
     memory_candidate_create_total: int = 0
@@ -47,6 +48,16 @@ class HomeMindMetrics:
     memory_candidate_reject_total: int = 0
     memory_candidate_merge_total: int = 0
     memory_candidate_sensitive_flagged_total: int = 0
+    # post-turn extractor (Stage 3)
+    memory_post_turn_candidates_created_total: int = 0
+    memory_post_turn_extractor_error_total: int = 0
+    memory_post_turn_lifecycle_error_total: int = 0
+    memory_post_turn_sensitive_skip_total: int = 0
+    memory_post_turn_low_confidence_skip_total: int = 0
+    # daily maintenance runner (Stage 3)
+    memory_decay_total: int = 0
+    memory_expiration_total: int = 0
+    memory_dedup_groups_total: int = 0
 
     # asset scan job
     asset_scan_sweep_total: int = 0

@@ -74,6 +74,7 @@ RETRYABLE_FROM_STATUSES: frozenset[TransactionStatus] = frozenset(
 
 
 DEFAULT_LEASE_TTL_SECONDS = 60
+DEFAULT_APPROVAL_TTL_SECONDS = 24 * 60 * 60
 
 
 class FamilyTransactionManager:
@@ -89,6 +90,7 @@ class FamilyTransactionManager:
         permission_evaluator: FamilyPermissionEvaluator | None = None,
         action_registry: FamilyActionRegistry | None = None,
         lease_ttl_seconds: int = DEFAULT_LEASE_TTL_SECONDS,
+        approval_ttl_seconds: int = DEFAULT_APPROVAL_TTL_SECONDS,
     ) -> None:
         self.family = family
         self.context = context
@@ -104,6 +106,7 @@ class FamilyTransactionManager:
             filesystem=filesystem,
         )
         self.lease_ttl_seconds = lease_ttl_seconds
+        self.approval_ttl_seconds = approval_ttl_seconds
 
     # --------------------------------------------------------------- planning
 
@@ -135,17 +138,24 @@ class FamilyTransactionManager:
         )
         # Idempotent re-plan: if the existing row is already in a
         # terminal or in-flight state, return it without re-executing.
-        terminal_statuses = {
+        idempotent_statuses = {
             TransactionStatus.COMPLETED.value,
             TransactionStatus.DENIED.value,
             TransactionStatus.REJECTED.value,
             TransactionStatus.CANCELLED.value,
             TransactionStatus.FAILED.value,
             TransactionStatus.FAILED_REQUIRES_REVIEW.value,
+            TransactionStatus.WAITING_APPROVAL.value,
+            TransactionStatus.APPROVED.value,
+            TransactionStatus.EXECUTING.value,
+            TransactionStatus.VERIFYING.value,
         }
-        if transaction.status in terminal_statuses:
+        if transaction.status in idempotent_statuses:
             _hm_inc("transaction_idempotent_replay_total")
             self._audit(transaction, user.id, "IDEMPOTENT_REPLAY")
+            if transaction.status == TransactionStatus.WAITING_APPROVAL.value:
+                approval = self.repo.get_approval_for_transaction(transaction.id)
+                return transaction, approval  # type: ignore[return-value]
             return transaction, None  # type: ignore[return-value]
         # Build a preview so the row carries useful context for audit
         # even if execution never runs.
@@ -188,7 +198,14 @@ class FamilyTransactionManager:
                 from_status=TransactionStatus.PLANNED,
                 to_status=TransactionStatus.WAITING_APPROVAL,
             )
-            approval = self.repo.create_approval(transaction)  # type: ignore[arg-type]
+            # Default 24 h approval window so the dashboard can show a
+            # concrete deadline and the daily sweep has something to
+            # expire. Callers can override via ``approval_ttl_seconds``.
+            ttl = getattr(user, "_approval_ttl_override", None) or self.approval_ttl_seconds
+            expires_at = self._now_epoch() + int(ttl)
+            approval = self.repo.create_approval(
+                transaction, approval_expires_at=expires_at,
+            )
             self._audit(transaction, user.id, "WAITING_APPROVAL", approval="PENDING")
             return transaction, approval  # type: ignore[return-value]
         # Auto-allow: transition to EXECUTING then drive through VERIFYING.
@@ -581,12 +598,43 @@ class FamilyTransactionManager:
         approval = self.repo.get_approval(approval_id)
         if approval is None or approval.family_id != family_id:
             raise OctopError(ErrorCode.NOT_FOUND, "family approval not found")
+        if approval.status == "EXPIRED":
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "family approval has expired",
+            )
         if approval.status != "PENDING":
             raise HomeMindError(
                 HomeMindErrorCode.FAMILY_CONFLICT,
                 "family approval is already decided",
             )
+        if (
+            approval.approval_expires_at is not None
+            and approval.approval_expires_at <= self._now_epoch()
+        ):
+            # The approval deadline has passed but the daily sweep
+            # has not yet flipped it; refuse the action so the
+            # approver cannot approve a stale window. The next sweep
+            # (or an explicit ``expire_pending_approvals`` call) will
+            # close the row.
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "family approval has expired",
+            )
         return approval
+
+    def expire_pending_approvals(self, *, now: int | None = None) -> int:
+        """Expire pending approvals whose deadline has passed.
+
+        Returns the number of approvals transitioned. The
+        underlying transaction is moved to ``CANCELLED`` by the repo
+        helper so a worker cannot resume it through ``acquire_lease``.
+        """
+        timestamp = self._now_epoch() if now is None else now
+        transitioned = self.repo.expire_pending_approvals(now=timestamp)
+        if transitioned:
+            _hm_inc("transaction_approval_expired_total", transitioned)
+        return int(transitioned)
 
     def _transaction(self, family_id: str, transaction_id: str) -> FamilyTransactionRow:
         transaction = self.repo.get_transaction(transaction_id)

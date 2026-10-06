@@ -371,6 +371,58 @@ class FamilyPermissionEvaluator:
             return False
         return True
 
+    def can_see_candidate(
+        self,
+        family_id: str,
+        user: "User",
+        candidate: Any,
+    ) -> bool:
+        """Visibility filter for ``MemoryCandidateRow``.
+
+        Candidates about a ``MEMBER`` whose private space the caller
+        does not own are hidden. ``FAMILY``-scoped candidates are
+        visible to any family member. ``USER``-scoped candidates (the
+        user themselves) follow ``memory.read`` for the user's own
+        private space.
+        """
+        from homemind.infra.db.repos.memory_candidates import (
+            MemoryCandidateRow,
+        )
+
+        if not isinstance(candidate, MemoryCandidateRow):
+            return True
+
+        decision = self.evaluate(
+            family_id=family_id,
+            user=user,
+            action="memory.read",
+            space_id=_candidate_space_id(self.repo, candidate),
+        )
+        return decision.effect is PermissionEffect.ALLOW
+
+
+def _candidate_space_id(repo: Any, candidate: Any) -> str | None:
+    """Return the private space id that owns ``candidate.subject`` when one exists.
+
+    ``MemoryCandidateRow`` carries ``subject_type`` + ``subject_id``;
+    for ``MEMBER`` we look up the member's private space, for
+    ``USER`` the user's own private space, otherwise ``None``.
+    """
+    subject_type = getattr(candidate, "subject_type", "")
+    subject_id = getattr(candidate, "subject_id", None)
+    if not subject_id:
+        return None
+    if subject_type == "MEMBER":
+        member = repo.get_member(str(subject_id))
+        if member is None:
+            return None
+        spaces = repo.list_spaces(member.family_id)
+        for space in spaces:
+            if space.space_type == "PRIVATE" and space.owner_member_id == member.id:
+                return space.id
+        return None
+    return None
+
 
 __all__ = [
     "DEFAULT_ACTION_EFFECTS",

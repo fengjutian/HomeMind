@@ -57,7 +57,7 @@ def test_homemind_pg_migration_files_have_no_sqlite_only_artifacts() -> None:
             )
 
 
-def test_homemind_pg_migration_directory_exists() -> None:
+def test_homemind_migrations_directory_layout_is_stable() -> None:
     """Regression guard: keep migrations folder colocated with the
     runner so the dialect switch in migrate.py keeps working when
     new files land."""
@@ -66,7 +66,7 @@ def test_homemind_pg_migration_directory_exists() -> None:
         f"expected HomeMind migrations directory at {HM_MIGRATIONS_DIR}"
     )
     assert HM_MIGRATIONS_DIR.parent.name == "db"
-    assert HM_MIGRATIONS_DIR.parent.parent.name == "db"
+    assert HM_MIGRATIONS_DIR.parent.parent.name == "infra"
     # The runner resolves the directory via Path(__file__).parent; keep
     # the layout stable so the relative path doesn't drift.
     runner_path = Path(__file__).resolve()
