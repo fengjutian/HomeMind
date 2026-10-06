@@ -111,4 +111,4 @@ def inc(name: str, n: int = 1) -> None:
     METRICS.inc(name, n)
 
 
-__all__ = ["HOMEMIND_METRICS", "HomeMindMetrics", "inc"]
+__all__ = ["METRICS", "HomeMindMetrics", "inc"]

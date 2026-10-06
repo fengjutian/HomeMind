@@ -93,11 +93,66 @@ async def test_family_foundation_api(
     assert response.status_code == 201
     assert response.json()["effect"] == "REQUIRE_CONFIRMATION"
 
+    # ``/permissions/evaluate`` always resolves the *caller's* permission
+    # and refuses a ``subject_member_id`` parameter, so the rule scoped to
+    # the child must be evaluated while authenticated as that child.
+    # ``FamilyMemberUpdateBody`` does not accept ``user_id`` (member
+    # binding arrives with Stage 9), so create a second, bound member
+    # instead of rebinding the child.
+    from tests.support.auth import create_user
+
+    child_user = await create_user(client, auth, username="child_user")
+    child_auth = {"Authorization": child_user["Authorization"]}
+    users_response = await client.get("/api/users", headers=auth)
+    assert users_response.status_code == 200
+    child_user_id = next(
+        row["id"] for row in users_response.json() if row["username"] == "child_user"
+    )
     response = await client.post(
-        f"/api/homemind/families/{family_id}/permissions/evaluate",
+        f"/api/homemind/families/{family_id}/members",
         headers=auth,
         json={
-            "space_id": space["id"],
+            "display_name": "Bound Child",
+            "role": "CHILD",
+            "user_id": child_user_id,
+        },
+    )
+    assert response.status_code == 201
+    bound_child = response.json()
+    assert bound_child["user_id"] == child_user_id
+
+    # Give the bound child its own private space so the evaluator's
+    # "private space the caller doesn't own" guard doesn't fire first.
+    response = await client.post(
+        f"/api/homemind/families/{family_id}/spaces",
+        headers=auth,
+        json={
+            "name": "Bound Child private",
+            "space_type": "PRIVATE",
+            "owner_member_id": bound_child["id"],
+        },
+    )
+    assert response.status_code == 201
+    bound_space = response.json()
+
+    response = await client.post(
+        f"/api/homemind/families/{family_id}/permissions",
+        headers=auth,
+        json={
+            "subject_member_id": bound_child["id"],
+            "space_id": bound_space["id"],
+            "action": "photo.delete",
+            "effect": "REQUIRE_CONFIRMATION",
+        },
+    )
+    assert response.status_code == 201
+    assert response.json()["effect"] == "REQUIRE_CONFIRMATION"
+
+    response = await client.post(
+        f"/api/homemind/families/{family_id}/permissions/evaluate",
+        headers=child_auth,
+        json={
+            "space_id": bound_space["id"],
             "action": "photo.delete",
         },
     )
@@ -105,7 +160,18 @@ async def test_family_foundation_api(
     payload = response.json()
     assert payload["effect"] == "REQUIRE_CONFIRMATION"
     assert payload["action"] == "photo.delete"
-    assert payload["space_id"] == space["id"]
+    assert payload["space_id"] == bound_space["id"]
+
+    # The owner must NOT inherit the child-scoped REQUIRE_CONFIRMATION
+    # decision: ``/permissions/evaluate`` resolves the caller's own rule
+    # pipeline and never accepts a ``subject_member_id``.
+    response = await client.post(
+        f"/api/homemind/families/{family_id}/permissions/evaluate",
+        headers=auth,
+        json={"space_id": bound_space["id"], "action": "photo.delete"},
+    )
+    assert response.status_code == 200
+    assert response.json()["effect"] != "REQUIRE_CONFIRMATION"
 
     response = await client.patch(
         f"/api/homemind/families/{family_id}/members/{child['id']}",

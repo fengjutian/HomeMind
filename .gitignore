@@ -41,6 +41,9 @@ ENV/
 
 # Test / coverage
 .pytest_cache/
+/.pytest-*/
+/.test-tmp-*/
+/.test-run-*/
 .testmondata*
 .mypy_cache/
 .ruff_cache/
@@ -64,6 +67,8 @@ coverage.xml
 
 # uv
 .uv/
+/.uv-cache*/
+/.cache/
 
 # Node / frontend
 node_modules/

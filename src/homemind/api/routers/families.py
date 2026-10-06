@@ -638,7 +638,9 @@ class PermissionDecisionResponse(BaseModel):
 
 
 def _permission_evaluator(server: OctopServer) -> FamilyPermissionEvaluator:
-    services = _services(server)
+    assert server.services is not None
+    run_migrations(server.services.db)
+    services = HomeMindServices.from_pool(server.services.db)
     return FamilyPermissionEvaluator(services.family_repo)
 
 
