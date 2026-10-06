@@ -17,6 +17,10 @@ from homemind.infra.db.repos.family_assets import FamilyAssetRepo, FamilyAssetSo
 from homemind.infra.db.repos.family_transactions import FamilyTransactionRepo
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.permissions import (
+    FamilyPermissionEvaluator,
+    PermissionEffect,
+)
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
 
@@ -53,10 +57,13 @@ class FamilyFilesystemManager:
         family: FamilyManager,
         assets: FamilyAssetRepo,
         audit: FamilyTransactionRepo,
+        *,
+        permission_evaluator: FamilyPermissionEvaluator | None = None,
     ) -> None:
         self.family = family
         self.assets = assets
         self.audit = audit
+        self.permissions = permission_evaluator or FamilyPermissionEvaluator(family.repo)
 
     def list(
         self, family_id: str, user: User, *, source_id: str, path: str = "."

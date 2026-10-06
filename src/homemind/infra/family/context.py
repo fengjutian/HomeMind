@@ -15,7 +15,11 @@ from homemind.infra.db.repos.family_context import (
     FamilyMemoryRow,
 )
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
-from homemind.infra.family.manager import FamilyManager, PermissionEffect
+from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.permissions import (
+    FamilyPermissionEvaluator,
+    PermissionEffect,
+)
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
 
@@ -42,9 +46,16 @@ class ResolvedFamilyContext:
 
 
 class FamilyContextManager:
-    def __init__(self, family: FamilyManager, repo: FamilyContextRepo) -> None:
+    def __init__(
+        self,
+        family: FamilyManager,
+        repo: FamilyContextRepo,
+        *,
+        permission_evaluator: FamilyPermissionEvaluator | None = None,
+    ) -> None:
         self.family = family
         self.repo = repo
+        self.permissions = permission_evaluator or FamilyPermissionEvaluator(family.repo)
 
     def create_event(self, family_id: str, user: User, **values: object) -> FamilyEventRow:
         self.family.require_manager(family_id, user)
@@ -208,19 +219,9 @@ class FamilyContextManager:
         return memory
 
     def _can_read_memory(self, memory: FamilyMemoryRow, user: User) -> bool:
-        if user.is_admin or memory.visibility in {"PUBLIC", "FAMILY"}:
-            return True
-        if memory.created_by == user.id:
-            return True
-        membership = self.family.repo.get_membership(memory.family_id, user.id)
-        if membership is None:
-            return False
-        return (
-            self.family.evaluate_permission(
-                memory.family_id,
-                user,
-                subject_member_id=str(membership["member_id"]),
-                action="memory.read",
-            )
-            is PermissionEffect.ALLOW
+        decision = self.permissions.evaluate(
+            family_id=memory.family_id,
+            user=user,
+            action="memory.read",
         )
+        return decision.effect is PermissionEffect.ALLOW

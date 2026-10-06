@@ -22,6 +22,11 @@ from homemind.infra.db.repos.families import (
     FamilySpaceRow,
 )
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
+from homemind.infra.family.permissions import (
+    FamilyPermissionEvaluator,
+    PermissionEffect,
+    PermissionDecision,
+)
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
 
@@ -50,10 +55,14 @@ class SpaceType(StrEnum):
     ARCHIVE = "ARCHIVE"
 
 
-class PermissionEffect(StrEnum):
-    ALLOW = "ALLOW"
-    DENY = "DENY"
-    REQUIRE_CONFIRMATION = "REQUIRE_CONFIRMATION"
+# ``PermissionEffect`` now lives in ``homemind.infra.family.permissions``.
+# Re-exported here for backward compatibility with existing callers.
+__all__ = [
+    "FamilyManager",
+    "FamilyPermissionEvaluator",
+    "PermissionDecision",
+    "PermissionEffect",
+]
 
 
 T = TypeVar("T")

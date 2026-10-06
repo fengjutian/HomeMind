@@ -22,7 +22,11 @@ from homemind.infra.db.repos.family_assets import (
     PhotoMetadataRow,
 )
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
-from homemind.infra.family.manager import FamilyManager, PermissionEffect
+from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.permissions import (
+    FamilyPermissionEvaluator,
+    PermissionEffect,
+)
 from octop.infra.db.repos._base import now_ts
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
@@ -132,9 +136,16 @@ def _photo_metadata(path: Path, timezone: ZoneInfo) -> PhotoMetadata:
 
 
 class FamilyAssetManager:
-    def __init__(self, family_repo: FamilyRepo, asset_repo: FamilyAssetRepo) -> None:
+    def __init__(
+        self,
+        family_repo: FamilyRepo,
+        asset_repo: FamilyAssetRepo,
+        *,
+        permission_evaluator: FamilyPermissionEvaluator | None = None,
+    ) -> None:
         self.family = FamilyManager(family_repo)
         self.repo = asset_repo
+        self.permissions = permission_evaluator or FamilyPermissionEvaluator(family_repo)
 
     def scan_directory(
         self,
@@ -372,27 +383,12 @@ class FamilyAssetManager:
         self.repo.delete(asset_id)
 
     def _can_read(self, asset: FamilyAssetRow, user: User) -> bool:
-        if user.is_admin:
-            return True
-        membership = self.family.repo.get_membership(asset.family_id, user.id)
-        if membership is None:
-            return False
-        if str(membership["role"]) in {"OWNER", "ADMIN"}:
-            return True
-        if asset.visibility in {"PUBLIC", "FAMILY"}:
-            return True
-        member_id = str(membership["member_id"])
-        if asset.visibility == "PRIVATE" and asset.space_id is not None:
-            space = self.family.repo.get_space(asset.space_id)
-            return space is not None and space.owner_member_id == member_id
         action = f"{asset.asset_type.lower()}.read"
-        return (
-            self.family.evaluate_permission(
-                asset.family_id,
-                user,
-                subject_member_id=member_id,
-                action=action,
-                space_id=asset.space_id,
-            )
-            is PermissionEffect.ALLOW
+        decision = self.permissions.evaluate(
+            family_id=asset.family_id,
+            user=user,
+            action=action,
+            space_id=asset.space_id,
+            asset=asset,
         )
+        return decision.effect is PermissionEffect.ALLOW
