@@ -3,6 +3,8 @@ import {
   App,
   Button,
   Card,
+  Descriptions,
+  Drawer,
   Empty,
   Form,
   Input,
@@ -58,6 +60,7 @@ export default function AssetsPanel({
     null,
   );
   const [scanning, setScanning] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<FamilyAsset | null>(null);
 
   const load = useCallback(
     async (filters?: {
@@ -273,6 +276,16 @@ export default function AssetsPanel({
           locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
           renderItem={(asset) => (
             <List.Item
+              className={styles.assetListItem}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedAsset(asset)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelectedAsset(asset);
+                }
+              }}
               actions={[
                 <Popconfirm
                   key="remove"
@@ -288,7 +301,12 @@ export default function AssetsPanel({
                     await Promise.all([load(), onAssetsChanged()]);
                   }}
                 >
-                  <Button type="text" danger icon={<Trash2 size={16} />}>
+                  <Button
+                    type="text"
+                    danger
+                    icon={<Trash2 size={16} />}
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     {t("family.removeIndex", "移除索引")}
                   </Button>
                 </Popconfirm>,
@@ -310,6 +328,65 @@ export default function AssetsPanel({
           )}
         />
       </Card>
+
+      <Drawer
+        title={selectedAsset?.name}
+        placement="right"
+        width={480}
+        open={selectedAsset !== null}
+        destroyOnHidden
+        onClose={() => setSelectedAsset(null)}
+      >
+        {selectedAsset && (
+          <Space direction="vertical" size="large" className={styles.fullWidth}>
+            <div className={styles.assetDrawerPreview}>
+              <FamilyAssetPreview
+                familyId={familyId}
+                asset={selectedAsset}
+                size={280}
+                showName={false}
+              />
+            </div>
+            <Descriptions
+              column={1}
+              bordered
+              size="small"
+              title={t("family.assetDetails", "资产详情")}
+              items={[
+                {
+                  key: "name",
+                  label: t("family.assetFileName", "文件名"),
+                  children: selectedAsset.name,
+                },
+                {
+                  key: "type",
+                  label: t("family.assetType", "资产类型"),
+                  children: <Tag>{selectedAsset.asset_type}</Tag>,
+                },
+                {
+                  key: "size",
+                  label: t("family.assetSize", "文件大小"),
+                  children: formatBytes(selectedAsset.size_bytes),
+                },
+                {
+                  key: "status",
+                  label: t("family.assetStatus", "状态"),
+                  children: selectedAsset.status,
+                },
+                {
+                  key: "path",
+                  label: t("family.assetPath", "服务器路径"),
+                  children: (
+                    <Typography.Text className={styles.assetDrawerPath}>
+                      {selectedAsset.uri}
+                    </Typography.Text>
+                  ),
+                },
+              ]}
+            />
+          </Space>
+        )}
+      </Drawer>
 
       <Modal
         title={t("family.duplicateAssets", "重复文件")}

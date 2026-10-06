@@ -105,6 +105,28 @@
   border-radius: 6px;
 }
 
+.assetListItem {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--fn-bg-secondary);
+  }
+}
+
+.assetDrawerPreview {
+  display: flex;
+  min-height: 160px;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--fn-bg-secondary);
+}
+
+.assetDrawerPath {
+  overflow-wrap: anywhere;
+}
+
 .duplicateAsset {
   display: grid;
   grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
