@@ -185,12 +185,64 @@ class FamilyAssetManager:
             visibility=visibility,
             created_by=user.id,
         )
+        return self._execute_scan(
+            family_id=family_id,
+            family_timezone=family.timezone,
+            source=source,
+            created_by_user_id=user.id,
+        )
+
+    def scan_source_internal(
+        self,
+        family_id: str,
+        source_id: str,
+        *,
+        created_by_user_id: int,
+    ) -> AssetScanResult:
+        """System-side variant of :meth:`scan_source` that skips
+        ``require_manager``. Used by the periodic re-scan job.
+        """
+        source = self.repo.get_source(source_id)
+        if source is None or source.family_id != family_id:
+            raise OctopError(ErrorCode.NOT_FOUND, "family asset source not found")
+        family = self.family.repo.get_family(family_id)
+        if family is None:
+            raise OctopError(ErrorCode.NOT_FOUND, "family not found")
+        return self._execute_scan(
+            family_id=family_id,
+            family_timezone=family.timezone,
+            source=source,
+            created_by_user_id=created_by_user_id,
+        )
+
+    def _execute_scan(
+        self,
+        *,
+        family_id: str,
+        family_timezone: str,
+        source: FamilyAssetSourceRow,
+        created_by_user_id: int,
+    ) -> AssetScanResult:
+        parsed = urlparse(source.directory_uri)
+        if parsed.scheme != "file":
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "asset source is not a local directory"
+            )
+        root = Path(url2pathname(unquote(parsed.path)))
+        if not root.is_dir():
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "asset scan path must be a directory"
+            )
+        recursive = bool(source.recursive)
+        visibility = source.visibility
+        space_id = source.space_id
         candidates = root.rglob("*") if recursive else root.glob("*")
         indexed: list[str] = []
         seen: list[str] = []
         unchanged = 0
         skipped = 0
         errors: list[str] = []
+        timezone = ZoneInfo(family_timezone)
         for path in candidates:
             if ".homemind-trash" in path.parts or path.is_symlink() or not path.is_file():
                 skipped += 1
@@ -209,14 +261,14 @@ class FamilyAssetManager:
                     continue
                 asset = self._index_file(
                     family_id,
-                    user,
+                    created_by_user_id,
                     source_id=source.id,
                     root=root,
                     path=path,
                     stat=stat,
                     space_id=space_id,
                     visibility=visibility,
-                    timezone=ZoneInfo(family.timezone),
+                    timezone=timezone,
                 )
                 if existing is None:
                     seen.append(asset.id)
@@ -240,7 +292,7 @@ class FamilyAssetManager:
     def _index_file(
         self,
         family_id: str,
-        user: User,
+        created_by_user_id: int,
         *,
         source_id: str,
         root: Path,
@@ -270,7 +322,7 @@ class FamilyAssetManager:
             content_hash=_sha256(path),
             captured_at=captured_at,
             metadata_json=json.dumps(metadata, ensure_ascii=False, sort_keys=True),
-            created_by=user.id,
+            created_by=created_by_user_id,
             visibility=visibility,
         )
         if kind == "PHOTO":
@@ -293,22 +345,8 @@ class FamilyAssetManager:
         self, family_id: str, source_id: str, user: User
     ) -> AssetScanResult:
         self.family.require_manager(family_id, user)
-        source = self.repo.get_source(source_id)
-        if source is None or source.family_id != family_id:
-            raise OctopError(ErrorCode.NOT_FOUND, "family asset source not found")
-        parsed = urlparse(source.directory_uri)
-        if parsed.scheme != "file":
-            raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "asset source is not a local directory"
-            )
-        directory = url2pathname(unquote(parsed.path))
-        return self.scan_directory(
-            family_id,
-            user,
-            directory=directory,
-            space_id=source.space_id,
-            recursive=source.recursive,
-            visibility=source.visibility,
+        return self.scan_source_internal(
+            family_id, source_id, created_by_user_id=user.id,
         )
 
     def search(

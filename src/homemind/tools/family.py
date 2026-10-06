@@ -69,42 +69,18 @@ def build_family_tools(
     """Build family tools backed by the current HomeMind control-plane database."""
     run_migrations(db)
     services = HomeMindServices.from_pool(db)
-    families = FamilyManager(services.family_repo)
-    permissions = FamilyPermissionEvaluator(services.family_repo)
-    context = FamilyContextManager(
-        families, services.family_context_repo, permission_evaluator=permissions
-    )
-    assets = FamilyAssetManager(
-        services.family_repo,
-        services.family_asset_repo,
-        permission_evaluator=permissions,
-    )
-    albums = FamilyAlbumManager(families, assets, services.family_album_repo)
-    photos = PhotoIntelligenceManager(
-        families,
-        assets,
-        services.family_context_repo,
-        services.photo_intelligence_repo,
-    )
-    search = FamilySearchManager(families, context, assets, photos)
+    managers = _build_managers(services, user_repo)
+    families = managers["family"]
+    context = managers["context"]
+    assets = managers["assets"]
+    albums = managers["albums"]
+    photos = managers["photos"]
+    search = managers["search"]
     providers = ProviderRepo(db)
-    tasks = FamilyTaskManager(families, services.family_task_repo)
-    filesystem = FamilyFilesystemManager(
-        families,
-        services.family_asset_repo,
-        services.family_transaction_repo,
-        permission_evaluator=permissions,
-    )
-    transactions = FamilyTransactionManager(
-        families,
-        context,
-        tasks,
-        services.family_transaction_repo,
-        user_repo,
-        filesystem,
-        permission_evaluator=permissions,
-    )
-    devices = services.family_device_repo
+    tasks = managers["tasks"]
+    filesystem = managers["filesystem"]
+    transactions = managers["transactions"]
+    devices = managers["device_repo"]
 
     def family_list_members(family_id: str) -> str:
         try:

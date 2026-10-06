@@ -1,1 +1,1 @@
-mavis-trash: 'src\homemind\api\routers\__pycache__\devices*.pyc' (resolved 'D:\github\HomeMind\src\homemind\api\routers\__pycache__\devices*.pyc', missing 'D:\github\HomeMind\src\homemind\api\routers\__pycache__\devices*.pyc'): No such file or directory
+mavis-trash: 'tests\unit\homemind\__pycache__\test_asset_scan_job*.pyc' (resolved 'D:\github\HomeMind\tests\unit\homemind\__pycache__\test_asset_scan_job*.pyc', missing 'D:\github\HomeMind\tests\unit\homemind\__pycache__\test_asset_scan_job*.pyc'): No such file or directory

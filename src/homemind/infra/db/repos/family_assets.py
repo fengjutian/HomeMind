@@ -244,6 +244,19 @@ class FamilyAssetRepo:
             ).fetchall()
         return map_rows(rows, FamilyAssetSourceRow)
 
+    def list_all_sources(self) -> list[FamilyAssetSourceRow]:
+        """Enumerate every asset source across every family.
+
+        Used by the periodic re-scan job so it can fan out without
+        knowing which families exist.
+        """
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_asset_sources "
+                "ORDER BY family_id, created_at, id"
+            ).fetchall()
+        return map_rows(rows, FamilyAssetSourceRow)
+
     def finish_source_scan(self, source_id: str, scanned_at: int) -> None:
         with self._db.transaction() as conn:
             conn.execute(
