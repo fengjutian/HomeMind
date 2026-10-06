@@ -49,6 +49,36 @@ class PermissionEffect(StrEnum):
     REQUIRE_CONFIRMATION = "REQUIRE_CONFIRMATION"
 
 
+# Actions that always require confirmation, even when an explicit
+# permission row grants ALLOW. This preserves the existing product rule
+# that destructive filesystem operations and durable-memory writes cannot
+# proceed without an additional human approval step.
+_FORCE_CONFIRMATION_ACTIONS: frozenset[str] = frozenset(
+    {
+        "filesystem.copy",
+        "filesystem.move",
+        "filesystem.rename",
+        "filesystem.delete",
+        "event.create",
+        "memory.create",
+        "family.delete",
+    }
+)
+
+
+def _apply_force_confirmation(
+    effect: PermissionEffect, action: str
+) -> PermissionEffect:
+    """Bump ALLOW → REQUIRE_CONFIRMATION for destructive actions.
+
+    DENY is never overridden: a destructive action that is explicitly denied
+    must stay denied. family.delete is force-confirmed regardless of role.
+    """
+    if effect is PermissionEffect.ALLOW and action in _FORCE_CONFIRMATION_ACTIONS:
+        return PermissionEffect.REQUIRE_CONFIRMATION
+    return effect
+
+
 # Conflict-resolution weight; higher value wins when multiple rules match.
 _EFFECT_PRIORITY: dict[str, int] = {
     PermissionEffect.ALLOW.value: 0,
@@ -105,7 +135,10 @@ class PermissionDecision:
 
 
 class _AssetLike(Protocol):
-    """Minimal asset shape required for private-space pre-checks."""
+    """Minimal asset / memory shape required for visibility and
+    private-space pre-checks. Either attribute may be missing for callers
+    that pass memory-like objects (no space) or asset-like objects
+    (no visibility at the protocol level)."""
 
     space_id: str | None
     visibility: str | None
@@ -177,11 +210,12 @@ class FamilyPermissionEvaluator:
             )
 
         # Step 3: family manager scope. Owners/Admins may run any
-        # family.* management action EXCEPT family.delete, which still
-        # needs confirmation.
+        # ``family.*`` administrative action EXCEPT family.delete, which
+        # still needs confirmation. Asset reads/mutations resolve through
+        # the normal rule pipeline below.
         if is_admin_manager and action.startswith("family.") and action != "family.delete":
             return PermissionDecision(
-                effect=PermissionEffect.ALLOW,
+                effect=_apply_force_confirmation(PermissionEffect.ALLOW, action),
                 action=action,
                 family_id=family_id,
                 member_id=member_id,
@@ -190,22 +224,49 @@ class FamilyPermissionEvaluator:
             )
 
         # Step 4: guard assets that live in another member's private space.
-        if asset is not None and asset.space_id is not None and asset.space_id != space_id:
-            space = self.repo.get_space(asset.space_id)
+        asset_space_id = getattr(asset, "space_id", None) if asset is not None else None
+        asset_visibility = (
+            getattr(asset, "visibility", None) if asset is not None else None
+        )
+        if asset_space_id is not None and asset_space_id != space_id:
+            space = self.repo.get_space(asset_space_id)
             if (
                 space is not None
                 and space.space_type == "PRIVATE"
                 and space.owner_member_id != member_id
-                and not is_owner
             ):
                 return PermissionDecision(
                     effect=PermissionEffect.DENY,
                     action=action,
                     family_id=family_id,
                     member_id=member_id,
-                    space_id=asset.space_id,
+                    space_id=asset_space_id,
                     reason="private_space_not_owned",
                 )
+
+        # Step 5: PRIVATE asset in a space the current member owns is allowed.
+        if asset_visibility == "PRIVATE":
+            space = self.repo.get_space(asset_space_id) if asset_space_id else None
+            if space is not None and space.owner_member_id == member_id:
+                return PermissionDecision(
+                    effect=PermissionEffect.ALLOW,
+                    action=action,
+                    family_id=family_id,
+                    member_id=member_id,
+                    space_id=asset_space_id,
+                    reason="private_space_owner",
+                )
+
+        # Step 6: PUBLIC and FAMILY-visibility assets are open to any family member.
+        if asset_visibility in {"PUBLIC", "FAMILY"}:
+            return PermissionDecision(
+                effect=PermissionEffect.ALLOW,
+                action=action,
+                family_id=family_id,
+                member_id=member_id,
+                space_id=asset_space_id,
+                reason="family_visibility",
+            )
 
         # Step 5: rule lookup with explicit specificity priority.
         decision = self._match_rule(
@@ -219,10 +280,7 @@ class FamilyPermissionEvaluator:
             return decision
 
         # Final fallback: action default risk.
-        default = default_effect_for(action)
-        # Owner still needs confirmation for family.delete.
-        if is_owner and action == "family.delete":
-            default = PermissionEffect.REQUIRE_CONFIRMATION
+        default = _apply_force_confirmation(default_effect_for(action), action)
         return PermissionDecision(
             effect=default,
             action=action,
@@ -265,8 +323,9 @@ class FamilyPermissionEvaluator:
 
         rules.sort(key=_sort_key)
         winner = rules[0]
+        effect = _apply_force_confirmation(PermissionEffect(winner.effect), action)
         return PermissionDecision(
-            effect=PermissionEffect(winner.effect),
+            effect=effect,
             action=action,
             family_id=family_id,
             member_id=member_id,

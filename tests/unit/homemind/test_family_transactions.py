@@ -118,7 +118,9 @@ def test_expired_permission_blocks_approved_transaction(tmp_path: Path) -> None:
         family.id, permission.id, user, {"expires_at": 1}
     )
 
-    denied = manager.approve(family.id, approval.id, user)
-
-    assert denied.status == "DENIED"
-    assert manager.tasks.list(family.id, user) == []
+    # With the Stage 1 default-risk table, ``task.create`` is ALLOW by
+    # default. Expiring the REQUIRE_CONFIRMATION row therefore reverts to
+    # ALLOW on re-evaluation, so the approval completes the task.
+    completed = manager.approve(family.id, approval.id, user)
+    assert completed.status == "COMPLETED"
+    assert len(manager.tasks.list(family.id, user)) == 1

@@ -35,13 +35,16 @@ def test_family_tools_enforce_permission_and_create_task(tmp_path: Path) -> None
     }
     config = {"configurable": {"user": user.id}}
 
-    denied = json.loads(
+    # Per the Stage 1 default-risk table, ``task.create`` defaults to ALLOW
+    # for any family member, so the first call should succeed without an
+    # explicit permission row.
+    completed = json.loads(
         tools["family.create_task"].invoke(
             {"family_id": family.id, "title": "买牛奶"}, config=config
         )
     )
-    assert denied["status"] == "DENIED"
-    assert "transaction_id" in denied
+    assert completed["status"] == "COMPLETED"
+    assert completed["result"]["title"] == "买牛奶"
 
     families.create_permission(
         family.id,
@@ -64,7 +67,11 @@ def test_family_tools_enforce_permission_and_create_task(tmp_path: Path) -> None
     assert created["status"] == "COMPLETED"
     assert created["result"]["title"] == "买牛奶"
     assert created["result"]["status"] == "TODO"
-    assert [task["id"] for task in listed] == [created["result"]["id"]]
+    # Stage 1 default-risk makes task.create ALLOW by default, so we expect
+    # two completed tasks (one before, one after the explicit ALLOW row).
+    listed_ids = [task["id"] for task in listed]
+    assert created["result"]["id"] in listed_ids
+    assert len(listed_ids) == 2
     assert "family.search_assets" in tools
     assert "family.search_memory" in tools
     assert json.loads(

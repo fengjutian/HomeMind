@@ -676,7 +676,6 @@ def evaluate_permission(
         user=user,
         action=body.action,
         space_id=body.space_id,
-        asset_id=body.asset_id,
     )
     return PermissionDecisionResponse(
         effect=decision.effect,

@@ -372,6 +372,30 @@ class FamilyRepo:
             ).fetchall()
         return map_rows(rows, FamilyRelationshipRow)
 
+    def list_relationships_for_member(
+        self, member_id: str
+    ) -> list[FamilyRelationshipRow]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_relationships "
+                "WHERE from_member_id = ? OR to_member_id = ? "
+                "ORDER BY created_at, id",
+                (member_id, member_id),
+            ).fetchall()
+        return map_rows(rows, FamilyRelationshipRow)
+
+    def list_members_by_display_name(
+        self, display_name: str
+    ) -> list[FamilyMemberRow]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_members "
+                "WHERE lower(display_name) = ? AND status = 'ACTIVE' "
+                "ORDER BY created_at, id",
+                (display_name.casefold(),),
+            ).fetchall()
+        return map_rows(rows, FamilyMemberRow)
+
     def create_space(
         self, family_id: str, *, name: str, space_type: str, owner_member_id: str | None = None
     ) -> FamilySpaceRow:
