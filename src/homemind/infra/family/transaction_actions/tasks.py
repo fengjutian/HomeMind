@@ -45,13 +45,19 @@ class TaskCreateHandler:
             assigned_member_id=payload.get("assigned_member_id"),
             due_at=payload.get("due_at"),
         )
-        return {"task_id": task.id, "id": task.id}
+        return {
+            "id": task.id,
+            "task_id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "status": task.status,
+        }
 
     def verify(self, context: ActionContext, result: dict[str, Any]) -> dict[str, Any]:
         task_id = result.get("task_id") or result.get("id")
         if not task_id:
             return {"verified": False, "reason": "missing task_id"}
-        task = self.tasks.repo.get_task(task_id)
+        task = self.tasks.repo.get(task_id)
         return {"verified": bool(task), "found": bool(task)}
 
     def compensate(self, context: ActionContext, result: dict[str, Any]) -> dict[str, Any]:

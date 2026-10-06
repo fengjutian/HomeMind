@@ -19,6 +19,14 @@ def test_homemind_app_registers_family_routes() -> None:
     assert "/api/homemind/families/{family_id}/filesystem/search" in paths
     assert "/api/homemind/families/{family_id}/filesystem/read" in paths
     assert "/api/homemind/families/{family_id}/filesystem/actions" in paths
+    assert "/api/homemind/families/{family_id}/devices" in paths
+    assert "/api/homemind/families/{family_id}/devices/{device_id}" in paths
+    assert "/api/homemind/families/{family_id}/devices/{device_id}/rotate-token" in paths
+    assert "/api/homemind/families/{family_id}/devices/{device_id}/commands" in paths
+    assert "/api/homemind/runtime/pair" in paths
+    assert "/api/homemind/runtime/heartbeat" in paths
+    assert "/api/homemind/runtime/commands" in paths
+    assert "/api/homemind/runtime/commands/{command_id}/result" in paths
 
 
 def test_homemind_routes_precede_dashboard_fallback() -> None:

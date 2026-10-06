@@ -147,6 +147,50 @@ async def get_transaction(
 
 
 @router.get(
+    "/{family_id}/transactions",
+    response_model=list[TransactionResponse],
+    summary="List family transactions",
+)
+async def list_transactions(
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
+    status: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> object:
+    return _manager(server).list_transactions(family_id, user, status=status, limit=limit)
+
+
+@router.post(
+    "/{family_id}/transactions/{transaction_id}/cancel",
+    response_model=TransactionResponse,
+    summary="Cancel a pending family transaction",
+)
+async def cancel_transaction(
+    family_id: str,
+    transaction_id: str,
+    server: Server,
+    user: CurrentUser,
+) -> object:
+    return _manager(server).cancel(family_id, transaction_id, user)
+
+
+@router.post(
+    "/{family_id}/transactions/{transaction_id}/retry",
+    response_model=TransactionResponse,
+    summary="Retry a failed family transaction",
+)
+async def retry_transaction(
+    family_id: str,
+    transaction_id: str,
+    server: Server,
+    user: CurrentUser,
+) -> object:
+    call = partial(_manager(server).retry, family_id, transaction_id, user)
+    return await asyncio.to_thread(call)
+
+
+@router.get(
     "/{family_id}/audit-log",
     response_model=list[AuditResponse],
     summary="List family agent audit records",

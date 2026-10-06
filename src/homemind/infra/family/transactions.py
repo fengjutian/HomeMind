@@ -132,6 +132,19 @@ class FamilyTransactionManager:
             json.dumps(payload, ensure_ascii=False, sort_keys=True),
             idempotency_key=idempotency_key,
         )
+        # Idempotent re-plan: if the existing row is already in a
+        # terminal or in-flight state, return it without re-executing.
+        terminal_statuses = {
+            TransactionStatus.COMPLETED.value,
+            TransactionStatus.DENIED.value,
+            TransactionStatus.REJECTED.value,
+            TransactionStatus.CANCELLED.value,
+            TransactionStatus.FAILED.value,
+            TransactionStatus.FAILED_REQUIRES_REVIEW.value,
+        }
+        if transaction.status in terminal_statuses:
+            self._audit(transaction, user.id, "IDEMPOTENT_REPLAY")
+            return transaction, None  # type: ignore[return-value]
         # Build a preview so the row carries useful context for audit
         # even if execution never runs.
         try:

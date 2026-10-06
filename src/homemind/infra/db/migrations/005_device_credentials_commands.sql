@@ -1,0 +1,57 @@
+-- HomeMind schema v5: device credentials and command queue.
+
+CREATE TABLE IF NOT EXISTS homemind_device_credentials (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  credential_id TEXT NOT NULL UNIQUE,
+  device_id     TEXT NOT NULL REFERENCES homemind_family_devices(device_id) ON DELETE CASCADE,
+  family_id     TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
+  token_hash    TEXT NOT NULL,
+  issued_at     INTEGER NOT NULL,
+  expires_at    INTEGER,
+  revoked_at    INTEGER,
+  rotated_from  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_device_credentials_device
+  ON homemind_device_credentials(device_id, revoked_at);
+CREATE INDEX IF NOT EXISTS idx_homemind_device_credentials_family
+  ON homemind_device_credentials(family_id, issued_at);
+CREATE INDEX IF NOT EXISTS idx_homemind_device_credentials_hash
+  ON homemind_device_credentials(token_hash);
+
+CREATE TABLE IF NOT EXISTS homemind_device_commands (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  command_id      TEXT NOT NULL UNIQUE,
+  family_id       TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
+  device_id       TEXT NOT NULL REFERENCES homemind_family_devices(device_id) ON DELETE CASCADE,
+  capability      TEXT NOT NULL,
+  payload_json    TEXT NOT NULL,
+  requested_by    INTEGER NOT NULL,
+  transaction_id  TEXT,
+  expires_at      INTEGER NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'PENDING',
+  result_json     TEXT,
+  error           TEXT,
+  created_at      INTEGER NOT NULL,
+  updated_at      INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_device_commands_device
+  ON homemind_device_commands(device_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_homemind_device_commands_family
+  ON homemind_device_commands(family_id, status, created_at);
+
+CREATE TABLE IF NOT EXISTS homemind_device_command_results (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  result_id       TEXT NOT NULL UNIQUE,
+  command_id      TEXT NOT NULL UNIQUE REFERENCES homemind_device_commands(command_id) ON DELETE CASCADE,
+  status          TEXT NOT NULL,
+  result_json     TEXT NOT NULL,
+  error           TEXT,
+  reported_at     INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_homemind_device_command_results_command
+  ON homemind_device_command_results(command_id);
+
+UPDATE _homemind_schema_version SET version = 5;

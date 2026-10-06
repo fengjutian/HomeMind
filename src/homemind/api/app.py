@@ -8,9 +8,11 @@ from fastapi.responses import JSONResponse
 from homemind.api.routers import (
     albums,
     context,
+    devices,
     families,
     filesystem,
     photos,
+    runtime,
     search,
     tasks,
     transactions,
@@ -35,6 +37,16 @@ def build_app(server: OctopServer) -> FastAPI:
         families.router,
         prefix="/api/homemind/families",
         tags=["homemind-families"],
+    )
+    app.include_router(
+        devices.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-devices"],
+    )
+    app.include_router(
+        runtime.router,
+        prefix="/api/homemind",
+        tags=["homemind-runtime"],
     )
     app.include_router(
         context.router,
