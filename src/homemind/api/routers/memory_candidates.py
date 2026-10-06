@@ -14,15 +14,14 @@ or operate on another family's data.
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.repos.memory_candidates import MemoryCandidateRow, MemoryEvidenceRow
 from homemind.infra.db.services import HomeMindServices
-from homemind.infra.family.context import MemoryType
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
 from octop.api.deps import current_user, get_server

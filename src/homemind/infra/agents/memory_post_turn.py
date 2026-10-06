@@ -15,6 +15,8 @@ from typing import Any
 
 from homemind.infra.agents._request_helpers import (
     ResolvedTurnUser as _ResolvedTurnUser,
+)
+from homemind.infra.agents._request_helpers import (
     extract_text as _extract_text,
 )
 from homemind.infra.agents.memory_candidate_extractor import (

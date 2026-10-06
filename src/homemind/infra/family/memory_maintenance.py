@@ -19,6 +19,7 @@ databases do not need to wait 24 h for the first pass.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import Any
 
@@ -82,10 +83,8 @@ class MemoryMaintenanceRunner:
         if self._task is None:
             return
         self._task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await self._task
-        except asyncio.CancelledError:
-            pass
         self._task = None
 
     async def _loop(self) -> None:
@@ -94,10 +93,8 @@ class MemoryMaintenanceRunner:
         except Exception:
             logger.exception("MemoryMaintenanceRunner: initial sweep crashed")
         while not self._stop_event.is_set():
-            try:
+            with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._stop_event.wait(), timeout=self._interval)
-            except asyncio.TimeoutError:
-                pass
             if self._stop_event.is_set():
                 break
             try:

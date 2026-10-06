@@ -16,12 +16,11 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from homemind.infra.db.repos.family_context import FamilyMemoryRow
 from homemind.infra.family.memory_lifecycle import CandidateSpec, is_sensitive
-from homemind.infra.family.resolvers.models import ResolutionCandidate
 from homemind.infra.family.resolvers.relationship import RelationshipResolver
 
 logger = logging.getLogger(__name__)

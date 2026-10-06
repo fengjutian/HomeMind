@@ -28,7 +28,7 @@ class ResolvedTurnUser:
     thread_id: str
 
     @classmethod
-    def from_request_config(cls) -> "ResolvedTurnUser | None":
+    def from_request_config(cls) -> ResolvedTurnUser | None:
         try:
             configurable = dict(get_config().get("configurable") or {})
         except RuntimeError:  # outside a LangGraph run — fall through

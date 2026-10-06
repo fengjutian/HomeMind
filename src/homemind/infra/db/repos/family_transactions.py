@@ -36,9 +36,47 @@ class FamilyTransactionRow:
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyTransactionRow:
+        # ``sqlite3.Row`` does not implement ``Mapping.get`` and raises
+        # ``IndexError`` on missing columns. Map the row to a dict so
+        # legacy schemas (e.g. before migration 004) hydrate cleanly
+        # without raising ``KeyError``.
+        if hasattr(row, "keys"):
+            row_dict: dict[str, Any] = {key: row[key] for key in row.keys()}
+        else:
+            row_dict = dict(row)  # type: ignore[arg-type]
+
         def _int(value: Any) -> int | None:
             return int(value) if value is not None else None
 
+        return cls(
+            id=str(row_dict["transaction_id"]),
+            family_id=str(row_dict["family_id"]),
+            requested_by=int(row_dict["requested_by"]),
+            action=str(row_dict["action"]),
+            payload_json=str(row_dict["payload_json"]),
+            status=str(row_dict["status"]),
+            result_json=row_dict.get("result_json"),
+            error=row_dict.get("error"),
+            created_at=int(row_dict["created_at"]),
+            updated_at=int(row_dict["updated_at"]),
+            idempotency_key=row_dict.get("idempotency_key"),
+            preview_json=row_dict.get("preview_json") or "{}",
+            verification_json=row_dict.get("verification_json"),
+            attempt_count=int(row_dict.get("attempt_count") or 0),
+            lease_owner=row_dict.get("lease_owner"),
+            lease_expires_at=_int(row_dict.get("lease_expires_at")),
+            approved_at=_int(row_dict.get("approved_at")),
+            executed_at=_int(row_dict.get("executed_at")),
+            verified_at=_int(row_dict.get("verified_at")),
+            cancelled_at=_int(row_dict.get("cancelled_at")),
+        )
+
+        # ``from_row`` is shared by every read path. Defensive defaults
+        # let older schemas (e.g. a DB created before migration 004 added
+        # ``preview_json`` / ``verification_json`` / ``attempt_count``
+        # / ``lease_owner`` / ``lease_expires_at`` / ``approved_at``
+        # / ``executed_at`` / ``verified_at`` / ``cancelled_at``) still
+        # hydrate without raising ``KeyError``.
         return cls(
             id=str(row["transaction_id"]),
             family_id=str(row["family_id"]),
@@ -51,15 +89,15 @@ class FamilyTransactionRow:
             created_at=int(row["created_at"]),
             updated_at=int(row["updated_at"]),
             idempotency_key=row["idempotency_key"],
-            preview_json=row["preview_json"],
-            verification_json=row["verification_json"],
-            attempt_count=int(row["attempt_count"]),
-            lease_owner=row["lease_owner"],
-            lease_expires_at=_int(row["lease_expires_at"]),
-            approved_at=_int(row["approved_at"]),
-            executed_at=_int(row["executed_at"]),
-            verified_at=_int(row["verified_at"]),
-            cancelled_at=_int(row["cancelled_at"]),
+            preview_json=_col("preview_json", "{}") or "{}",
+            verification_json=_col("verification_json"),
+            attempt_count=int(_col("attempt_count", 0) or 0),
+            lease_owner=_col("lease_owner"),
+            lease_expires_at=_int(_col("lease_expires_at")),
+            approved_at=_int(_col("approved_at")),
+            executed_at=_int(_col("executed_at")),
+            verified_at=_int(_col("verified_at")),
+            cancelled_at=_int(_col("cancelled_at")),
         )
 
 
@@ -139,7 +177,8 @@ class FamilyTransactionRepo:
         # row. SQLite/PG both enforce the partial unique index, so the
         # INSERT may still raise ``IntegrityError`` when two concurrent
         # ``plan()`` calls race past the SELECT — we catch that and
-        # return the surviving row.
+        # return the surviving row via ``get_transaction`` so the row
+        # is hydrated through the same path as the regular read.
         if idempotency_key:
             existing = self.find_by_idempotency_key(family_id, idempotency_key)
             if existing is not None:
@@ -165,9 +204,10 @@ class FamilyTransactionRepo:
                     ),
                 )
         except IntegrityError:
-            existing = self.find_by_idempotency_key(family_id, idempotency_key)
-            if existing is not None:
-                return existing
+            if idempotency_key:
+                survivor = self.find_by_idempotency_key(family_id, idempotency_key)
+                if survivor is not None:
+                    return survivor
             raise
         return self.get_transaction(transaction_id)  # type: ignore[return-value]
 
@@ -180,6 +220,7 @@ class FamilyTransactionRepo:
                 "WHERE family_id = ? AND idempotency_key = ?",
                 (family_id, idempotency_key),
             ).fetchone()
+        return FamilyTransactionRow.from_row(row) if row else None
 
     def get_approval_for_transaction(self, transaction_id: str) -> FamilyApprovalRow | None:
         """Return the (still-pending) approval for ``transaction_id``.
@@ -194,7 +235,7 @@ class FamilyTransactionRepo:
                 "ORDER BY created_at DESC LIMIT 1",
                 (transaction_id,),
             ).fetchone()
-        return FamilyTransactionRow.from_row(row) if row else None
+        return FamilyApprovalRow.from_row(row) if row else None
 
     def get_transaction(self, transaction_id: str) -> FamilyTransactionRow | None:
         with self._db.connect() as conn:

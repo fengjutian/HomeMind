@@ -15,6 +15,7 @@ middleware appends a minimal hint and does not pick a fallback.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
@@ -22,29 +23,28 @@ from typing import Any
 from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import SystemMessage
 
+from homemind.infra.active_family import ActiveFamilyResolver
 from homemind.infra.agents._request_helpers import (
     ResolvedTurnUser as _ResolvedTurnUser,
+)
+from homemind.infra.agents._request_helpers import (
     extract_text as _extract_text,
+)
+from homemind.infra.agents._request_helpers import (
     message_hash as _message_hash,
 )
-from homemind.infra.active_family import ActiveFamilyResolver
 from homemind.infra.agents.family_context_renderer import (
+    _XML_PROLOGUE_NOTE,
     AssetSummary,
     EventSummary,
     FamilySummary,
     MemberSummary,
     MemorySummary,
     RelationshipSummary,
-    _XML_PROLOGUE_NOTE,
     render_family_context,
     render_no_active_family_hint,
 )
 from homemind.infra.agents.memory_post_turn import run_for_turn as _run_post_turn
-from homemind.infra.db.repos.family_context import FamilyContextRepo
-from homemind.infra.db.repos.memory_candidates import (
-    MemoryCandidateRepo,
-    MemoryEvidenceRepo,
-)
 from homemind.infra.family.context import FamilyContextManager, ResolvedFamilyContext
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
@@ -214,22 +214,17 @@ class FamilyContextMiddleware(AgentMiddleware[Any, Any]):
 
 def _append_block(request: Any, block: str, base_message: SystemMessage) -> Any:
     existing_content = base_message.content or ""
+    merged: Any
     if isinstance(existing_content, str):
-        merged = existing_content
-        if merged:
-            merged = merged.rstrip() + "\n\n" + block
-        else:
-            merged = block
+        merged = existing_content.rstrip() + "\n\n" + block if existing_content else block
     else:
         merged = existing_content
     new_message = SystemMessage(content=merged)
     if hasattr(request, "override"):
         return request.override(system_message=new_message)
     # Fallback for stub requests in tests.
-    try:
-        request.system_message = new_message  # type: ignore[attr-defined]
-    except Exception:
-        pass
+    with contextlib.suppress(Exception):
+        setattr(request, "system_message", new_message)
     return request
 
 

@@ -136,7 +136,7 @@ def test_two_admins_approving_concurrently_only_one_wins(tmp_path: Path) -> None
 
 def test_idempotency_key_only_creates_one_transaction(tmp_path: Path) -> None:
     pool, txn_manager, txn_repo, family_id, owner, manager_a, manager_b = _bootstrap(tmp_path)
-    first_txn, _ = txn_manager.plan(
+    first_txn, first_approval = txn_manager.plan(
         family_id, owner, action="task.create",
         payload={"title": "倒垃圾"},
         idempotency_key="dedupe-key",
@@ -147,7 +147,12 @@ def test_idempotency_key_only_creates_one_transaction(tmp_path: Path) -> None:
         idempotency_key="dedupe-key",
     )
     assert first_txn.id == second_txn.id
-    assert second_approval is None
+    # The replay must surface the *existing* approval so the caller can
+    # still approve it — never mint a second row for the same key.
+    assert second_approval is not None
+    assert second_approval.transaction_id == first_txn.id
+    assert second_approval.id == first_approval.id
+    assert txn_repo.list_approvals(family_id, None) == [first_approval]
     pool.close()
 
 

@@ -11,8 +11,9 @@ instructions — see the warning injected next to the block.
 from __future__ import annotations
 
 import html
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
 
 from homemind.infra.family.resolvers.models import ResolutionCandidate, ResolvedTimeRange
 
@@ -285,7 +286,6 @@ __all__ = [
     "MemberSummary",
     "MemorySummary",
     "RelationshipSummary",
-    "XML_PROLOGUE_NOTE",
     "_XML_PROLOGUE_NOTE",
     "family_summary_from_dict",
     "render_family_context",
