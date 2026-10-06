@@ -10,7 +10,11 @@ import {
   setAuthToken,
   setRememberLoginPreference,
 } from "../../api";
-import { authApi, type OauthProviderStatus } from "../../api/modules/auth";
+import {
+  authApi,
+  type LdapStatus,
+  type OauthProviderStatus,
+} from "../../api/modules/auth";
 import { apiErrorMessage } from "../../utils/apiError";
 import { refreshServerLabels } from "../../i18n";
 import { applyUserLocale, applyGuestLocale } from "../../utils/locale";
@@ -77,6 +81,7 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [providers, setProviders] = useState<OauthProviderStatus[]>([]);
+  const [ldap, setLdap] = useState<LdapStatus | null>(null);
   const [ssoLoadingKind, setSsoLoadingKind] = useState<string | null>(null);
   const [captchaReady, setCaptchaReady] = useState(false);
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
@@ -108,6 +113,12 @@ export default function LoginPage() {
             if (!cancelled) {
               setProviders(next.providers.filter((item) => item.enabled));
             }
+          })
+          .catch(() => {});
+        authApi
+          .getLdapStatus()
+          .then((next) => {
+            if (!cancelled) setLdap(next);
           })
           .catch(() => {});
         authApi
@@ -294,6 +305,24 @@ export default function LoginPage() {
           onPressEnter={handleLogin}
           style={{ borderRadius: 10 }}
         />
+
+        {ldap?.enabled && (
+          <p
+            style={{
+              margin: 0,
+              marginTop: -8,
+              width: "100%",
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: "var(--fn-text-tertiary)",
+              textAlign: "center",
+            }}
+          >
+            {t("login.ldapHint", {
+              name: ldap.display_name.trim() || t("adminSso.ldap.kind"),
+            })}
+          </p>
+        )}
 
         <CaptchaField
           ref={captchaRef}
