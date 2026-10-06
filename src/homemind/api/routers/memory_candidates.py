@@ -24,6 +24,7 @@ from homemind.infra.db.repos.memory_candidates import MemoryCandidateRow, Memory
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
+from homemind.infra.family.permissions import FamilyPermissionEvaluator
 from octop.api.deps import current_user, get_server
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.server import OctopServer
@@ -173,15 +174,15 @@ async def list_memory_candidates(
     status: str | None = Query(default=None, description="PENDING / APPROVED / REJECTED / MERGED / EXPIRED"),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> list[MemoryCandidateResponse]:
-    lifecycle = _lifecycle(_services(server))
-    family = _family(_services(server))
+    services = _services(server)
+    lifecycle = _lifecycle(services)
+    family = _family(services)
     family.require_access(family_id, user)
+    permissions = FamilyPermissionEvaluator(services.family_repo)
     rows = lifecycle.candidates.list_for_family(family_id, status=status, limit=limit)
     visible: list[MemoryCandidateResponse] = []
     for row in rows:
-        if lifecycle.permissions is not None and not lifecycle.permissions.can_see_candidate(
-            family_id, user, row
-        ):
+        if not permissions.can_see_candidate(family_id, user, row):
             continue
         visible.append(_candidate_response(row))
     return visible
@@ -195,11 +196,13 @@ async def list_memory_candidates(
 async def get_memory_candidate(
     family_id: str, candidate_id: str, server: Server, user: CurrentUser,
 ) -> MemoryCandidateResponse:
-    lifecycle = _lifecycle(_services(server))
-    family = _family(_services(server))
+    services = _services(server)
+    lifecycle = _lifecycle(services)
+    family = _family(services)
     family.require_access(family_id, user)
     candidate = _load_candidate(lifecycle, family_id, candidate_id)
-    if not lifecycle.permissions.can_see_candidate(family_id, user, candidate):
+    permissions = FamilyPermissionEvaluator(services.family_repo)
+    if not permissions.can_see_candidate(family_id, user, candidate):
         raise OctopError(ErrorCode.FORBIDDEN, "candidate not visible")
     return _candidate_response(candidate)
 
