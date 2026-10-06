@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from octop.infra.db.pool import DatabasePool
 from octop.infra.db.repos._base import DbRow, map_rows, now_ts
@@ -21,15 +22,43 @@ class FamilyTransactionRow:
     error: str | None
     created_at: int
     updated_at: int
+    idempotency_key: str | None = None
+    preview_json: str | None = None
+    verification_json: str | None = None
+    attempt_count: int = 0
+    lease_owner: str | None = None
+    lease_expires_at: int | None = None
+    approved_at: int | None = None
+    executed_at: int | None = None
+    verified_at: int | None = None
+    cancelled_at: int | None = None
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyTransactionRow:
+        def _int(value: Any) -> int | None:
+            return int(value) if value is not None else None
+
         return cls(
-            id=str(row["transaction_id"]), family_id=str(row["family_id"]),
-            requested_by=int(row["requested_by"]), action=str(row["action"]),
-            payload_json=str(row["payload_json"]), status=str(row["status"]),
-            result_json=row["result_json"], error=row["error"],
-            created_at=int(row["created_at"]), updated_at=int(row["updated_at"]),
+            id=str(row["transaction_id"]),
+            family_id=str(row["family_id"]),
+            requested_by=int(row["requested_by"]),
+            action=str(row["action"]),
+            payload_json=str(row["payload_json"]),
+            status=str(row["status"]),
+            result_json=row["result_json"],
+            error=row["error"],
+            created_at=int(row["created_at"]),
+            updated_at=int(row["updated_at"]),
+            idempotency_key=row["idempotency_key"],
+            preview_json=row["preview_json"],
+            verification_json=row["verification_json"],
+            attempt_count=int(row["attempt_count"]),
+            lease_owner=row["lease_owner"],
+            lease_expires_at=_int(row["lease_expires_at"]),
+            approved_at=_int(row["approved_at"]),
+            executed_at=_int(row["executed_at"]),
+            verified_at=_int(row["verified_at"]),
+            cancelled_at=_int(row["cancelled_at"]),
         )
 
 
@@ -86,14 +115,29 @@ class FamilyTransactionRepo:
         self._db = db
 
     def create_transaction(
-        self, family_id: str, requested_by: int, action: str, payload_json: str
+        self,
+        family_id: str,
+        requested_by: int,
+        action: str,
+        payload_json: str,
+        *,
+        idempotency_key: str | None = None,
+        preview_json: str = "{}",
     ) -> FamilyTransactionRow:
+        # Idempotency: if (family_id, idempotency_key) already maps to a
+        # transaction, return the existing one instead of inserting a new
+        # row. SQLite/PG both enforce the partial unique index.
+        if idempotency_key:
+            existing = self.find_by_idempotency_key(family_id, idempotency_key)
+            if existing is not None:
+                return existing
         transaction_id, timestamp = new_ulid(), now_ts()
         with self._db.transaction() as conn:
             conn.execute(
                 "INSERT INTO homemind_family_transactions(transaction_id, family_id, "
-                "requested_by, action, payload_json, status, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, 'PLANNED', ?, ?)",
+                "requested_by, action, payload_json, status, created_at, updated_at, "
+                "idempotency_key, preview_json) "
+                "VALUES (?, ?, ?, ?, ?, 'PLANNED', ?, ?, ?, ?)",
                 (
                     transaction_id,
                     family_id,
@@ -102,9 +146,22 @@ class FamilyTransactionRepo:
                     payload_json,
                     timestamp,
                     timestamp,
+                    idempotency_key,
+                    preview_json,
                 ),
             )
         return self.get_transaction(transaction_id)  # type: ignore[return-value]
+
+    def find_by_idempotency_key(
+        self, family_id: str, idempotency_key: str,
+    ) -> FamilyTransactionRow | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM homemind_family_transactions "
+                "WHERE family_id = ? AND idempotency_key = ?",
+                (family_id, idempotency_key),
+            ).fetchone()
+        return FamilyTransactionRow.from_row(row) if row else None
 
     def get_transaction(self, transaction_id: str) -> FamilyTransactionRow | None:
         with self._db.connect() as conn:
@@ -125,6 +182,133 @@ class FamilyTransactionRepo:
                 (status, result_json, error, now_ts(), transaction_id),
             )
         return self.get_transaction(transaction_id)  # type: ignore[return-value]
+
+    def transition(
+        self,
+        transaction_id: str,
+        *,
+        from_status: str | tuple[str, ...],
+        to_status: str,
+        result_json: str | None = None,
+        verification_json: str | None = None,
+        error: str | None = None,
+        lease_owner: str | None = None,
+        lease_expires_at: int | None = None,
+        approved_at: int | None = None,
+        executed_at: int | None = None,
+        verified_at: int | None = None,
+        cancelled_at: int | None = None,
+        increment_attempt: bool = False,
+    ) -> FamilyTransactionRow | None:
+        """Atomic compare-and-swap status transition.
+
+        Returns the updated row, or ``None`` if no row matched the
+        ``from_status`` guard (i.e. another worker already moved the
+        transaction forward).
+        """
+        from_clause = (
+            f"status = '{from_status}'"
+            if isinstance(from_status, str)
+            else "status IN (" + ", ".join(f"'{s}'" for s in from_status) + ")"
+        )
+        sets = [
+            "status = ?",
+            "updated_at = ?",
+        ]
+        params: list[object] = [to_status, now_ts()]
+        if result_json is not None:
+            sets.append("result_json = ?"); params.append(result_json)
+        if verification_json is not None:
+            sets.append("verification_json = ?"); params.append(verification_json)
+        if error is not None:
+            sets.append("error = ?"); params.append(error)
+        if lease_owner is not None:
+            sets.append("lease_owner = ?"); params.append(lease_owner)
+        if lease_expires_at is not None:
+            sets.append("lease_expires_at = ?"); params.append(lease_expires_at)
+        if approved_at is not None:
+            sets.append("approved_at = ?"); params.append(approved_at)
+        if executed_at is not None:
+            sets.append("executed_at = ?"); params.append(executed_at)
+        if verified_at is not None:
+            sets.append("verified_at = ?"); params.append(verified_at)
+        if cancelled_at is not None:
+            sets.append("cancelled_at = ?"); params.append(cancelled_at)
+        if increment_attempt:
+            sets.append("attempt_count = attempt_count + 1")
+        params.append(transaction_id)
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                f"UPDATE homemind_family_transactions SET {', '.join(sets)} "
+                f"WHERE transaction_id = ? AND {from_clause}",
+                params,
+            )
+            if cursor.rowcount != 1:
+                return None
+        return self.get_transaction(transaction_id)
+
+    def list_transactions(
+        self,
+        family_id: str,
+        *,
+        status: str | None = None,
+        limit: int = 100,
+    ) -> list[FamilyTransactionRow]:
+        clauses = ["family_id = ?"]
+        params: list[object] = [family_id]
+        if status is not None:
+            clauses.append("status = ?")
+            params.append(status)
+        params.append(limit)
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_transactions WHERE "
+                + " AND ".join(clauses)
+                + " ORDER BY created_at DESC, id DESC LIMIT ?",
+                params,
+            ).fetchall()
+        return map_rows(rows, FamilyTransactionRow)
+
+    def list_running_with_expired_lease(
+        self, *, now: int, statuses: tuple[str, ...] = ("EXECUTING", "VERIFYING"),
+    ) -> list[FamilyTransactionRow]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_transactions WHERE "
+                "status IN (" + ", ".join(f"'{s}'" for s in statuses) + ") "
+                "AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?",
+                (now,),
+            ).fetchall()
+        return map_rows(rows, FamilyTransactionRow)
+
+    def acquire_lease(
+        self,
+        transaction_id: str,
+        *,
+        from_status: str,
+        owner: str,
+        ttl_seconds: int,
+    ) -> FamilyTransactionRow | None:
+        """Take a lease on a transaction from ``from_status``."""
+        return self.transition(
+            transaction_id,
+            from_status=from_status,
+            to_status="EXECUTING",
+            lease_owner=owner,
+            lease_expires_at=now_ts() + ttl_seconds,
+            increment_attempt=True,
+        )
+
+    def release_lease(
+        self, transaction_id: str, *, to_status: str,
+    ) -> FamilyTransactionRow | None:
+        return self.transition(
+            transaction_id,
+            from_status="EXECUTING",
+            to_status=to_status,
+            lease_owner=None,
+            lease_expires_at=None,
+        )
 
     def create_approval(self, transaction: FamilyTransactionRow) -> FamilyApprovalRow:
         approval_id, timestamp = new_ulid(), now_ts()
