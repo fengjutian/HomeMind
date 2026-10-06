@@ -163,16 +163,6 @@ class FamilyPermissionUpdateBody(BaseModel):
     expires_at: int | None = None
 
 
-class FamilyPermissionEvaluateBody(BaseModel):
-    subject_member_id: str
-    action: str = Field(min_length=1, max_length=100)
-    space_id: str | None = None
-
-
-class FamilyPermissionDecision(BaseModel):
-    effect: PermissionEffect
-
-
 class FamilyAssetResponse(BaseModel):
     id: str
     family_id: str
@@ -495,30 +485,6 @@ async def delete_permission(
 
 
 @router.post(
-    "/{family_id}/permissions/evaluate",
-    response_model=FamilyPermissionDecision,
-    summary="Evaluate a family permission",
-)
-async def evaluate_permission(
-    family_id: str,
-    body: FamilyPermissionEvaluateBody,
-    server: Server,
-    user: CurrentUser,
-) -> FamilyPermissionDecision:
-    effect = _manager(server).evaluate_permission(
-        family_id, user, **body.model_dump()
-    )
-    from homemind.infra.metrics import inc as _hm_inc
-    if effect.value == "ALLOW":
-        _hm_inc("permission_allow_total")
-    elif effect.value == "DENY":
-        _hm_inc("permission_deny_total")
-    elif effect.value == "REQUIRE_CONFIRMATION":
-        _hm_inc("permission_require_confirmation_total")
-    return FamilyPermissionDecision(effect=effect)
-
-
-@router.post(
     "/{family_id}/assets/scan",
     response_model=FamilyAssetScanResponse,
     summary="Scan a local directory into the family asset index",
@@ -680,6 +646,7 @@ def _permission_evaluator(server: OctopServer) -> FamilyPermissionEvaluator:
     "/{family_id}/permissions/evaluate",
     response_model=PermissionDecisionResponse,
     summary="Explain the current user's permission decision",
+    operation_id="homemind_evaluate_permission",
 )
 def evaluate_permission(
     family_id: str,

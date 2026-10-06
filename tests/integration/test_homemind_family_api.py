@@ -97,13 +97,15 @@ async def test_family_foundation_api(
         f"/api/homemind/families/{family_id}/permissions/evaluate",
         headers=auth,
         json={
-            "subject_member_id": child["id"],
             "space_id": space["id"],
             "action": "photo.delete",
         },
     )
     assert response.status_code == 200
-    assert response.json() == {"effect": "REQUIRE_CONFIRMATION"}
+    payload = response.json()
+    assert payload["effect"] == "REQUIRE_CONFIRMATION"
+    assert payload["action"] == "photo.delete"
+    assert payload["space_id"] == space["id"]
 
     response = await client.patch(
         f"/api/homemind/families/{family_id}/members/{child['id']}",

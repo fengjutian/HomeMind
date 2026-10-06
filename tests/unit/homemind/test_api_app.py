@@ -36,3 +36,17 @@ def test_homemind_routes_precede_dashboard_fallback() -> None:
     app = build_app(HomeMindServer())
 
     assert app.routes[-1].name == "spa_fallback"
+
+
+def test_homemind_openapi_has_unique_operation_ids() -> None:
+    schema = build_app(HomeMindServer()).openapi()
+    ids: list[str] = []
+    for path, methods in schema["paths"].items():
+        for method, op in methods.items():
+            if not isinstance(op, dict):
+                continue
+            operation_id = op.get("operationId")
+            if operation_id:
+                ids.append(f"{method.upper()} {path} :: {operation_id}")
+    duplicates = sorted({i for i in ids if ids.count(i) > 1})
+    assert duplicates == [], f"Duplicate OpenAPI operation IDs: {duplicates}"

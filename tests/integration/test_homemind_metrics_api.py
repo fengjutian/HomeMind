@@ -69,7 +69,7 @@ async def test_metrics_reflect_traffic(
     response = await client.post(
         f"/api/homemind/families/{family_id}/permissions/evaluate",
         headers=auth,
-        json={"subject_member_id": owner_member_id, "action": "memory.read"},
+        json={"action": "memory.read"},
     )
     assert response.status_code == 200
 
