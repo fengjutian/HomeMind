@@ -16,7 +16,12 @@ from homemind.infra.db.repos.family_transactions import (
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.filesystem import FamilyFilesystemManager
-from homemind.infra.family.manager import FamilyManager, PermissionEffect
+from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.permissions import (
+    FamilyPermissionEvaluator,
+    PermissionDecision,
+    PermissionEffect,
+)
 from homemind.infra.family.tasks import FamilyTaskManager
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.errors import ErrorCode, OctopError
@@ -42,6 +47,8 @@ class FamilyTransactionManager:
         repo: FamilyTransactionRepo,
         user_repo: UserRepo,
         filesystem: FamilyFilesystemManager | None = None,
+        *,
+        permission_evaluator: FamilyPermissionEvaluator | None = None,
     ) -> None:
         self.family = family
         self.context = context
@@ -49,6 +56,7 @@ class FamilyTransactionManager:
         self.repo = repo
         self.user_repo = user_repo
         self.filesystem = filesystem
+        self.permissions = permission_evaluator or FamilyPermissionEvaluator(family.repo)
 
     def plan(
         self, family_id: str, user: User, *, action: str, payload: dict[str, Any]
@@ -63,16 +71,13 @@ class FamilyTransactionManager:
             action,
             json.dumps(payload, ensure_ascii=False, sort_keys=True),
         )
-        effect = self.family.evaluate_permission(
-            family_id,
-            user,
-            subject_member_id=str(membership["member_id"]),
+        decision = self.permissions.evaluate(
+            family_id=family_id,
+            user=user,
             action=action,
+            space_id=(payload.get("space_id") if isinstance(payload, dict) else None),
         )
-        if action in {"filesystem.move", "filesystem.rename", "filesystem.delete"} and (
-            effect is PermissionEffect.ALLOW
-        ):
-            effect = PermissionEffect.REQUIRE_CONFIRMATION
+        effect = decision.effect
         if effect is PermissionEffect.DENY:
             transaction = self.repo.set_transaction(transaction.id, TransactionStatus.DENIED)
             self._audit(transaction, user.id, "DENIED", approval="DENY")
@@ -93,13 +98,12 @@ class FamilyTransactionManager:
         approval = self._pending_approval(family_id, approval_id)
         transaction = self._transaction(family_id, approval.transaction_id)
         requester = self._user(transaction.requested_by)
-        membership = self.family.repo.get_membership(family_id, requester.id)
-        if membership is None or self.family.evaluate_permission(
-            family_id,
-            requester,
-            subject_member_id=str(membership["member_id"]),
+        decision = self.permissions.evaluate(
+            family_id=family_id,
+            user=requester,
             action=transaction.action,
-        ) is PermissionEffect.DENY:
+        )
+        if decision.effect is PermissionEffect.DENY:
             try:
                 self.repo.decide_approval(
                     approval_id,

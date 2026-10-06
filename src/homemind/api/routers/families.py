@@ -21,6 +21,10 @@ from homemind.infra.family.manager import (
     RelationshipType,
     SpaceType,
 )
+from homemind.infra.family.permissions import (
+    FamilyPermissionEvaluator,
+    PermissionDecision,
+)
 from octop.api.deps import current_user, get_server
 from octop.infra.server import OctopServer
 from octop.infra.users.identity import User
@@ -628,3 +632,58 @@ async def delete_asset_index(
 ) -> Response:
     _asset_manager(server).delete_index(family_id, asset_id, user)
     return Response(status_code=204)
+
+
+class PermissionEvaluateBody(BaseModel):
+    action: str = Field(min_length=1, max_length=200, description="Permission action (e.g. filesystem.read).")
+    space_id: str | None = Field(default=None, description="Target space id; null for unscoped actions.")
+    asset_id: str | None = Field(default=None, description="Optional asset id used to resolve private-space ownership.")
+
+
+class PermissionDecisionResponse(BaseModel):
+    effect: PermissionEffect
+    action: str
+    family_id: str
+    member_id: str | None
+    space_id: str | None
+    matched_permission_ids: list[str]
+    reason: str
+
+
+def _permission_evaluator(server: OctopServer) -> FamilyPermissionEvaluator:
+    services = _services(server)
+    return FamilyPermissionEvaluator(services.family_repo)
+
+
+@router.post(
+    "/{family_id}/permissions/evaluate",
+    response_model=PermissionDecisionResponse,
+    summary="Explain the current user's permission decision",
+)
+def evaluate_permission(
+    family_id: str,
+    body: PermissionEvaluateBody,
+    server: Server,
+    user: CurrentUser,
+) -> PermissionDecisionResponse:
+    """Explain (do NOT evaluate on behalf of another principal) the caller's
+    permission to perform ``action``. Always evaluates the *current* user only —
+    ``user_id`` is not accepted as a parameter.
+    """
+    evaluator = _permission_evaluator(server)
+    decision: PermissionDecision = evaluator.evaluate(
+        family_id=family_id,
+        user=user,
+        action=body.action,
+        space_id=body.space_id,
+        asset_id=body.asset_id,
+    )
+    return PermissionDecisionResponse(
+        effect=decision.effect,
+        action=decision.action,
+        family_id=decision.family_id,
+        member_id=decision.member_id,
+        space_id=decision.space_id,
+        matched_permission_ids=list(decision.matched_permission_ids),
+        reason=decision.reason,
+    )

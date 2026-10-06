@@ -18,6 +18,7 @@ from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.filesystem import FamilyFilesystemManager
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.permissions import FamilyPermissionEvaluator
 from homemind.infra.family.photo_intelligence import PhotoIntelligenceManager
 from homemind.infra.family.photo_providers import (
     NominatimReverseGeocodingProvider,
@@ -69,8 +70,15 @@ def build_family_tools(
     run_migrations(db)
     services = HomeMindServices.from_pool(db)
     families = FamilyManager(services.family_repo)
-    context = FamilyContextManager(families, services.family_context_repo)
-    assets = FamilyAssetManager(services.family_repo, services.family_asset_repo)
+    permissions = FamilyPermissionEvaluator(services.family_repo)
+    context = FamilyContextManager(
+        families, services.family_context_repo, permission_evaluator=permissions
+    )
+    assets = FamilyAssetManager(
+        services.family_repo,
+        services.family_asset_repo,
+        permission_evaluator=permissions,
+    )
     albums = FamilyAlbumManager(families, assets, services.family_album_repo)
     photos = PhotoIntelligenceManager(
         families,
@@ -82,7 +90,10 @@ def build_family_tools(
     providers = ProviderRepo(db)
     tasks = FamilyTaskManager(families, services.family_task_repo)
     filesystem = FamilyFilesystemManager(
-        families, services.family_asset_repo, services.family_transaction_repo
+        families,
+        services.family_asset_repo,
+        services.family_transaction_repo,
+        permission_evaluator=permissions,
     )
     transactions = FamilyTransactionManager(
         families,
@@ -91,6 +102,7 @@ def build_family_tools(
         services.family_transaction_repo,
         user_repo,
         filesystem,
+        permission_evaluator=permissions,
     )
     devices = services.family_device_repo
 
