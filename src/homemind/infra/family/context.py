@@ -303,25 +303,41 @@ class FamilyContextManager:
         member_id: str,
         asset_ids: list[str],
     ) -> list[PermissionDecision]:
-        """Surface the read/search decisions the Agent is most likely to act on."""
-        actions = ["family.read", "family.search", "filesystem.read"]
+        """Surface the read/search decisions the Agent is most likely to act on.
+
+        For each private space in the family we evaluate the per-space
+        ``filesystem.read`` so private-space denials surface in the
+        resolved context for follow-up Agent reasoning.
+        """
         decisions = [
             self.permissions.evaluate(
                 family_id=family_id, user=user, action=action,
             )
-            for action in actions
+            for action in ("family.read", "family.search")
         ]
-        if asset_ids and member_id:
-                # Per-asset decisions (placeholder; full asset lookup requires
-                # FamilyAssetRepo, intentionally minimal in this stage).
+        private_space_ids = [
+            space.id
+            for space in self.family.repo.list_spaces(family_id)
+            if space.space_type == "PRIVATE"
+        ]
+        if private_space_ids:
+            for space_id in private_space_ids:
                 decisions.append(
                     self.permissions.evaluate(
                         family_id=family_id,
                         user=user,
-                        action="asset.read",
-                        space_id=None,
+                        action="filesystem.read",
+                        space_id=space_id,
                     )
                 )
+        else:
+            decisions.append(
+                self.permissions.evaluate(
+                    family_id=family_id,
+                    user=user,
+                    action="filesystem.read",
+                )
+            )
         return decisions
 
     def _event(self, family_id: str, event_id: str) -> FamilyEventRow:

@@ -34,7 +34,7 @@ class AssetQueryResolver:
         space_ids: Iterable[str] | None = None,
         asset_type: str | None = None,
         time_range: ResolvedTimeRange | None = None,
-        min_confidence: float = 0.0,
+        min_confidence: float = 0.05,
     ) -> list[AssetMatch]:
         members = set(member_ids or ())
         spaces = set(space_ids or ())

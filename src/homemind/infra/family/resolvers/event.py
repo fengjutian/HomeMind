@@ -33,7 +33,7 @@ class EventResolver:
         member_ids: Iterable[str] | None = None,
         event_type: str | None = None,
         time_range: ResolvedTimeRange | None = None,
-        min_confidence: float = 0.0,
+        min_confidence: float = 0.05,
     ) -> list[EventMatch]:
         members = set(member_ids or ())
         normalized = (text or "").casefold()
@@ -48,6 +48,7 @@ class EventResolver:
                 text=normalized,
                 member_ids=members,
                 event_type=event_type,
+                time_range=time_range,
             )
             if score < min_confidence:
                 continue
@@ -79,6 +80,7 @@ def _score_event(
     text: str,
     member_ids: set[str],
     event_type: str | None,
+    time_range: ResolvedTimeRange | None = None,
 ) -> tuple[float, list[str]]:
     score = 0.0
     breakdown: list[str] = []
@@ -95,6 +97,21 @@ def _score_event(
         if event.description and text in event.description.casefold():
             score += 0.1
             breakdown.append("description_match")
+        # Time-expression match: a phrase like "去年" inside the query
+        # doesn't directly match the event fields, but we still want to
+        # surface the event because it lived through the resolved
+        # time_range filter above. Give it a small positive score so
+        # well-formed time queries don't drop everything.
+        for phrase in ("去年", "今年", "前年", "上周", "本周", "本月", "今天", "昨天"):
+            if phrase in text:
+                score += 0.1
+                breakdown.append(f"time_phrase:{phrase}")
+                break
+    # When a time range is supplied and no other signal matched, give
+    # the event a baseline so time-only queries don't drop everything.
+    if not breakdown and time_range is not None:
+        score = 0.1
+        breakdown.append("time_range_match")
     if member_ids:
         try:
             import json as _json

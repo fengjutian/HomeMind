@@ -11,6 +11,10 @@ from homemind.infra.db.repos.family_context import FamilyContextRepo
 from homemind.infra.db.repos.family_devices import FamilyDeviceRepo
 from homemind.infra.db.repos.family_tasks import FamilyTaskRepo
 from homemind.infra.db.repos.family_transactions import FamilyTransactionRepo
+from homemind.infra.db.repos.memory_candidates import (
+    MemoryCandidateRepo,
+    MemoryEvidenceRepo,
+)
 from homemind.infra.db.repos.photo_intelligence import PhotoIntelligenceRepo
 from octop.infra.db.pool import DatabasePool
 
@@ -25,6 +29,8 @@ class HomeMindServices:
     family_device_repo: FamilyDeviceRepo
     family_task_repo: FamilyTaskRepo
     family_transaction_repo: FamilyTransactionRepo
+    memory_candidate_repo: MemoryCandidateRepo
+    memory_evidence_repo: MemoryEvidenceRepo
     photo_intelligence_repo: PhotoIntelligenceRepo
 
     @classmethod
@@ -38,5 +44,7 @@ class HomeMindServices:
             family_device_repo=FamilyDeviceRepo(db),
             family_task_repo=FamilyTaskRepo(db),
             family_transaction_repo=FamilyTransactionRepo(db),
+            memory_candidate_repo=MemoryCandidateRepo(db),
+            memory_evidence_repo=MemoryEvidenceRepo(db),
             photo_intelligence_repo=PhotoIntelligenceRepo(db),
         )

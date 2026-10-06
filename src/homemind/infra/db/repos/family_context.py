@@ -234,6 +234,19 @@ class FamilyContextRepo:
             ).fetchall()
         return map_rows(rows, FamilyMemoryRow)
 
+    def list_all_memories(self, family_id: str) -> list[FamilyMemoryRow]:
+        """Return *every* memory row for ``family_id`` regardless of
+        status / expiry. Used by the memory lifecycle manager for
+        maintenance operations (decay, archive, duplicate detection).
+        """
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_memories WHERE family_id = ? "
+                "ORDER BY importance DESC, updated_at DESC",
+                (family_id,),
+            ).fetchall()
+        return map_rows(rows, FamilyMemoryRow)
+
     def update_memory(self, memory_id: str, **values: object) -> FamilyMemoryRow | None:
         allowed = {
             "subject_type", "subject_id", "content", "memory_type", "importance",

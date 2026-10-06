@@ -94,6 +94,9 @@ DEFAULT_ACTION_EFFECTS: tuple[tuple[str, PermissionEffect], ...] = (
     ("family.read.", PermissionEffect.ALLOW),
     ("family.search.", PermissionEffect.ALLOW),
     ("filesystem.read", PermissionEffect.ALLOW),
+    ("memory.read", PermissionEffect.ALLOW),
+    ("photo.read", PermissionEffect.ALLOW),
+    ("event.read", PermissionEffect.ALLOW),
     ("task.create", PermissionEffect.ALLOW),
     ("event.create", PermissionEffect.REQUIRE_CONFIRMATION),
     ("memory.create", PermissionEffect.REQUIRE_CONFIRMATION),
@@ -228,6 +231,25 @@ class FamilyPermissionEvaluator:
         asset_visibility = (
             getattr(asset, "visibility", None) if asset is not None else None
         )
+        # When ``space_id`` itself points at a private space the current
+        # member doesn't own, deny up front. This lets callers pass the
+        # space id directly (e.g. "filesystem.read in space X") without
+        # also having to materialize the asset object.
+        if space_id is not None:
+            space = self.repo.get_space(space_id)
+            if (
+                space is not None
+                and space.space_type == "PRIVATE"
+                and space.owner_member_id != member_id
+            ):
+                return PermissionDecision(
+                    effect=PermissionEffect.DENY,
+                    action=action,
+                    family_id=family_id,
+                    member_id=member_id,
+                    space_id=space_id,
+                    reason="private_space_not_owned",
+                )
         if asset_space_id is not None and asset_space_id != space_id:
             space = self.repo.get_space(asset_space_id)
             if (

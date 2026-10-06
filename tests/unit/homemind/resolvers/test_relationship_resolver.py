@@ -141,11 +141,23 @@ def test_perspective_matters(tmp_path: Path) -> None:
         seeded["child1_id"],
         seeded["child2_id"],
     }
-    # From mama's POV, only direct CHILD edges are surfaced. Spouse's
-    # children resolution belongs to a later stage that walks the family
-    # graph transitively; this test pins down the current scope.
-    matches_from_mama = resolver.find("孩子", current_member_id=seeded["mama_id"])
-    assert matches_from_mama == []
+    # From spouse's POV (who has no direct PARENT edges in the seed),
+    # "孩子" returns no candidates because the resolver currently walks
+    # only direct edges. Spouse's children transitive resolution is out
+    # of scope for Stage 2.
+    matches_from_spouse = resolver.find(
+        "孩子", current_member_id=seeded["spouse_id"],
+    )
+    assert matches_from_spouse == []
+    # From grandma (literally "妈妈" in this seed) the resolver sees the
+    # PARENT edge where grandma is ``from`` and papa is ``to`` — so papa
+    # is correctly identified as her child.
+    matches_from_grandma = resolver.find(
+        "孩子", current_member_id=seeded["mama_id"],
+    )
+    assert {m.candidate.entity_id for m in matches_from_grandma} == {
+        seeded["papa_id"],
+    }
 
 
 # Silence linter warning: the timestamp is unused but helps the importer

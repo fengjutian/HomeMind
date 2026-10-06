@@ -158,45 +158,51 @@ class RelationshipResolver:
     ) -> str | None:
         """Return the *other* end of the edge that satisfies ``direction``.
 
-        A relationship edge ``(from=A, to=B, type=PARENT)`` means A is the
-        parent of B. Resolving "current's parent" therefore needs the
-        *from* side of any PARENT edge whose other end is ``current``.
-        Resolving "current's child" needs the *to* side. Spouse / sibling
-        edges are symmetric so either side works.
+        Family edges are stored with the senior end as ``from``:
+
+        * PARENT(from=parent, to=child) → "current's parent" is the from
+          side when to=current; "current's child" is the to side when
+          from=current.
+        * GRANDPARENT(from=grandparent, to=grandchild) → analogous.
+        * CHILD / GRANDCHILD edges are accepted when present (some
+          deployments store the inverse) and routed through the same logic.
+        * SPOUSE / SIBLING edges are symmetric.
         """
         edge_type = relationship.relationship_type
-        # Sibling and spouse edges are symmetric.
+        # Symmetric types.
         if edge_type in {"SPOUSE", "SIBLING"}:
             if relationship.from_member_id == current_member_id:
                 return relationship.to_member_id
             if relationship.to_member_id == current_member_id:
                 return relationship.from_member_id
             return None
-        if edge_type == "PARENT":
-            # "current's parent" = the *from* side of a PARENT edge where
-            # the *to* side is current. Equivalently, the *to* side of a
-            # CHILD edge from current.
-            if direction == "up" and relationship.to_member_id == current_member_id:
-                return relationship.from_member_id
-            if direction == "down" and relationship.from_member_id == current_member_id:
-                return relationship.to_member_id
-            return None
-        if edge_type == "CHILD":
-            if direction == "up" and relationship.from_member_id == current_member_id:
-                return relationship.to_member_id
-            if direction == "down" and relationship.to_member_id == current_member_id:
-                return relationship.from_member_id
-            return None
-        if edge_type == "GRANDPARENT":
-            # current's grandparent = the from-side of GRANDPARENT edge whose
-            # to-side is current.
-            if direction == "up" and relationship.to_member_id == current_member_id:
-                return relationship.from_member_id
-            return None
-        if edge_type == "GRANDCHILD":
-            if direction == "down" and relationship.from_member_id == current_member_id:
-                return relationship.to_member_id
-            return None
+        # Hierarchical types where the senior end is ``from``.
+        if edge_type in {"PARENT", "GRANDPARENT", "CHILD", "GRANDCHILD"}:
+            # "up" = current's senior; "down" = current's junior.
+            if direction == "up":
+                # current's senior = from side when to=current
+                if relationship.to_member_id == current_member_id:
+                    return relationship.from_member_id
+                # OR to side when from=current AND edge encodes current as junior
+                # (e.g. CHILD edge stored with child=from)
+                if relationship.from_member_id == current_member_id and edge_type in {
+                    "CHILD",
+                    "GRANDCHILD",
+                }:
+                    return relationship.to_member_id
+                return None
+            if direction == "down":
+                # current's junior = to side when from=current
+                if relationship.from_member_id == current_member_id:
+                    return relationship.to_member_id
+                # OR from side when to=current AND edge encodes current as senior
+                # (e.g. CHILD edge stored with parent=to)
+                if relationship.to_member_id == current_member_id and edge_type in {
+                    "CHILD",
+                    "GRANDCHILD",
+                }:
+                    return relationship.from_member_id
+                return None
         return None
 
 
