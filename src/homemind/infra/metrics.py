@@ -71,6 +71,9 @@ class HomeMindMetrics:
     device_command_enqueued_total: int = 0
     device_command_succeeded_total: int = 0
     device_command_failed_total: int = 0
+    device_command_dispatched_total: int = 0
+    device_command_approved_total: int = 0
+    device_marked_offline_total: int = 0
 
     # invites
     invite_mint_total: int = 0

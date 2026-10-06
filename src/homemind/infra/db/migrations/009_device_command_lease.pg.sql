@@ -5,6 +5,14 @@
 -- epoch columns to match the rest of the HomeMind PostgreSQL schema, and
 -- ``ADD COLUMN IF NOT EXISTS`` keeps the migration idempotent on databases
 -- that recorded the version out of band.
+--
+-- ``root_path`` is the device's authorized filesystem root: a
+-- path-bearing command (``filesystem.*``) whose payload names a path
+-- outside this root is refused at enqueue time. ``address`` is a network
+-- address, not a mount point, so it cannot stand in.
+
+ALTER TABLE homemind_family_devices
+  ADD COLUMN IF NOT EXISTS root_path TEXT;
 
 ALTER TABLE homemind_device_commands
   ADD COLUMN IF NOT EXISTS is_unsafe BOOLEAN NOT NULL DEFAULT FALSE;

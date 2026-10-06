@@ -1,19 +1,18 @@
-"""Daily memory maintenance runner.
+"""Daily maintenance runner for HomeMind.
 
-The runner keeps the memory table healthy without requiring an
-external scheduler:
+Two sweeps run here so neither depends on a browser being open:
 
-* ``memory_decay`` lowers ``confidence`` on long-idle, low-importance
-  memories so a stale fact cannot outvote a fresh one.
-* ``memory_expiration`` archives any active memory whose
-  ``expires_at`` has passed; reviewers can still restore it via the
-  ``/memories/{id}/restore`` endpoint.
-* ``memory_deduplication`` flags candidate clusters for the manager
-  to merge; it never deletes rows on its own.
+* **Memory** — ``memory_decay`` lowers ``confidence`` on long-idle,
+  low-importance memories; ``memory_expiration`` archives rows whose
+  ``expires_at`` has passed; ``memory_deduplication`` flags candidate
+  clusters for a manager to merge (it never deletes).
+* **Devices** — any device whose ``last_seen`` fell behind the heartbeat
+  timeout is flipped to ``OFFLINE`` so online state stays truthful even
+  when nobody is looking at the dashboard.
 
-The runner is idempotent — running it twice in a row yields the same
-result. The first sweep runs immediately at startup so freshly bound
-databases do not need to wait 24 h for the first pass.
+Both sweeps are idempotent — running twice in a row yields the same
+result — and the first pass runs immediately at startup so a freshly
+bound database does not wait 24 h.
 """
 
 from __future__ import annotations
@@ -24,11 +23,16 @@ import logging
 from typing import Any
 
 from homemind.infra.db.repos.family_context import FamilyContextRepo
+from homemind.infra.db.repos.family_devices import FamilyDeviceRepo
 from homemind.infra.db.repos.memory_candidates import (
     MemoryCandidateRepo,
     MemoryEvidenceRepo,
 )
 from homemind.infra.family.context import FamilyContextManager
+from homemind.infra.family.device_runtime import (
+    DEFAULT_HEARTBEAT_TIMEOUT_SECONDS,
+    DeviceRuntimeManager,
+)
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
 from homemind.infra.metrics import inc as _hm_inc
@@ -37,8 +41,8 @@ from octop.infra.db.pool import DatabasePool
 logger = logging.getLogger(__name__)
 
 
-class MemoryMaintenanceRunner:
-    """Run decay / expiration / dedup once on startup then daily."""
+class MaintenanceRunner:
+    """Run memory + device sweeps once on startup then daily."""
 
     def __init__(
         self,
@@ -48,9 +52,11 @@ class MemoryMaintenanceRunner:
         context_repo: FamilyContextRepo,
         candidate_repo: MemoryCandidateRepo,
         evidence_repo: MemoryEvidenceRepo,
+        device_repo: FamilyDeviceRepo | None = None,
         family_manager: FamilyManager | None = None,
         context_manager: FamilyContextManager | None = None,
         lifecycle: MemoryLifecycleManager | None = None,
+        device_manager: DeviceRuntimeManager | None = None,
         interval_seconds: float = 24 * 60 * 60,
     ) -> None:
         self._db = db
@@ -68,6 +74,15 @@ class MemoryMaintenanceRunner:
             candidate_repo,
             evidence_repo,
         )
+        self._device_manager = (
+            device_manager
+            if device_manager is not None
+            else (
+                DeviceRuntimeManager(self._family_manager, device_repo)
+                if device_repo is not None
+                else None
+            )
+        )
         self._interval = interval_seconds
         self._task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
@@ -76,7 +91,7 @@ class MemoryMaintenanceRunner:
         if self._task is not None:
             return
         # First sweep runs on the event loop without blocking startup.
-        self._task = asyncio.create_task(self._loop(), name="homemind-memory-maintenance")
+        self._task = asyncio.create_task(self._loop(), name="homemind-maintenance")
 
     async def stop(self) -> None:
         self._stop_event.set()
@@ -91,7 +106,7 @@ class MemoryMaintenanceRunner:
         try:
             self.run_once()
         except Exception:
-            logger.exception("MemoryMaintenanceRunner: initial sweep crashed")
+            logger.exception("MaintenanceRunner: initial sweep crashed")
         while not self._stop_event.is_set():
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._stop_event.wait(), timeout=self._interval)
@@ -100,11 +115,17 @@ class MemoryMaintenanceRunner:
             try:
                 self.run_once()
             except Exception:
-                logger.exception("MemoryMaintenanceRunner: periodic sweep crashed")
+                logger.exception("MaintenanceRunner: periodic sweep crashed")
 
     def run_once(self) -> dict[str, int]:
-        """Run one full sweep across every family. Returns counters."""
-        totals = {"decayed": 0, "expired": 0, "duplicate_groups": 0, "families": 0}
+        """Run one full sweep. Returns counters for tests + metrics."""
+        totals = {
+            "decayed": 0,
+            "expired": 0,
+            "duplicate_groups": 0,
+            "families": 0,
+            "devices_offline": 0,
+        }
         with self._db.connect() as conn:
             rows = conn.execute(
                 "SELECT family_id FROM homemind_families"
@@ -115,7 +136,7 @@ class MemoryMaintenanceRunner:
                 self._sweep_family(family_id, totals)
             except Exception:
                 logger.exception(
-                    "MemoryMaintenanceRunner: family sweep crashed family_id=%s",
+                    "MaintenanceRunner: family sweep crashed family_id=%s",
                     family_id,
                 )
         if totals["decayed"]:
@@ -124,6 +145,11 @@ class MemoryMaintenanceRunner:
             _hm_inc("memory_expiration_total", totals["expired"])
         if totals["duplicate_groups"]:
             _hm_inc("memory_dedup_groups_total", totals["duplicate_groups"])
+        if self._device_manager is not None:
+            try:
+                totals["devices_offline"] = self._device_manager.mark_stale_devices_offline()
+            except Exception:
+                logger.exception("MaintenanceRunner: device liveness sweep crashed")
         return totals
 
     def _sweep_family(self, family_id: str, totals: dict[str, int]) -> None:
@@ -134,4 +160,11 @@ class MemoryMaintenanceRunner:
         totals["duplicate_groups"] += len(groups)
 
 
-__all__ = ["MemoryMaintenanceRunner"]
+# Backwards-compatible alias: the runner was originally memory-only.
+MemoryMaintenanceRunner = MaintenanceRunner
+
+__all__ = [
+    "DEFAULT_HEARTBEAT_TIMEOUT_SECONDS",
+    "MaintenanceRunner",
+    "MemoryMaintenanceRunner",
+]

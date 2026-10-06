@@ -13,6 +13,15 @@
 --
 -- ``retry_count`` bounds automatic reclaim so a poison command cannot
 -- spin forever.
+--
+-- ``root_path`` is the device's authorized filesystem root: a
+-- path-bearing command (``filesystem.*``) whose payload names a path
+-- outside this root is refused at enqueue time. Without it there is no
+-- way to honour "file paths must stay inside the device's authorized
+-- root", and ``address`` is a network address, not a mount point, so it
+-- cannot stand in.
+
+ALTER TABLE homemind_family_devices ADD COLUMN root_path TEXT;
 
 ALTER TABLE homemind_device_commands ADD COLUMN is_unsafe INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE homemind_device_commands ADD COLUMN lease_owner TEXT;

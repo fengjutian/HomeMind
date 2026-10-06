@@ -274,6 +274,12 @@ async def revoke_token(
     response_model=FamilyDeviceCommandResponse,
     status_code=201,
     summary="Enqueue a command for a device",
+    description=(
+        "Validates family access, the device's declared capability, and "
+        "path confinement. Unsafe capabilities (delete / move / rename / "
+        "reboot) land in ``WAITING_APPROVAL`` and are invisible to the "
+        "runtime until a manager approves them."
+    ),
 )
 async def enqueue_command(
     family_id: str,
@@ -291,8 +297,42 @@ async def enqueue_command(
         requested_by=user.id,
         expires_at=expires_at,
         transaction_id=body.transaction_id,
+        user=user,
     )
     return _command_response(row)
+
+
+@router.post(
+    "/{family_id}/devices/commands/{command_id}/approve",
+    response_model=FamilyDeviceCommandResponse,
+    summary="Approve an approval-gated device command",
+    description="Manager-only. The runtime has no route into this action.",
+)
+async def approve_command(
+    family_id: str,
+    command_id: str,
+    server: Server,
+    user: CurrentUser,
+) -> FamilyDeviceCommandResponse:
+    return _command_response(
+        _manager(server).approve_command(family_id, command_id, user),
+    )
+
+
+@router.post(
+    "/{family_id}/devices/commands/{command_id}/cancel",
+    response_model=FamilyDeviceCommandResponse,
+    summary="Cancel a device command that has not finished",
+)
+async def cancel_command(
+    family_id: str,
+    command_id: str,
+    server: Server,
+    user: CurrentUser,
+) -> FamilyDeviceCommandResponse:
+    return _command_response(
+        _manager(server).cancel_command(family_id, command_id, user),
+    )
 
 
 @router.get(

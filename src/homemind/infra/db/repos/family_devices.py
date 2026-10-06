@@ -26,6 +26,7 @@ class FamilyDeviceRow:
     last_seen: int | None
     created_at: int
     updated_at: int
+    root_path: str | None = None
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyDeviceRow:
@@ -43,6 +44,7 @@ class FamilyDeviceRow:
             last_seen=int(data["last_seen"]) if data["last_seen"] is not None else None,
             created_at=int(data["created_at"]),
             updated_at=int(data["updated_at"]),
+            root_path=data.get("root_path"),
         )
 
 
@@ -163,6 +165,7 @@ class FamilyDeviceRepo:
         platform: str | None,
         capabilities: list[str],
         address: str | None = None,
+        root_path: str | None = None,
     ) -> FamilyDeviceRow:
         device_id = new_ulid()
         ts = now_ts()
@@ -170,8 +173,8 @@ class FamilyDeviceRepo:
             conn.execute(
                 "INSERT INTO homemind_family_devices(device_id, family_id, name, "
                 "device_type, platform, status, address, capabilities, last_seen, "
-                "created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, 'OFFLINE', ?, ?, NULL, ?, ?)",
+                "root_path, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, 'OFFLINE', ?, ?, NULL, ?, ?, ?)",
                 (
                     device_id,
                     family_id,
@@ -180,6 +183,7 @@ class FamilyDeviceRepo:
                     platform,
                     address,
                     json.dumps(capabilities, ensure_ascii=False, sort_keys=True),
+                    root_path,
                     ts,
                     ts,
                 ),
@@ -195,6 +199,7 @@ class FamilyDeviceRepo:
         capabilities: list[str] | None = None,
         status: str | None = None,
         address: str | None = None,
+        root_path: str | None = None,
     ) -> FamilyDeviceRow | None:
         values: dict[str, Any] = {}
         if name is not None:
@@ -209,6 +214,8 @@ class FamilyDeviceRepo:
             values["status"] = status
         if address is not None:
             values["address"] = address
+        if root_path is not None:
+            values["root_path"] = root_path
         fields, params = optional_updates(list(values.items()))
         if not fields:
             return self.get(device_id)

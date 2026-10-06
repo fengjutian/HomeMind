@@ -16,7 +16,7 @@ from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
-from homemind.infra.family.memory_maintenance import MemoryMaintenanceRunner
+from homemind.infra.family.memory_maintenance import MaintenanceRunner
 from homemind.infra.family.permissions import FamilyPermissionEvaluator
 from homemind.infra.family.scan_job import FamilyAssetScanJob
 from homemind.tools.family import build_family_tools
@@ -112,12 +112,13 @@ class HomeMindServer(OctopServer):
             return
         run_migrations(self.services.db)
         hm = HomeMindServices.from_pool(self.services.db)
-        self._memory_maintenance = MemoryMaintenanceRunner(
+        self._memory_maintenance = MaintenanceRunner(
             db=self.services.db,
             family_repo=hm.family_repo,
             context_repo=hm.family_context_repo,
             candidate_repo=hm.memory_candidate_repo,
             evidence_repo=hm.memory_evidence_repo,
+            device_repo=hm.family_device_repo,
         )
         await self._memory_maintenance.start()
 

@@ -178,11 +178,16 @@ def test_runtime_claim_and_complete_command(tmp_path: Path) -> None:
         requested_by=user.id,
         expires_at=10**10,
     )
-    next_command = runtime.next_pending_command(device.id)
+    # Dispatch is credential-gated: the token resolves the device, so a
+    # runtime cannot be pointed at another device's queue.
+    next_command = runtime.next_pending_command(token)
     assert next_command is not None
     assert next_command.id == command.id
     assert next_command.status == "DISPATCHED"
+    assert next_command.lease_owner == f"device:{device.id}"
+    assert next_command.lease_expires_at is not None
     finished = runtime.report_command_result(
+        token,
         next_command.id,
         status="SUCCEEDED",
         result={"pong": True},
@@ -193,9 +198,34 @@ def test_runtime_claim_and_complete_command(tmp_path: Path) -> None:
     assert refreshed.last_seen is not None
 
 
+def test_runtime_result_is_idempotent(tmp_path: Path) -> None:
+    """A retrying runtime resubmitting a terminal outcome must not
+    error out — it cannot tell "lost" from "already done"."""
+
+    pool, runtime, family, user, family_id = _bootstrap(tmp_path)
+    device, token = _pair_device(runtime, family_id, user)
+    runtime.enqueue_command(
+        family_id, device.id,
+        capability="ping",
+        payload={},
+        requested_by=user.id,
+        expires_at=10**10,
+    )
+    claimed = runtime.next_pending_command(token)
+    assert claimed is not None
+    first = runtime.report_command_result(
+        token, claimed.id, status="SUCCEEDED", result={"pong": True},
+    )
+    second = runtime.report_command_result(
+        token, claimed.id, status="SUCCEEDED", result={"pong": True},
+    )
+    assert first is not None and first.status == "SUCCEEDED"
+    assert second is not None and second.status == "SUCCEEDED"
+
+
 def test_expired_command_is_marked(tmp_path: Path) -> None:
     pool, runtime, family, user, family_id = _bootstrap(tmp_path)
-    device, _token = _pair_device(runtime, family_id, user)
+    device, token = _pair_device(runtime, family_id, user)
     runtime.enqueue_command(
         family_id, device.id,
         capability="ping",
@@ -203,7 +233,7 @@ def test_expired_command_is_marked(tmp_path: Path) -> None:
         requested_by=user.id,
         expires_at=1,  # already expired
     )
-    runtime.next_pending_command(device.id)  # triggers expiry side-effect
+    runtime.next_pending_command(token)  # triggers expiry side-effect
     recent = runtime.list_commands(family_id, device.id, user)
     assert recent
     statuses = {cmd.status for cmd in recent}

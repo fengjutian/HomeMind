@@ -88,16 +88,16 @@ def mint_token(length_bytes: int = 32) -> str:
 
 
 def _normalize_device_path(raw: str) -> str:
-    """Return ``raw`` as a canonical, traversal-free POSIX path.
+    """Return ``raw`` as a canonical, traversal-free POSIX absolute path.
 
-    ``..`` segments are collapsed before the root check so
+    A leading ``/`` is not special: device payloads name paths *relative
+    to the device root*, so ``photos/a.jpg`` and ``/photos/a.jpg`` both
+    resolve under that root. ``..`` segments are collapsed here so
     ``photos/../../etc/passwd`` cannot smuggle its way out.
     """
     candidate = raw.replace("\\", "/").strip()
     if not candidate:
         return ""
-    # ``posixpath.normpath`` collapses ``..`` but keeps a leading ``..``
-    # when the path escapes its own root; we reject that case explicitly.
     normalized = posixpath.normpath("/" + candidate.lstrip("/"))
     return normalized if normalized != "/" else ""
 
@@ -151,6 +151,7 @@ class _PairingEntry:
     platform: str | None
     capabilities: list[str]
     expires_at: int
+    root_path: str | None = None
 
 
 def _purge_expired_pairings(now: int) -> None:
@@ -186,11 +187,16 @@ class DeviceRuntimeManager:
         device_type: str,
         platform: str | None,
         capabilities: list[str],
+        root_path: str | None = None,
     ) -> PairingCode:
         """Family-side: return a short-lived pairing code the runtime
         client exchanges for a credential. The placeholder device row
         is NOT created here; the runtime's ``complete_pairing`` builds
         the actual record so address and capabilities match reality.
+
+        ``root_path`` is the filesystem root the device is authorized to
+        touch. Path-bearing commands are refused outside it, so a device
+        that will run ``filesystem.*`` capabilities must declare one.
         """
         self.family.require_manager(family_id, user)
         if not device_name:
@@ -202,6 +208,12 @@ class DeviceRuntimeManager:
                 HomeMindErrorCode.FAMILY_INVALID,
                 "device must declare at least one capability",
             )
+        if any(capability.startswith(PATH_BEARING_CAPABILITY_PREFIXES) for capability in capabilities):
+            if not root_path:
+                raise HomeMindError(
+                    HomeMindErrorCode.FAMILY_INVALID,
+                    "device must declare root_path for filesystem capabilities",
+                )
         code = secrets.token_urlsafe(8)
         expires_at = int(time.time()) + _PAIRING_TTL_SECONDS
         with _PAIRING_LOCK:
@@ -212,6 +224,7 @@ class DeviceRuntimeManager:
                 device_type=device_type,
                 platform=platform,
                 capabilities=capabilities,
+                root_path=root_path,
                 expires_at=expires_at,
             )
         return PairingCode(code=code, expires_at=expires_at)
@@ -221,6 +234,7 @@ class DeviceRuntimeManager:
         code: str,
         *,
         address: str | None,
+        root_path: str | None = None,
     ) -> tuple[FamilyDeviceRow, str, int]:
         """Runtime-side: exchange a pairing code for a long-lived
         credential token. The plaintext token is returned exactly
@@ -242,6 +256,7 @@ class DeviceRuntimeManager:
             platform=entry.platform,
             capabilities=entry.capabilities,
             address=address,
+            root_path=entry.root_path or root_path,
         )
         token = mint_token()
         credential = self.repo.issue_credential(
@@ -362,14 +377,28 @@ class DeviceRuntimeManager:
         name: str | None = None,
         platform: str | None = None,
         capabilities: list[str] | None = None,
+        root_path: str | None = None,
     ) -> FamilyDeviceRow:
         self.family.require_manager(family_id, user)
         self._assert_device(family_id, device_id)
+        if capabilities is not None and any(
+            capability.startswith(PATH_BEARING_CAPABILITY_PREFIXES)
+            for capability in capabilities
+        ):
+            effective_root = root_path
+            if effective_root is None:
+                effective_root = (self.repo.get(device_id) or None) and self.repo.get(device_id).root_path  # type: ignore[union-attr]
+            if not effective_root:
+                raise HomeMindError(
+                    HomeMindErrorCode.FAMILY_INVALID,
+                    "device must declare root_path for filesystem capabilities",
+                )
         updated = self.repo.update(
             device_id,
             name=name,
             platform=platform,
             capabilities=capabilities,
+            root_path=root_path,
         )
         if updated is None:
             raise HomeMindError(
@@ -616,21 +645,17 @@ class DeviceRuntimeManager:
 
         Only path-bearing capabilities are checked; ``source_path`` /
         ``destination_path`` / ``path`` are the keys the filesystem
-        handlers consume.
+        handlers consume. A device that never registered a ``root_path``
+        fails closed — it may still run non-filesystem capabilities, but
+        nothing that touches the host filesystem.
         """
         if not capability.startswith(PATH_BEARING_CAPABILITY_PREFIXES):
             return
-        root = getattr(device, "root_path", None)
-        if root is None:
-            # ``FamilyDeviceRow`` predates the root column; treat a
-            # device without an explicit root as unconstrained rather
-            # than silently breaking every filesystem capability.
-            root = None
         for key in ("source_path", "destination_path", "path"):
             raw = payload.get(key)
             if not isinstance(raw, str) or not raw.strip():
                 continue
-            if not path_within_root(raw, root if isinstance(root, str) else _declared_root(device)):
+            if not path_within_root(raw, device.root_path):
                 raise HomeMindError(
                     HomeMindErrorCode.FAMILY_INVALID,
                     f"{key} escapes the device's authorized root",
@@ -643,16 +668,6 @@ class DeviceRuntimeManager:
                 HomeMindErrorCode.FAMILY_INVALID, "family device not found",
             )
         return device
-
-
-def _declared_root(device: FamilyDeviceRow) -> str | None:
-    """Device root for path confinement.
-
-    ``homemind_family_devices`` has no ``root_path`` column yet; the
-    device's registered ``address`` is the closest existing anchor, and a
-    device with no address declares no root, which fails closed.
-    """
-    return device.address or None
 
 
 __all__ = [
