@@ -36,6 +36,7 @@ import AssetsPanel from "./AssetsPanel";
 import FamilyAssetPreview from "./FamilyAssetPreview";
 import FileManagerPanel from "./FileManagerPanel";
 import GovernancePanel from "./GovernancePanel";
+import InvitesPanel from "./InvitesPanel";
 import PhotoIntelligencePanel from "./PhotoIntelligencePanel";
 import TaskPanel from "./TaskPanel";
 
@@ -308,6 +309,10 @@ export default function FamilyPage() {
                   {
                     key: "governance",
                     label: t("family.tabs.governance", "审批与审计"),
+                  },
+                  {
+                    key: "invites",
+                    label: t("family.tabs.invites", "成员邀请"),
                   },
                   {
                     key: "search",
@@ -845,6 +850,11 @@ export default function FamilyPage() {
               key: "governance",
               label: t("family.tabs.governance", "审批与审计"),
               children: <GovernancePanel familyId={familyId} />,
+            },
+            {
+              key: "invites",
+              label: t("family.tabs.invites", "成员邀请"),
+              children: <InvitesPanel familyId={familyId} />,
             },
             {
               key: "search",

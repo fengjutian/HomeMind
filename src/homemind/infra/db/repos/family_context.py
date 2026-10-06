@@ -234,6 +234,35 @@ class FamilyContextRepo:
             ).fetchall()
         return map_rows(rows, FamilyMemoryRow)
 
+    def search_memories_fts(
+        self,
+        family_id: str,
+        *,
+        query: str,
+        limit: int = 20,
+    ) -> list[FamilyMemoryRow]:
+        """FTS5-backed memory search.
+
+        Returns rows ordered by FTS5 ``bm25`` rank (lower = better match).
+        Falls back to an empty list on dialects without FTS5 support
+        (the FTS virtual table won't exist on PostgreSQL).
+        """
+        try:
+            with self._db.connect() as conn:
+                rows = conn.execute(
+                    "SELECT m.* FROM homemind_family_memories m "
+                    "JOIN homemind_family_memory_fts fts "
+                    "  ON fts.memory_id = m.memory_id "
+                    "WHERE fts.family_id = ? "
+                    "  AND m.status = 'ACTIVE' "
+                    "  AND homemind_family_memory_fts MATCH ? "
+                    "ORDER BY fts.rank LIMIT ?",
+                    (family_id, query, limit),
+                ).fetchall()
+        except Exception:  # noqa: BLE001 — graceful degradation
+            return []
+        return map_rows(rows, FamilyMemoryRow)
+
     def list_all_memories(self, family_id: str) -> list[FamilyMemoryRow]:
         """Return *every* memory row for ``family_id`` regardless of
         status / expiry. Used by the memory lifecycle manager for

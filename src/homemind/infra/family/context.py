@@ -146,6 +146,30 @@ class FamilyContextManager:
         memories = self.repo.search_memories(family_id, query=query)
         return [memory for memory in memories if self._can_read_memory(memory, user)]
 
+    def search_memories_fts(
+        self,
+        family_id: str,
+        user: User,
+        query: str,
+        *,
+        limit: int = 20,
+    ) -> list[FamilyMemoryRow]:
+        """FTS5-backed memory search (stage 8).
+
+        Postgres falls through to the LIKE-based ``search_memories``
+        because the FTS virtual table only exists on SQLite.
+        """
+        self.family.require_access(family_id, user)
+        memories = self.repo.search_memories_fts(
+            family_id, query=query, limit=limit,
+        )
+        if memories:
+            return [
+                memory for memory in memories
+                if self._can_read_memory(memory, user)
+            ]
+        return self.search_memories(family_id, user, query=query)
+
     def update_memory(
         self,
         family_id: str,

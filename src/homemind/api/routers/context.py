@@ -211,6 +211,27 @@ async def search_memories(
     return _manager(server).search_memories(family_id, user, query)
 
 
+@router.get(
+    "/{family_id}/memories/search",
+    response_model=list[MemoryResponse],
+    summary="FTS5-backed memory search (stage 8)",
+    description=(
+        "Uses SQLite FTS5 with bm25 ranking. Falls back to LIKE "
+        "search on dialects without FTS5 (e.g. PostgreSQL)."
+    ),
+)
+async def search_memories_fts(
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
+    q: str = Query(min_length=1, max_length=200, description="FTS5 MATCH query."),
+    limit: int = Query(default=20, ge=1, le=200),
+) -> object:
+    return _manager(server).search_memories_fts(
+        family_id, user, q, limit=limit,
+    )
+
+
 @router.patch(
     "/{family_id}/memories/{memory_id}",
     response_model=MemoryResponse,

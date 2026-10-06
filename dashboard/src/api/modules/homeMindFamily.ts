@@ -72,6 +72,31 @@ export interface FamilyRelationship {
   updated_at: number;
 }
 
+export interface FamilyInvite {
+  id: string;
+  family_id: string;
+  role: string;
+  display_name: string;
+  created_by: number;
+  created_at: number;
+  expires_at: number;
+  redeemed_at: number | null;
+  redeemed_by: number | null;
+}
+
+export interface FamilyInviteCreateResponse {
+  invite_id: string;
+  token: string;
+  expires_at: number;
+}
+
+export interface FamilyInviteRedeemResponse {
+  member_id: string;
+  family_id: string;
+  role: string;
+  display_name: string;
+}
+
 export interface FamilyEvent {
   id: string;
   family_id: string;
@@ -272,6 +297,34 @@ export const homeMindFamilyApi = {
     request<void>(
       `${root}/${familyId}/relationships/${relationshipId}`,
       mutate("DELETE"),
+    ),
+  listInvites: (familyId: string, includeRedeemed: boolean = false) =>
+    request<FamilyInvite[]>(
+      `${root}/${familyId}/invites${
+        includeRedeemed ? "?include_redeemed=true" : ""
+      }`,
+    ),
+  createInvite: (
+    familyId: string,
+    body: {
+      display_name: string;
+      role?: string;
+      ttl_seconds?: number;
+    },
+  ) =>
+    request<FamilyInviteCreateResponse>(
+      `${root}/${familyId}/invites`,
+      json(body),
+    ),
+  revokeInvite: (familyId: string, inviteId: string) =>
+    request<void>(
+      `${root}/${familyId}/invites/${inviteId}`,
+      mutate("DELETE"),
+    ),
+  redeemInvite: (body: { token: string }) =>
+    request<FamilyInviteRedeemResponse>(
+      `${root}/invites/redeem`,
+      json(body),
     ),
   listSpaces: (familyId: string) =>
     request<FamilySpace[]>(`${root}/${familyId}/spaces`),
