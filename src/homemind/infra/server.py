@@ -27,7 +27,7 @@ class HomeMindServer(OctopServer):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._asset_scan_job: FamilyAssetScanJob | None = None
-        self._memory_maintenance: MemoryMaintenanceRunner | None = None
+        self._memory_maintenance: MaintenanceRunner | None = None
 
     def build_extra_agent_tools(self) -> list[Any]:
         if self.services is None:
@@ -80,7 +80,7 @@ class HomeMindServer(OctopServer):
         ]
 
     @property
-    def memory_maintenance(self) -> MemoryMaintenanceRunner | None:
+    def memory_maintenance(self) -> MaintenanceRunner | None:
         return self._memory_maintenance
 
     @property

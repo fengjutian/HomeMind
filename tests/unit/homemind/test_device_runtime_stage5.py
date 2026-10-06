@@ -57,11 +57,21 @@ def _bootstrap(tmp_path: Path, **kwargs: object):
     return pool, runtime, family, user, fam.id
 
 
-def _pair(runtime, family_id, user, *, name="pi", capabilities=("ping",), address="192.0.2.10"):
+def _pair(
+    runtime,
+    family_id,
+    user,
+    *,
+    name="pi",
+    capabilities=("ping",),
+    address="192.0.2.10",
+    root_path=None,
+):
     pairing = runtime.create_pairing_code(
         family_id, user,
         device_name=name, device_type="rpi", platform="linux",
         capabilities=list(capabilities),
+        root_path=root_path,
     )
     device, token, _expires = runtime.complete_pairing(pairing.code, address=address)
     return device, token
@@ -213,11 +223,13 @@ def test_capability_not_declared_is_refused(tmp_path: Path) -> None:
 def test_unsafe_command_is_not_claimable_before_approval(tmp_path: Path) -> None:
     pool, runtime, family, user, family_id = _bootstrap(tmp_path)
     device, token = _pair(
-        runtime, family_id, user, capabilities=["ping", "filesystem.delete"],
+        runtime, family_id, user,
+        capabilities=["ping", "filesystem.delete"],
+        root_path="/mnt/photos",
     )
     command = runtime.enqueue_command(
         family_id, device.id, capability="filesystem.delete",
-        payload={"path": "photos/a.jpg"},
+        payload={"path": "a.jpg"},
         requested_by=user.id, expires_at=10**10,
     )
     assert command.status == "WAITING_APPROVAL"
@@ -238,11 +250,13 @@ def test_unsafe_capabilities_never_auto_reclaim(tmp_path: Path) -> None:
         tmp_path, command_lease_seconds=1,
     )
     device, token = _pair(
-        runtime, family_id, user, capabilities=["ping", "filesystem.delete"],
+        runtime, family_id, user,
+        capabilities=["ping", "filesystem.delete"],
+        root_path="/mnt/photos",
     )
     command = runtime.enqueue_command(
         family_id, device.id, capability="filesystem.delete",
-        payload={"path": "photos/a.jpg"},
+        payload={"path": "a.jpg"},
         requested_by=user.id, expires_at=10**10,
     )
     runtime.approve_command(family_id, command.id, user)
@@ -253,6 +267,41 @@ def test_unsafe_capabilities_never_auto_reclaim(tmp_path: Path) -> None:
     assert runtime.next_pending_command(token) is None, (
         "unsafe commands must escalate to a human instead of replaying"
     )
+    pool.close()
+
+
+def test_filesystem_capability_requires_a_root(tmp_path: Path) -> None:
+    """A device that will run ``filesystem.*`` must declare where it is
+    allowed to write; otherwise every path would be unconstrained."""
+
+    pool, runtime, family, user, family_id = _bootstrap(tmp_path)
+    with pytest.raises(HomeMindError):
+        runtime.create_pairing_code(
+            family_id, user,
+            device_name="pi", device_type="rpi", platform="linux",
+            capabilities=["filesystem.read"],
+        )
+    pool.close()
+
+
+def test_path_escaping_the_root_is_refused(tmp_path: Path) -> None:
+    pool, runtime, family, user, family_id = _bootstrap(tmp_path)
+    device, _token = _pair(
+        runtime, family_id, user,
+        capabilities=["ping", "filesystem.read"],
+        root_path="/mnt/photos",
+    )
+    runtime.enqueue_command(
+        family_id, device.id, capability="filesystem.read",
+        payload={"path": "sub/a.jpg"},
+        requested_by=user.id, expires_at=10**10,
+    )
+    with pytest.raises(HomeMindError):
+        runtime.enqueue_command(
+            family_id, device.id, capability="filesystem.read",
+            payload={"path": "../../etc/passwd"},
+            requested_by=user.id, expires_at=10**10,
+        )
     pool.close()
 
 
@@ -326,11 +375,15 @@ def test_fresh_device_stays_online(tmp_path: Path) -> None:
 
 
 def test_path_within_root_normalizes_traversal() -> None:
+    # Device payload paths resolve *under* the root, so a leading "/"
+    # does not by itself escape, but an absolute path does.
     assert path_within_root("photos/a.jpg", "/mnt/photos") is True
-    assert path_within_root("/mnt/photos/sub/a.jpg", "/mnt/photos") is True
-    assert path_within_root("photos/../../etc/passwd", "/mnt/photos") is False
+    assert path_within_root("sub/a.jpg", "/mnt/photos") is True
+    assert path_within_root("sub/../../etc/passwd", "/mnt/photos") is False
     assert path_within_root("/etc/passwd", "/mnt/photos") is False
     assert path_within_root("anything", None) is False, "fail closed without a root"
+    # A relative path that walks up and back down stays inside.
+    assert path_within_root("mnt/photos/../../etc", "/mnt/photos") is True
 
 
 def test_unsafe_capability_set_covers_destructive_actions() -> None:

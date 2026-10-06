@@ -206,7 +206,7 @@ class PhotoIntelligenceManager:
             )
         }
         results: list[PhotoSearchResult] = []
-        for row in self.repo.list(family_id):
+        for row in self.repo.list_for_family(family_id):
             if row.embedding_json is None or row.asset_id not in visible_ids:
                 continue
             vector = [float(value) for value in json.loads(row.embedding_json)]
@@ -243,7 +243,7 @@ class PhotoIntelligenceManager:
             )
         }
         matches: list[tuple[str, int]] = []
-        for row in self.repo.list(family_id):
+        for row in self.repo.list_for_family(family_id):
             if (
                 row.asset_id == asset_id
                 or row.perceptual_hash is None

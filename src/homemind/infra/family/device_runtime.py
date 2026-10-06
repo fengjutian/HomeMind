@@ -24,7 +24,6 @@ Security invariants enforced here (Stage 5):
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import json
 import logging
@@ -88,12 +87,10 @@ def mint_token(length_bytes: int = 32) -> str:
 
 
 def _normalize_device_path(raw: str) -> str:
-    """Return ``raw`` as a canonical, traversal-free POSIX absolute path.
+    """Return ``raw`` as a canonical, traversal-free absolute POSIX path.
 
-    A leading ``/`` is not special: device payloads name paths *relative
-    to the device root*, so ``photos/a.jpg`` and ``/photos/a.jpg`` both
-    resolve under that root. ``..`` segments are collapsed here so
-    ``photos/../../etc/passwd`` cannot smuggle its way out.
+    ``..`` segments are collapsed, so ``photos/../../etc/passwd`` cannot
+    smuggle its way out of the root it is later joined onto.
     """
     candidate = raw.replace("\\", "/").strip()
     if not candidate:
@@ -105,6 +102,12 @@ def _normalize_device_path(raw: str) -> str:
 def path_within_root(candidate: str, root: str | None) -> bool:
     """Return True when ``candidate`` resolves inside ``root``.
 
+    Device payloads name paths *relative to the device root*, so the
+    candidate is joined onto ``root`` before the containment check. An
+    absolute candidate still works because ``posixpath.join`` lets it
+    win — which then fails the prefix check, keeping an absolute path
+    from being used as an escape hatch.
+
     ``root`` of ``None`` or ``""`` means "device declared no root", which
     forbids every path-bearing capability — fail closed rather than
     letting an unconstrained runtime wander the host filesystem.
@@ -114,12 +117,12 @@ def path_within_root(candidate: str, root: str | None) -> bool:
     normalized_root = _normalize_device_path(root)
     if not normalized_root:
         return False
-    normalized_candidate = _normalize_device_path(candidate)
-    if not normalized_candidate:
+    resolved = _normalize_device_path(posixpath.join(normalized_root, candidate))
+    if not resolved:
         return False
-    candidate_parts = PurePosixPath(normalized_candidate).parts
+    resolved_parts = PurePosixPath(resolved).parts
     root_parts = PurePosixPath(normalized_root).parts
-    return candidate_parts[: len(root_parts)] == root_parts
+    return resolved_parts[: len(root_parts)] == root_parts
 
 
 @dataclass(frozen=True)
@@ -140,7 +143,7 @@ class PairingCode:
 # Module-level so the store survives across per-request manager instances.
 _PAIRING_TTL_SECONDS = 600
 _PAIRING_LOCK = __import__("threading").Lock()
-_PAIRING_STORE: dict[str, "_PairingEntry"] = {}
+_PAIRING_STORE: dict[str, _PairingEntry] = {}
 
 
 @dataclass
@@ -208,12 +211,14 @@ class DeviceRuntimeManager:
                 HomeMindErrorCode.FAMILY_INVALID,
                 "device must declare at least one capability",
             )
-        if any(capability.startswith(PATH_BEARING_CAPABILITY_PREFIXES) for capability in capabilities):
-            if not root_path:
-                raise HomeMindError(
-                    HomeMindErrorCode.FAMILY_INVALID,
-                    "device must declare root_path for filesystem capabilities",
-                )
+        if not root_path and any(
+            capability.startswith(PATH_BEARING_CAPABILITY_PREFIXES)
+            for capability in capabilities
+        ):
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "device must declare root_path for filesystem capabilities",
+            )
         code = secrets.token_urlsafe(8)
         expires_at = int(time.time()) + _PAIRING_TTL_SECONDS
         with _PAIRING_LOCK:
@@ -360,7 +365,7 @@ class DeviceRuntimeManager:
 
     def list_devices(self, family_id: str, user: User) -> list[FamilyDeviceRow]:
         self.family.require_access(family_id, user)
-        return self.repo.list(family_id)
+        return self.repo.list_for_family(family_id)
 
     def get_device(
         self, family_id: str, device_id: str, user: User,

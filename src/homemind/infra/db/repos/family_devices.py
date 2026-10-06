@@ -30,7 +30,15 @@ class FamilyDeviceRow:
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyDeviceRow:
-        data = {key: row[key] for key in row.keys()} if hasattr(row, "keys") else dict(row)
+        # ``sqlite3.Row`` iterates *values*, so column names must come
+        # from ``.keys()``; ``.get`` is not available on it either.
+        # ruff SIM118 wants ``for key in row`` here, which would yield
+        # values and raise IndexError — keep ``.keys()``.
+        data: dict[str, Any] = (
+            {key: row[key] for key in row.keys()}  # noqa: SIM118  # noqa: SIM118
+            if hasattr(row, "keys")
+            else dict(row)
+        )
         return cls(
             id=str(data["device_id"]),
             pk=int(data["id"]),
@@ -62,7 +70,13 @@ class FamilyDeviceCredentialRow:
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyDeviceCredentialRow:
-        data = {key: row[key] for key in row.keys()} if hasattr(row, "keys") else dict(row)
+        # `sqlite3.Row` iterates *values*, so column names come from
+        # `.keys()`; `.get` is not available on it either.
+        data: dict[str, Any] = (
+            {key: row[key] for key in row.keys()}  # noqa: SIM118
+            if hasattr(row, "keys")
+            else dict(row)
+        )
         return cls(
             id=str(data["credential_id"]),
             pk=int(data["id"]),
@@ -101,7 +115,13 @@ class FamilyDeviceCommandRow:
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyDeviceCommandRow:
-        data = {key: row[key] for key in row.keys()} if hasattr(row, "keys") else dict(row)
+        # `sqlite3.Row` iterates *values*, so column names come from
+        # `.keys()`; `.get` is not available on it either.
+        data: dict[str, Any] = (
+            {key: row[key] for key in row.keys()}  # noqa: SIM118
+            if hasattr(row, "keys")
+            else dict(row)
+        )
         return cls(
             id=str(data["command_id"]),
             pk=int(data["id"]),
@@ -147,7 +167,13 @@ class FamilyDeviceRepo:
             ).fetchone()
         return FamilyDeviceRow.from_row(row) if row else None
 
-    def list(self, family_id: str) -> list[FamilyDeviceRow]:
+    def list_for_family(self, family_id: str) -> list[FamilyDeviceRow]:
+        """All devices in ``family_id``.
+
+        Named ``list_for_family`` rather than ``list`` because a method
+        named ``list`` shadows the builtin inside the class body, which
+        breaks every ``list[...]`` annotation below it.
+        """
         with self._db.connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM homemind_family_devices WHERE family_id = ? "
@@ -504,9 +530,10 @@ class FamilyDeviceRepo:
 
         Reclaiming is refused for ``is_unsafe`` commands: replaying a
         delete or a "format disk" is not idempotent, so a stale lease must
-        escalate to a human instead of silently re-running. ``max_retries``
-        additionally bounds automatic reclaim so a poison command cannot
-        loop forever.
+        escalate to a human instead of silently re-running. This only
+        applies to the *reclaim* path — an unsafe command that a manager
+        approved still dispatches normally. ``max_retries`` additionally
+        bounds automatic reclaim so a poison command cannot loop forever.
 
         The CAS ``UPDATE ... WHERE status = <observed>`` is what makes two
         concurrent runtimes safe: only the writer whose status guard still
@@ -526,9 +553,9 @@ class FamilyDeviceRepo:
             ).fetchall()
         for row in rows:
             command = FamilyDeviceCommandRow.from_row(row)
-            if command.is_unsafe:
-                continue
             is_reclaim = command.status in {"DISPATCHED", "RUNNING"}
+            if is_reclaim and command.is_unsafe:
+                continue
             if is_reclaim and command.retry_count >= max_retries:
                 continue
             claimed = self.transition_command(

@@ -20,11 +20,11 @@ from homemind.infra.db.repos.family_devices import (
     FamilyDeviceRow,
 )
 from homemind.infra.db.services import HomeMindServices
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.device_runtime import (
     DeviceRuntimeManager,
 )
 from homemind.infra.family.manager import FamilyManager
-from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from octop.api.deps import get_server
 from octop.infra.server import OctopServer
 
