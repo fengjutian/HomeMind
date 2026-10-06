@@ -90,6 +90,17 @@ class RuntimeCommandResultBody(BaseModel):
     error: str | None = Field(default=None, max_length=2000)
 
 
+class RuntimeCommandAckBody(BaseModel):
+    runtime_version: str | None = Field(default=None, max_length=64)
+
+
+class RuntimeCommandAckResponse(BaseModel):
+    id: str
+    status: str
+    lease_expires_at: int | None
+    retry_count: int
+
+
 def _manager(server: OctopServer) -> DeviceRuntimeManager:
     assert server.services is not None
     run_migrations(server.services.db)
@@ -183,6 +194,14 @@ async def heartbeat(
     "/runtime/commands",
     response_model=RuntimeCommandResponse | RuntimeNoCommandResponse,
     summary="Fetch the next pending command for this runtime",
+    description=(
+        "The device is resolved from the bearer token, never from a "
+        "query parameter, so one runtime can never claim another "
+        "runtime's queue. Commands still awaiting approval are not "
+        "returned. A live lease is taken on the returned command; an "
+        "expired lease from a crashed runtime is reclaimed automatically "
+        "unless the capability is unsafe."
+    ),
 )
 async def next_command(
     server: Server,
@@ -190,17 +209,50 @@ async def next_command(
 ) -> RuntimeCommandResponse | RuntimeNoCommandResponse:
     token = _resolve_token(authorization)
     manager = _manager(server)
-    device = manager.heartbeat(token)
-    command = manager.next_pending_command(device.id)
+    manager.heartbeat(token)
+    command = manager.next_pending_command(token)
     if command is None:
         return RuntimeNoCommandResponse(command=None)
     return _command_payload(command)
 
 
 @router.post(
+    "/runtime/commands/{command_id}/ack",
+    response_model=RuntimeCommandAckResponse,
+    summary="Mark a dispatched command as running",
+    description=(
+        "Refreshes the command lease before a long execution so the "
+        "sweep does not hand the same work to a second runtime."
+    ),
+)
+async def ack_command(
+    command_id: str,
+    body: RuntimeCommandAckBody,
+    server: Server,
+    authorization: Annotated[str | None, Header()] = None,
+) -> RuntimeCommandAckResponse:
+    token = _resolve_token(authorization)
+    manager = _manager(server)
+    updated = manager.acknowledge_command(
+        token, command_id, runtime_version=body.runtime_version,
+    )
+    return RuntimeCommandAckResponse(
+        id=updated.id,
+        status=updated.status,
+        lease_expires_at=updated.lease_expires_at,
+        retry_count=updated.retry_count,
+    )
+
+
+@router.post(
     "/runtime/commands/{command_id}/result",
     status_code=204,
     summary="Report the outcome of a dispatched command",
+    description=(
+        "Ownership is re-derived from the bearer token, so a runtime "
+        "cannot report on another device's command. Resubmitting a "
+        "terminal outcome is idempotent and returns 204."
+    ),
 )
 async def report_result(
     command_id: str,
@@ -210,11 +262,11 @@ async def report_result(
 ) -> Response:
     token = _resolve_token(authorization)
     manager = _manager(server)
-    # Confirm the token still authenticates the same device before we
-    # let the runtime mutate command state — otherwise an ex-device
-    # could still report success on a stale command_id it once owned.
-    manager.heartbeat(token)
+    # ``report_command_result`` re-authenticates and re-derives the owning
+    # device from the token, so an ex-device cannot report success on a
+    # stale command_id it once observed.
     updated = manager.report_command_result(
+        token,
         command_id,
         status=body.status,
         result=body.result,

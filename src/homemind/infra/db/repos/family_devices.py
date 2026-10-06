@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 from dataclasses import dataclass
 from typing import Any
@@ -28,19 +29,20 @@ class FamilyDeviceRow:
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyDeviceRow:
+        data = {key: row[key] for key in row.keys()} if hasattr(row, "keys") else dict(row)
         return cls(
-            id=str(row["device_id"]),
-            pk=int(row["id"]),
-            family_id=str(row["family_id"]),
-            name=str(row["name"]),
-            device_type=str(row["device_type"]),
-            platform=row["platform"],
-            status=str(row["status"]),
-            address=row["address"],
-            capabilities=[str(value) for value in json.loads(str(row["capabilities"]))],
-            last_seen=int(row["last_seen"]) if row["last_seen"] is not None else None,
-            created_at=int(row["created_at"]),
-            updated_at=int(row["updated_at"]),
+            id=str(data["device_id"]),
+            pk=int(data["id"]),
+            family_id=str(data["family_id"]),
+            name=str(data["name"]),
+            device_type=str(data["device_type"]),
+            platform=data["platform"],
+            status=str(data["status"]),
+            address=data["address"],
+            capabilities=[str(value) for value in json.loads(str(data["capabilities"]))],
+            last_seen=int(data["last_seen"]) if data["last_seen"] is not None else None,
+            created_at=int(data["created_at"]),
+            updated_at=int(data["updated_at"]),
         )
 
 
@@ -58,16 +60,17 @@ class FamilyDeviceCredentialRow:
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyDeviceCredentialRow:
+        data = {key: row[key] for key in row.keys()} if hasattr(row, "keys") else dict(row)
         return cls(
-            id=str(row["credential_id"]),
-            pk=int(row["id"]),
-            device_id=str(row["device_id"]),
-            family_id=str(row["family_id"]),
-            token_hash=str(row["token_hash"]),
-            issued_at=int(row["issued_at"]),
-            expires_at=int(row["expires_at"]) if row["expires_at"] is not None else None,
-            revoked_at=int(row["revoked_at"]) if row["revoked_at"] is not None else None,
-            rotated_from=row["rotated_from"],
+            id=str(data["credential_id"]),
+            pk=int(data["id"]),
+            device_id=str(data["device_id"]),
+            family_id=str(data["family_id"]),
+            token_hash=str(data["token_hash"]),
+            issued_at=int(data["issued_at"]),
+            expires_at=int(data["expires_at"]) if data["expires_at"] is not None else None,
+            revoked_at=int(data["revoked_at"]) if data["revoked_at"] is not None else None,
+            rotated_from=data["rotated_from"],
         )
 
 
@@ -87,24 +90,45 @@ class FamilyDeviceCommandRow:
     error: str | None
     created_at: int
     updated_at: int
+    is_unsafe: bool = False
+    lease_owner: str | None = None
+    lease_expires_at: int | None = None
+    approved_at: int | None = None
+    approved_by: int | None = None
+    retry_count: int = 0
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyDeviceCommandRow:
+        data = {key: row[key] for key in row.keys()} if hasattr(row, "keys") else dict(row)
         return cls(
-            id=str(row["command_id"]),
-            pk=int(row["id"]),
-            family_id=str(row["family_id"]),
-            device_id=str(row["device_id"]),
-            capability=str(row["capability"]),
-            payload_json=str(row["payload_json"]),
-            requested_by=int(row["requested_by"]),
-            transaction_id=row["transaction_id"],
-            expires_at=int(row["expires_at"]),
-            status=str(row["status"]),
-            result_json=row["result_json"],
-            error=row["error"],
-            created_at=int(row["created_at"]),
-            updated_at=int(row["updated_at"]),
+            id=str(data["command_id"]),
+            pk=int(data["id"]),
+            family_id=str(data["family_id"]),
+            device_id=str(data["device_id"]),
+            capability=str(data["capability"]),
+            payload_json=str(data["payload_json"]),
+            requested_by=int(data["requested_by"]),
+            transaction_id=data["transaction_id"],
+            expires_at=int(data["expires_at"]),
+            status=str(data["status"]),
+            result_json=data["result_json"],
+            error=data["error"],
+            created_at=int(data["created_at"]),
+            updated_at=int(data["updated_at"]),
+            is_unsafe=bool(data.get("is_unsafe")),
+            lease_owner=data.get("lease_owner"),
+            lease_expires_at=(
+                int(data["lease_expires_at"])
+                if data.get("lease_expires_at") is not None
+                else None
+            ),
+            approved_at=(
+                int(data["approved_at"]) if data.get("approved_at") is not None else None
+            ),
+            approved_by=(
+                int(data["approved_by"]) if data.get("approved_by") is not None else None
+            ),
+            retry_count=int(data.get("retry_count") or 0),
         )
 
 
@@ -264,14 +288,52 @@ class FamilyDeviceRepo:
     def find_active_credential_by_hash(
         self, token_hash: str,
     ) -> FamilyDeviceCredentialRow | None:
+        """Look up a live credential for ``token_hash``.
+
+        The SQL ``WHERE token_hash = ?`` narrows the candidate set, but
+        SQLite / PostgreSQL string comparison is *not* constant-time, so
+        a timing oracle would let an attacker who can time the endpoint
+        recover a token hash byte-by-byte. The spec requires constant
+        time, so we scan the non-revoked rows and settle the match with
+        :func:`hmac.compare_digest`. The active-credential set per
+        install is small (one row per paired device), so the linear scan
+        is cheap and keeps the token itself out of the SQL layer.
+        """
         with self._db.connect() as conn:
-            row = conn.execute(
+            rows = conn.execute(
                 "SELECT * FROM homemind_device_credentials "
-                "WHERE token_hash = ? AND revoked_at IS NULL "
-                "ORDER BY issued_at DESC LIMIT 1",
-                (token_hash,),
-            ).fetchone()
-        return FamilyDeviceCredentialRow.from_row(row) if row else None
+                "WHERE revoked_at IS NULL ORDER BY issued_at DESC"
+            ).fetchall()
+        candidates = [FamilyDeviceCredentialRow.from_row(row) for row in rows]
+        matched: FamilyDeviceCredentialRow | None = None
+        for candidate in candidates:
+            # ``compare_digest`` over equal-length hex keeps the work per
+            # candidate constant regardless of where the first mismatch is.
+            if hmac.compare_digest(candidate.token_hash, token_hash):
+                matched = candidate
+        return matched
+
+    def mark_stale_devices_offline(
+        self, *, heartbeat_timeout_seconds: int, now: int | None = None,
+    ) -> int:
+        """Flip devices to ``OFFLINE`` once ``last_seen`` falls behind the
+        heartbeat timeout.
+
+        Runs in the background so online state does not depend on someone
+        opening the dashboard. Only ``ONLINE`` / ``BUSY`` rows are
+        touched; ``REVOKED`` and ``DISABLED`` are terminal and must not be
+        resurrected into an ``OFFLINE`` state that looks recoverable.
+        """
+        timestamp = now_ts() if now is None else now
+        cutoff = timestamp - heartbeat_timeout_seconds
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                "UPDATE homemind_family_devices SET status = 'OFFLINE', updated_at = ? "
+                "WHERE status IN ('ONLINE', 'BUSY') "
+                "  AND (last_seen IS NULL OR last_seen <= ?)",
+                (timestamp, cutoff),
+            )
+        return int(cursor.rowcount or 0)
 
     def revoke_credential(self, credential_id: str) -> FamilyDeviceCredentialRow | None:
         ts = now_ts()
@@ -305,6 +367,8 @@ class FamilyDeviceRepo:
         requested_by: int,
         expires_at: int,
         transaction_id: str | None = None,
+        is_unsafe: bool = False,
+        initial_status: str = "PENDING",
     ) -> FamilyDeviceCommandRow:
         command_id = new_ulid()
         ts = now_ts()
@@ -312,8 +376,8 @@ class FamilyDeviceRepo:
             conn.execute(
                 "INSERT INTO homemind_device_commands(command_id, family_id, device_id, "
                 "capability, payload_json, requested_by, transaction_id, expires_at, "
-                "status, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)",
+                "status, is_unsafe, retry_count, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
                 (
                     command_id,
                     family_id,
@@ -323,6 +387,8 @@ class FamilyDeviceRepo:
                     requested_by,
                     transaction_id,
                     expires_at,
+                    initial_status,
+                    1 if is_unsafe else 0,
                     ts,
                     ts,
                 ),
@@ -367,6 +433,11 @@ class FamilyDeviceRepo:
         to_status: str,
         result_json: str | None = None,
         error: str | None = None,
+        lease_owner: str | None = None,
+        lease_expires_at: int | None = None,
+        clear_lease: bool = False,
+        approved_by: int | None = None,
+        increment_retry: bool = False,
     ) -> FamilyDeviceCommandRow | None:
         ts = now_ts()
         from_clause = (
@@ -382,6 +453,21 @@ class FamilyDeviceRepo:
         if error is not None:
             sets.append("error = ?")
             params.append(error)
+        if lease_owner is not None:
+            sets.append("lease_owner = ?")
+            params.append(lease_owner)
+        if lease_expires_at is not None:
+            sets.append("lease_expires_at = ?")
+            params.append(lease_expires_at)
+        if clear_lease:
+            sets.append("lease_owner = NULL")
+            sets.append("lease_expires_at = NULL")
+        if approved_by is not None:
+            sets.append("approved_at = ?")
+            sets.append("approved_by = ?")
+            params.extend((ts, approved_by))
+        if increment_retry:
+            sets.append("retry_count = retry_count + 1")
         params.append(command_id)
         with self._db.transaction() as conn:
             cursor = conn.execute(
@@ -392,6 +478,78 @@ class FamilyDeviceRepo:
             if cursor.rowcount != 1:
                 return None
         return self.get_command(command_id)
+
+    def claim_next_command(
+        self,
+        device_id: str,
+        *,
+        lease_owner: str,
+        lease_ttl_seconds: int,
+        now: int | None = None,
+        max_retries: int = 3,
+    ) -> FamilyDeviceCommandRow | None:
+        """Atomically claim the next dispatchable command for ``device_id``.
+
+        Eligible rows are:
+        * ``PENDING`` and not yet expired, or
+        * ``DISPATCHED`` / ``RUNNING`` whose lease expired — an abandoned
+          claim another runtime is allowed to pick up.
+
+        Reclaiming is refused for ``is_unsafe`` commands: replaying a
+        delete or a "format disk" is not idempotent, so a stale lease must
+        escalate to a human instead of silently re-running. ``max_retries``
+        additionally bounds automatic reclaim so a poison command cannot
+        loop forever.
+
+        The CAS ``UPDATE ... WHERE status = <observed>`` is what makes two
+        concurrent runtimes safe: only the writer whose status guard still
+        matches gets a row back, and the loser moves on to the next
+        candidate.
+        """
+        timestamp = now_ts() if now is None else now
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_device_commands "
+                "WHERE device_id = ? AND ("
+                "  (status = 'PENDING' AND expires_at > ?) OR"
+                "  (status IN ('DISPATCHED', 'RUNNING') "
+                "   AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)"
+                ") ORDER BY created_at ASC, id ASC",
+                (device_id, timestamp, timestamp),
+            ).fetchall()
+        for row in rows:
+            command = FamilyDeviceCommandRow.from_row(row)
+            if command.is_unsafe:
+                continue
+            is_reclaim = command.status in {"DISPATCHED", "RUNNING"}
+            if is_reclaim and command.retry_count >= max_retries:
+                continue
+            claimed = self.transition_command(
+                command.id,
+                from_status=command.status,
+                to_status="DISPATCHED",
+                lease_owner=lease_owner,
+                lease_expires_at=timestamp + lease_ttl_seconds,
+                increment_retry=is_reclaim,
+            )
+            if claimed is not None:
+                return claimed
+        return None
+
+    def list_reclaimable_commands(
+        self, device_id: str, *, now: int | None = None,
+    ) -> list[FamilyDeviceCommandRow]:
+        """Commands whose lease expired and may still be reclaimed."""
+        timestamp = now_ts() if now is None else now
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_device_commands "
+                "WHERE device_id = ? AND status IN ('DISPATCHED', 'RUNNING') "
+                "  AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? "
+                "ORDER BY created_at ASC, id ASC",
+                (device_id, timestamp),
+            ).fetchall()
+        return map_rows(rows, FamilyDeviceCommandRow)
 
 
 __all__ = [

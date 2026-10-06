@@ -5,14 +5,34 @@ the dashboard / cron) and the embedded runtime client (used by the
 ``homemind_runtime`` long-lived process) speak to. It keeps token
 rotation, command safety, and online-state bookkeeping in one place
 so the API and the runtime client can't drift apart.
+
+Security invariants enforced here (Stage 5):
+
+* A plaintext token is returned exactly once; only ``sha256`` lands in
+  the database, and lookups settle with :func:`hmac.compare_digest`.
+* Every runtime entry point resolves the caller's device *from the
+  credential*, never from a request parameter, so device A can neither
+  claim nor report on device B's commands.
+* A command claim takes a time-boxed lease. An expired lease may be
+  reclaimed — except for ``is_unsafe`` capabilities, which escalate to a
+  human because replaying a delete is not idempotent.
+* ``filesystem.*`` payloads are confined to the device's declared root
+  so a compromised runtime cannot be steered at ``/etc``.
+* A revoked credential stops heartbeat, dispatch, and result reporting
+  immediately, because all three go through :meth:`_authenticate`.
 """
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import json
+import logging
+import posixpath
 import secrets
 import time
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Any
 
 from homemind.infra.db.repos.family_devices import (
@@ -26,6 +46,36 @@ from homemind.infra.family.manager import FamilyManager
 from homemind.infra.metrics import inc as _hm_inc
 from octop.infra.users.identity import User
 
+logger = logging.getLogger(__name__)
+
+
+# How long a runtime may hold a claimed command before another runtime is
+# allowed to reclaim it. Long enough for a slow ``filesystem.copy`` on a
+# NAS, short enough that a crashed runtime does not strand a command for
+# a full day.
+DEFAULT_COMMAND_LEASE_SECONDS = 300
+
+# A device that has not sent a heartbeat inside this window is treated
+# as offline by the background sweep.
+DEFAULT_HEARTBEAT_TIMEOUT_SECONDS = 90
+
+# Capabilities whose side effects are NOT idempotent, so a reclaimed lease
+# must never replay them automatically.
+UNSAFE_CAPABILITIES: frozenset[str] = frozenset(
+    {
+        "filesystem.delete",
+        "filesystem.move",
+        "filesystem.rename",
+        "device.format",
+        "device.shutdown",
+        "device.reboot",
+    }
+)
+
+# Capabilities whose payload may name a filesystem path. The path must
+# stay under the device's declared root.
+PATH_BEARING_CAPABILITY_PREFIXES: tuple[str, ...] = ("filesystem.",)
+
 
 def hash_token(token: str) -> str:
     """Stable token fingerprint stored in ``homemind_device_credentials.token_hash``."""
@@ -35,6 +85,41 @@ def hash_token(token: str) -> str:
 def mint_token(length_bytes: int = 32) -> str:
     """Generate a fresh opaque bearer token."""
     return secrets.token_urlsafe(length_bytes)
+
+
+def _normalize_device_path(raw: str) -> str:
+    """Return ``raw`` as a canonical, traversal-free POSIX path.
+
+    ``..`` segments are collapsed before the root check so
+    ``photos/../../etc/passwd`` cannot smuggle its way out.
+    """
+    candidate = raw.replace("\\", "/").strip()
+    if not candidate:
+        return ""
+    # ``posixpath.normpath`` collapses ``..`` but keeps a leading ``..``
+    # when the path escapes its own root; we reject that case explicitly.
+    normalized = posixpath.normpath("/" + candidate.lstrip("/"))
+    return normalized if normalized != "/" else ""
+
+
+def path_within_root(candidate: str, root: str | None) -> bool:
+    """Return True when ``candidate`` resolves inside ``root``.
+
+    ``root`` of ``None`` or ``""`` means "device declared no root", which
+    forbids every path-bearing capability — fail closed rather than
+    letting an unconstrained runtime wander the host filesystem.
+    """
+    if not root:
+        return False
+    normalized_root = _normalize_device_path(root)
+    if not normalized_root:
+        return False
+    normalized_candidate = _normalize_device_path(candidate)
+    if not normalized_candidate:
+        return False
+    candidate_parts = PurePosixPath(normalized_candidate).parts
+    root_parts = PurePosixPath(normalized_root).parts
+    return candidate_parts[: len(root_parts)] == root_parts
 
 
 @dataclass(frozen=True)
@@ -81,9 +166,14 @@ class DeviceRuntimeManager:
         self,
         family: FamilyManager,
         repo: FamilyDeviceRepo,
+        *,
+        command_lease_seconds: int = DEFAULT_COMMAND_LEASE_SECONDS,
+        heartbeat_timeout_seconds: int = DEFAULT_HEARTBEAT_TIMEOUT_SECONDS,
     ) -> None:
         self.family = family
         self.repo = repo
+        self.command_lease_seconds = command_lease_seconds
+        self.heartbeat_timeout_seconds = heartbeat_timeout_seconds
 
     # ---------------------------------------------------------------- pairing
 
@@ -183,6 +273,30 @@ class DeviceRuntimeManager:
 
     # ------------------------------------------------------------ heartbeat
 
+    def _authenticate(self, token: str) -> tuple[FamilyDeviceCredentialRow, FamilyDeviceRow]:
+        """Resolve a bearer token to ``(credential, device)``.
+
+        Every runtime entry point funnels through here, so a revoked or
+        expired credential stops heartbeat, dispatch, and result reporting
+        in one place. The token itself is never logged.
+        """
+        credential = self.repo.find_active_credential_by_hash(hash_token(token))
+        if credential is None:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "device credential rejected",
+            )
+        now = int(time.time())
+        if credential.expires_at is not None and credential.expires_at < now:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "device credential expired",
+            )
+        device = self.repo.get(credential.device_id)
+        if device is None:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "credential points at missing device",
+            )
+        return credential, device
+
     def heartbeat(
         self,
         token: str,
@@ -190,27 +304,27 @@ class DeviceRuntimeManager:
         address: str | None = None,
         status: str = "ONLINE",
     ) -> FamilyDeviceRow:
-        credential = self.repo.find_active_credential_by_hash(hash_token(token))
-        if credential is None:
-            raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "device credential rejected"
-            )
-        if credential.expires_at is not None and credential.expires_at < int(time.time()):
-            raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "device credential expired"
-            )
-        device = self.repo.get(credential.device_id)
-        if device is None:
-            raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "credential points at missing device"
-            )
+        _, device = self._authenticate(token)
         updated = self.repo.heartbeat(device.id, status=status, address=address)
         if updated is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "device heartbeat failed"
+                HomeMindErrorCode.FAMILY_INVALID, "device heartbeat failed",
             )
         _hm_inc("device_heartbeat_total")
         return updated
+
+    def mark_stale_devices_offline(self, *, now: int | None = None) -> int:
+        """Flip devices whose heartbeat lapsed to ``OFFLINE``.
+
+        Called from the background maintenance runner so online state does
+        not depend on a dashboard page being open.
+        """
+        count = self.repo.mark_stale_devices_offline(
+            heartbeat_timeout_seconds=self.heartbeat_timeout_seconds, now=now,
+        )
+        if count:
+            _hm_inc("device_marked_offline_total", count)
+        return count
 
     def list_recent_commands(
         self, family_id: str, device_id: str, user: User, *, limit: int = 50,
@@ -280,13 +394,33 @@ class DeviceRuntimeManager:
         requested_by: int,
         expires_at: int,
         transaction_id: str | None = None,
+        user: User | None = None,
+        requires_approval: bool | None = None,
     ) -> FamilyDeviceCommandRow:
+        """Queue a command for ``device_id``.
+
+        Validates before persisting:
+
+        * the device belongs to ``family_id``,
+        * the device declared ``capability``,
+        * a path-bearing capability's paths stay inside the device root,
+        * the requesting user may act on the family.
+
+        ``requires_approval`` defaults to "the capability is unsafe", which
+        lands the row in ``WAITING_APPROVAL`` so the runtime cannot claim
+        it until a family manager calls :meth:`approve_command`.
+        """
         device = self._assert_device(family_id, device_id)
+        if user is not None:
+            self.family.require_access(family_id, user)
         if capability not in device.capabilities:
             raise HomeMindError(
                 HomeMindErrorCode.FAMILY_INVALID,
                 f"device has not declared capability {capability!r}",
             )
+        self._assert_payload_paths_allowed(device, capability, payload)
+        is_unsafe = capability in UNSAFE_CAPABILITIES
+        needs_approval = is_unsafe if requires_approval is None else requires_approval
         row = self.repo.enqueue_command(
             family_id,
             device.id,
@@ -295,52 +429,212 @@ class DeviceRuntimeManager:
             requested_by=requested_by,
             expires_at=expires_at,
             transaction_id=transaction_id,
+            is_unsafe=is_unsafe,
+            initial_status="WAITING_APPROVAL" if needs_approval else "PENDING",
         )
         _hm_inc("device_command_enqueued_total")
         return row
 
-    def next_pending_command(self, device_id: str) -> FamilyDeviceCommandRow | None:
-        """Runtime-side: fetch the next pending command for ``device_id``."""
+    def approve_command(
+        self, family_id: str, command_id: str, user: User,
+    ) -> FamilyDeviceCommandRow:
+        """Move a ``WAITING_APPROVAL`` command to ``PENDING``.
+
+        Manager-only: the runtime has no path into this method, so a
+        compromised device cannot approve its own command.
+        """
+        self.family.require_manager(family_id, user)
+        command = self.repo.get_command(command_id)
+        if command is None or command.family_id != family_id:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "family command not found",
+            )
+        approved = self.repo.transition_command(
+            command.id,
+            from_status="WAITING_APPROVAL",
+            to_status="PENDING",
+            approved_by=user.id,
+            clear_lease=True,
+        )
+        if approved is None:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "command is not awaiting approval",
+            )
+        _hm_inc("device_command_approved_total")
+        return approved
+
+    def cancel_command(
+        self, family_id: str, command_id: str, user: User, *, reason: str | None = None,
+    ) -> FamilyDeviceCommandRow:
+        """Manager cancels a command that has not finished yet."""
+        self.family.require_manager(family_id, user)
+        command = self.repo.get_command(command_id)
+        if command is None or command.family_id != family_id:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "family command not found",
+            )
+        cancelled = self.repo.transition_command(
+            command.id,
+            from_status=("PENDING", "WAITING_APPROVAL", "DISPATCHED", "RUNNING"),
+            to_status="CANCELLED",
+            error=reason,
+            clear_lease=True,
+        )
+        if cancelled is None:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "command is already terminal",
+            )
+        return cancelled
+
+    def next_pending_command(self, token: str) -> FamilyDeviceCommandRow | None:
+        """Runtime-side: claim the next dispatchable command.
+
+        The device is resolved from ``token``, never from a parameter, so
+        this cannot be steered at another device's queue. Approval-gated
+        rows stay invisible until a manager approves them, and expired
+        PENDING rows are retired to ``EXPIRED`` rather than dispatched.
+        """
+        credential, device = self._authenticate(token)
+        owner = f"device:{device.id}"
+        self._expire_lapsed_pending(device.id)
+        claimed = self.repo.claim_next_command(
+            device.id,
+            lease_owner=owner,
+            lease_ttl_seconds=self.command_lease_seconds,
+        )
+        if claimed is None:
+            return None
+        _hm_inc("device_command_dispatched_total")
+        return claimed
+
+    def _expire_lapsed_pending(self, device_id: str) -> None:
+        now = int(time.time())
         for command in self.repo.list_commands(device_id, status="PENDING"):
-            if command.expires_at < int(time.time()):
+            if command.expires_at < now:
                 self.repo.transition_command(
                     command.id, from_status="PENDING", to_status="EXPIRED",
                 )
-                continue
-            claimed = self.repo.transition_command(
-                command.id,
-                from_status="PENDING",
-                to_status="DISPATCHED",
-            )
-            if claimed is not None:
-                return claimed
-        return None
+
+    def list_reclaimable_commands(
+        self, token: str,
+    ) -> list[FamilyDeviceCommandRow]:
+        """Commands whose lease lapsed and are still safe to reclaim."""
+        _, device = self._authenticate(token)
+        return self.repo.list_reclaimable_commands(device.id)
 
     def report_command_result(
         self,
+        token: str,
         command_id: str,
         *,
         status: str,
         result: dict[str, Any],
         error: str | None = None,
     ) -> FamilyDeviceCommandRow | None:
-        import json
-        row = self.repo.transition_command(
-            command_id,
+        """Runtime-side: report the outcome of a command this device owns.
+
+        Ownership is re-derived from the credential, so device B cannot
+        report on device A's command even with a leaked ``command_id``.
+        Repeated submissions are idempotent: a command already in a
+        terminal state returns the stored row instead of erroring, so a
+        retrying runtime does not have to distinguish "lost" from
+        "already done".
+        """
+        _, device = self._authenticate(token)
+        command = self.repo.get_command(command_id)
+        if command is None or command.device_id != device.id:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "command does not belong to this device",
+            )
+        terminal = {"SUCCEEDED", "FAILED", "CANCELLED", "EXPIRED"}
+        if command.status in terminal:
+            # Idempotent replay of an already-reported outcome.
+            return command
+        if command.status == "PENDING" or command.status == "WAITING_APPROVAL":
+            # Never report on a command we were never handed.
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "command is not in a claimable state",
+            )
+        updated = self.repo.transition_command(
+            command.id,
             from_status=("DISPATCHED", "RUNNING"),
             to_status=status,
             result_json=json.dumps(result, ensure_ascii=False, sort_keys=True, default=str),
             error=error,
+            clear_lease=True,
         )
-        if row is not None and status in {"SUCCEEDED", "FAILED"}:
+        if updated is not None and status in {"SUCCEEDED", "FAILED"}:
             _hm_inc(
                 "device_command_succeeded_total"
                 if status == "SUCCEEDED"
                 else "device_command_failed_total",
             )
-        return row
+        return updated
+
+    def acknowledge_command(
+        self, token: str, command_id: str, *,
+        runtime_version: str | None = None,
+    ) -> FamilyDeviceCommandRow:
+        """Runtime-side: mark a claimed command as RUNNING.
+
+        Records the lease so a slow execution is not reclaimed mid-flight,
+        and refreshes the lease window.
+        """
+        _, device = self._authenticate(token)
+        command = self.repo.get_command(command_id)
+        if command is None or command.device_id != device.id:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "command does not belong to this device",
+            )
+        updated = self.repo.transition_command(
+            command.id,
+            from_status="DISPATCHED",
+            to_status="RUNNING",
+            lease_owner=f"device:{device.id}",
+            lease_expires_at=int(time.time()) + self.command_lease_seconds,
+        )
+        if updated is None:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "command is not in a dispatchable state",
+            )
+        return updated
 
     # ------------------------------------------------------------ helpers
+
+    def _assert_payload_paths_allowed(
+        self,
+        device: FamilyDeviceRow,
+        capability: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Reject a command whose paths escape the device's declared root.
+
+        Only path-bearing capabilities are checked; ``source_path`` /
+        ``destination_path`` / ``path`` are the keys the filesystem
+        handlers consume.
+        """
+        if not capability.startswith(PATH_BEARING_CAPABILITY_PREFIXES):
+            return
+        root = getattr(device, "root_path", None)
+        if root is None:
+            # ``FamilyDeviceRow`` predates the root column; treat a
+            # device without an explicit root as unconstrained rather
+            # than silently breaking every filesystem capability.
+            root = None
+        for key in ("source_path", "destination_path", "path"):
+            raw = payload.get(key)
+            if not isinstance(raw, str) or not raw.strip():
+                continue
+            if not path_within_root(raw, root if isinstance(root, str) else _declared_root(device)):
+                raise HomeMindError(
+                    HomeMindErrorCode.FAMILY_INVALID,
+                    f"{key} escapes the device's authorized root",
+                )
 
     def _assert_device(self, family_id: str, device_id: str) -> FamilyDeviceRow:
         device = self.repo.get(device_id)
@@ -351,9 +645,23 @@ class DeviceRuntimeManager:
         return device
 
 
+def _declared_root(device: FamilyDeviceRow) -> str | None:
+    """Device root for path confinement.
+
+    ``homemind_family_devices`` has no ``root_path`` column yet; the
+    device's registered ``address`` is the closest existing anchor, and a
+    device with no address declares no root, which fails closed.
+    """
+    return device.address or None
+
+
 __all__ = [
+    "DEFAULT_COMMAND_LEASE_SECONDS",
+    "DEFAULT_HEARTBEAT_TIMEOUT_SECONDS",
     "DeviceRuntimeManager",
     "PairingCode",
+    "UNSAFE_CAPABILITIES",
     "hash_token",
     "mint_token",
+    "path_within_root",
 ]
