@@ -190,6 +190,38 @@ class FamilyManager:
             )
         )
 
+    def create_member_for_invite(
+        self,
+        family_id: str,
+        *,
+        display_name: str,
+        role: MemberRole,
+        user_id: int,
+    ) -> FamilyMemberRow:
+        """Like :meth:`create_member` but bypasses ``require_manager``.
+
+        Stage 10 invite redemption uses this so a brand-new redeemer
+        can join without already being a member. The invite itself is
+        the authorization; the manager-only path is reserved for
+        in-app member creation.
+        """
+        if role is MemberRole.OWNER:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "family can have only one owner"
+            )
+        if not self.repo.user_exists(user_id):
+            raise OctopError(ErrorCode.NOT_FOUND, "linked user not found")
+        return _write(
+            lambda: self.repo.create_member(
+                family_id,
+                display_name=display_name.strip(),
+                role=role.value,
+                user_id=user_id,
+                avatar=None,
+                birthday=None,
+            )
+        )
+
     def update_member(
         self, family_id: str, member_id: str, user: User, changes: dict[str, object]
     ) -> FamilyMemberRow:

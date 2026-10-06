@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from homemind.infra.errors import HomeMindError
+from homemind.infra.metrics import inc as _hm_inc
 
 if TYPE_CHECKING:
     from homemind.infra.db.repos.family_assets import FamilyAssetRepo
@@ -121,6 +122,7 @@ class FamilyAssetScanJob:
 
     async def run_once(self) -> AssetScanReport:
         """Run one full sweep across every source. Safe to call directly."""
+        _hm_inc("asset_scan_sweep_total")
         started_at = int(time.time())
         scanned_sources = 0
         indexed = 0
@@ -174,6 +176,8 @@ class FamilyAssetScanJob:
             report.missing,
             report.failed,
         )
+        _hm_inc("asset_scan_sources_total", report.scanned_sources)
+        _hm_inc("asset_scan_failures_total", report.failed)
         return report
 
     async def _loop(self) -> None:

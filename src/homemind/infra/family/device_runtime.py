@@ -23,6 +23,7 @@ from homemind.infra.db.repos.family_devices import (
 )
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.metrics import inc as _hm_inc
 from octop.infra.users.identity import User
 
 
@@ -170,12 +171,15 @@ class DeviceRuntimeManager:
         self.repo.revoke_all_credentials_for_device(device.id)
         token = mint_token()
         self.repo.issue_credential(device.id, device.family_id, hash_token(token))
+        _hm_inc("device_rotate_token_total")
         return token
 
     def revoke_token(self, family_id: str, device_id: str, user: User) -> int:
         self.family.require_manager(family_id, user)
         device = self._assert_device(family_id, device_id)
-        return self.repo.revoke_all_credentials_for_device(device.id)
+        count = self.repo.revoke_all_credentials_for_device(device.id)
+        _hm_inc("device_revoke_token_total")
+        return count
 
     # ------------------------------------------------------------ heartbeat
 
@@ -205,6 +209,7 @@ class DeviceRuntimeManager:
             raise HomeMindError(
                 HomeMindErrorCode.FAMILY_INVALID, "device heartbeat failed"
             )
+        _hm_inc("device_heartbeat_total")
         return updated
 
     def list_recent_commands(
@@ -282,7 +287,7 @@ class DeviceRuntimeManager:
                 HomeMindErrorCode.FAMILY_INVALID,
                 f"device has not declared capability {capability!r}",
             )
-        return self.repo.enqueue_command(
+        row = self.repo.enqueue_command(
             family_id,
             device.id,
             capability=capability,
@@ -291,6 +296,8 @@ class DeviceRuntimeManager:
             expires_at=expires_at,
             transaction_id=transaction_id,
         )
+        _hm_inc("device_command_enqueued_total")
+        return row
 
     def next_pending_command(self, device_id: str) -> FamilyDeviceCommandRow | None:
         """Runtime-side: fetch the next pending command for ``device_id``."""
@@ -318,13 +325,20 @@ class DeviceRuntimeManager:
         error: str | None = None,
     ) -> FamilyDeviceCommandRow | None:
         import json
-        return self.repo.transition_command(
+        row = self.repo.transition_command(
             command_id,
             from_status=("DISPATCHED", "RUNNING"),
             to_status=status,
             result_json=json.dumps(result, ensure_ascii=False, sort_keys=True, default=str),
             error=error,
         )
+        if row is not None and status in {"SUCCEEDED", "FAILED"}:
+            _hm_inc(
+                "device_command_succeeded_total"
+                if status == "SUCCEEDED"
+                else "device_command_failed_total",
+            )
+        return row
 
     # ------------------------------------------------------------ helpers
 

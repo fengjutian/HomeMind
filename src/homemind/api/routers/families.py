@@ -14,6 +14,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.assets import FamilyAssetManager
+from homemind.infra.family.invites import (
+    DEFAULT_INVITE_TTL_SECONDS,
+    FamilyInviteManager,
+)
 from homemind.infra.family.manager import (
     FamilyManager,
     MemberRole,
@@ -241,6 +245,16 @@ def _asset_manager(server: OctopServer) -> FamilyAssetManager:
     run_migrations(server.services.db)
     services = HomeMindServices.from_pool(server.services.db)
     return FamilyAssetManager(services.family_repo, services.family_asset_repo)
+
+
+def _invite_manager(server: OctopServer) -> FamilyInviteManager:
+    assert server.services is not None
+    run_migrations(server.services.db)
+    services = HomeMindServices.from_pool(server.services.db)
+    return FamilyInviteManager(
+        FamilyManager(services.family_repo),
+        services.family_invite_repo,
+    )
 
 
 def _asset_response(row: Any) -> FamilyAssetResponse:
@@ -494,6 +508,13 @@ async def evaluate_permission(
     effect = _manager(server).evaluate_permission(
         family_id, user, **body.model_dump()
     )
+    from homemind.infra.metrics import inc as _hm_inc
+    if effect.value == "ALLOW":
+        _hm_inc("permission_allow_total")
+    elif effect.value == "DENY":
+        _hm_inc("permission_deny_total")
+    elif effect.value == "REQUIRE_CONFIRMATION":
+        _hm_inc("permission_require_confirmation_total")
     return FamilyPermissionDecision(effect=effect)
 
 
@@ -677,6 +698,16 @@ def evaluate_permission(
         action=body.action,
         space_id=body.space_id,
     )
+    # Record decision for stage 12 observability.
+    from homemind.infra.metrics import inc as _hm_inc
+    if decision.effect.value == "ALLOW":
+        _hm_inc("permission_allow_total")
+    elif decision.effect.value == "DENY":
+        _hm_inc("permission_deny_total")
+    elif decision.effect.value == "REQUIRE_CONFIRMATION":
+        _hm_inc("permission_require_confirmation_total")
+    if decision.reason == "force_confirmation":
+        _hm_inc("permission_force_confirmation_total")
     return PermissionDecisionResponse(
         effect=decision.effect,
         action=decision.action,
@@ -685,4 +716,141 @@ def evaluate_permission(
         space_id=decision.space_id,
         matched_permission_ids=list(decision.matched_permission_ids),
         reason=decision.reason,
+    )
+
+
+class FamilyInviteResponse(_RowModel):
+    id: str
+    family_id: str
+    role: str
+    display_name: str
+    created_by: int
+    created_at: int
+    expires_at: int
+    redeemed_at: int | None
+    redeemed_by: int | None
+
+
+class FamilyInviteCreateBody(BaseModel):
+    display_name: str = Field(min_length=1, max_length=100)
+    role: MemberRole = MemberRole.MEMBER
+    ttl_seconds: int = Field(
+        default=DEFAULT_INVITE_TTL_SECONDS, ge=60, le=30 * 24 * 3600,
+    )
+
+
+class FamilyInviteCreateResponse(BaseModel):
+    invite_id: str
+    token: str
+    expires_at: int
+
+
+class FamilyInviteRedeemBody(BaseModel):
+    token: str = Field(min_length=1, max_length=4096)
+
+
+class FamilyInviteRedeemResponse(BaseModel):
+    member_id: str
+    family_id: str
+    role: str
+    display_name: str
+
+
+@router.post(
+    "/{family_id}/invites",
+    response_model=FamilyInviteCreateResponse,
+    status_code=201,
+    summary="Mint a family invite token",
+    description=(
+        "Returns the plaintext token exactly once; only its hash is "
+        "stored. Hand the token to the new family member who redeems "
+        "it via ``POST /api/homemind/families/invites/redeem``."
+    ),
+)
+async def create_invite(
+    family_id: str,
+    body: FamilyInviteCreateBody,
+    server: Server,
+    user: CurrentUser,
+) -> FamilyInviteCreateResponse:
+    token = _invite_manager(server).create_invite(
+        family_id,
+        user,
+        display_name=body.display_name,
+        role=body.role,
+        ttl_seconds=body.ttl_seconds,
+    )
+    return FamilyInviteCreateResponse(
+        invite_id=token.invite_id,
+        token=token.token,
+        expires_at=token.expires_at,
+    )
+
+
+@router.get(
+    "/{family_id}/invites",
+    response_model=list[FamilyInviteResponse],
+    summary="List outstanding family invites",
+)
+async def list_invites(
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
+    include_redeemed: bool = Query(default=False),
+) -> list[FamilyInviteResponse]:
+    rows = _invite_manager(server).list_invites(
+        family_id, user, include_redeemed=include_redeemed,
+    )
+    return [
+        FamilyInviteResponse(
+            id=row.id,
+            family_id=row.family_id,
+            role=row.role,
+            display_name=row.display_name,
+            created_by=row.created_by,
+            created_at=row.created_at,
+            expires_at=row.expires_at,
+            redeemed_at=row.redeemed_at,
+            redeemed_by=row.redeemed_by,
+        )
+        for row in rows
+    ]
+
+
+@router.delete(
+    "/{family_id}/invites/{invite_id}",
+    status_code=204,
+    summary="Revoke an unredeemed family invite",
+)
+async def revoke_invite(
+    family_id: str,
+    invite_id: str,
+    server: Server,
+    user: CurrentUser,
+) -> Response:
+    _invite_manager(server).revoke_invite(family_id, invite_id, user)
+    return Response(status_code=204)
+
+
+@router.post(
+    "/invites/redeem",
+    response_model=FamilyInviteRedeemResponse,
+    status_code=201,
+    summary="Redeem an invite token and join the family",
+    description=(
+        "Authenticated endpoint — the redeemer's JWT identifies the "
+        "user account that the new member row is bound to."
+    ),
+)
+async def redeem_invite(
+    body: FamilyInviteRedeemBody,
+    server: Server,
+    user: CurrentUser,
+) -> FamilyInviteRedeemResponse:
+    result = _invite_manager(server).redeem(body.token, user)
+    return FamilyInviteRedeemResponse(
+        member_id=result.member_id,
+        family_id=result.family_id,
+        role=result.role,
+        display_name=result.display_name,
     )

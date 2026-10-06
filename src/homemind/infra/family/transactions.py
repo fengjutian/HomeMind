@@ -41,6 +41,7 @@ from homemind.infra.family.transaction_actions.registry import (
     FamilyActionRegistry,
     build_default_action_registry,
 )
+from homemind.infra.metrics import inc as _hm_inc
 from octop.infra.db.repos._base import now_ts
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.errors import ErrorCode, OctopError
@@ -143,6 +144,7 @@ class FamilyTransactionManager:
             TransactionStatus.FAILED_REQUIRES_REVIEW.value,
         }
         if transaction.status in terminal_statuses:
+            _hm_inc("transaction_idempotent_replay_total")
             self._audit(transaction, user.id, "IDEMPOTENT_REPLAY")
             return transaction, None  # type: ignore[return-value]
         # Build a preview so the row carries useful context for audit
@@ -190,6 +192,7 @@ class FamilyTransactionManager:
             self._audit(transaction, user.id, "WAITING_APPROVAL", approval="PENDING")
             return transaction, approval  # type: ignore[return-value]
         # Auto-allow: transition to EXECUTING then drive through VERIFYING.
+        _hm_inc("transaction_plan_total")
         return self._run_handler(transaction, user, payload), None
 
     def approve(
@@ -248,6 +251,7 @@ class FamilyTransactionManager:
             ) from exc
         self._audit(updated, user.id, "APPROVED", approval="APPROVED")
         payload = json.loads(updated.payload_json)
+        _hm_inc("transaction_approve_total")
         return self._run_handler(updated, requester, payload)
 
     def reject(
@@ -273,6 +277,7 @@ class FamilyTransactionManager:
                 "family transaction is not in WAITING_APPROVAL",
             )
         self._audit(transaction, user.id, "REJECTED", approval="REJECTED")
+        _hm_inc("transaction_reject_total")
         return transaction
 
     def cancel(
@@ -307,6 +312,7 @@ class FamilyTransactionManager:
                 "family transaction state changed during cancel",
             )
         self._audit(updated, user.id, "CANCELLED")
+        _hm_inc("transaction_cancel_total")
         return updated
 
     def retry(
@@ -335,6 +341,7 @@ class FamilyTransactionManager:
             )
         requester = self._user(transaction.requested_by)
         payload = json.loads(transaction.payload_json)
+        _hm_inc("transaction_retry_total")
         return self._run_handler(reset, requester, payload)
 
     def get_transaction(
@@ -560,6 +567,8 @@ class FamilyTransactionManager:
                 )
                 if flagged is not None:
                     affected.append(flagged)
+                    _hm_inc("transaction_failed_requires_review_total")
+            _hm_inc("transaction_recover_total")
         return affected
 
     # ------------------------------------------------------------ helpers

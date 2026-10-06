@@ -27,20 +27,15 @@ from typing import Any, Literal
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, ConfigDict, Field
 
-from homemind.infra.db.pool import DatabasePool
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
-from homemind.infra.family.assets import FamilyAssetManager
-from homemind.infra.family.context import FamilyContextManager
-from homemind.infra.family.device_runtime import DeviceRuntimeManager
-from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import (
     CandidateSpec,
     MemoryLifecycleManager,
+    is_sensitive,
 )
-from homemind.infra.family.tasks import FamilyTaskManager
-from homemind.infra.family.transactions import FamilyTransactionManager
 from homemind.tools.family import _build_managers
+from octop.infra.db.pool import DatabasePool
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +124,9 @@ class McpFamilyToolkit:
 
     def _managers(self, services: HomeMindServices) -> dict[str, Any]:
         """Construct the full manager graph used by the umbrella tools."""
-        return _build_managers(services)
+        from octop.infra.db.repos.users import UserRepo
+
+        return _build_managers(services, UserRepo(self._db))
 
     # --------------------------------------------------------------- family_query
 
@@ -137,7 +134,7 @@ class McpFamilyToolkit:
         services = self._services()
         managers = self._managers(services)
         family_manager = managers["family"]
-        user = _resolve_user(services.user_repo)
+        user = _resolve_user(self._user_repo())
         family_manager.require_access(payload.family_id, user)
         rows: list[Any] = []
         if payload.target == "members":
@@ -169,7 +166,7 @@ class McpFamilyToolkit:
     def context_resolve(self, payload: ContextResolveInput) -> dict[str, Any]:
         services = self._services()
         managers = self._managers(services)
-        user = _resolve_user(services.user_repo)
+        user = _resolve_user(self._user_repo())
         resolved = managers["context"].resolve(
             payload.family_id, user, payload.query,
         )
@@ -190,7 +187,7 @@ class McpFamilyToolkit:
         services = self._services()
         managers = self._managers(services)
         family_manager = managers["family"]
-        user = _resolve_user(services.user_repo)
+        user = _resolve_user(self._user_repo())
         family_manager.require_manager(payload.family_id, user)
         lifecycle = MemoryLifecycleManager(
             family_manager,
@@ -218,7 +215,7 @@ class McpFamilyToolkit:
         # call ``approve_candidate`` explicitly. Non-sensitive content
         # is auto-promoted through ``approve_candidate`` so the tool
         # returns a single committed memory in one MCP call.
-        if candidate.status == "PENDING" and getattr(candidate, "sensitive", False):
+        if is_sensitive(payload.content):
             return _envelope(
                 "memory_commit",
                 status="PENDING",
@@ -239,11 +236,11 @@ class McpFamilyToolkit:
     def transaction_plan(self, payload: TransactionPlanInput) -> dict[str, Any]:
         services = self._services()
         managers = self._managers(services)
-        user = _resolve_user(services.user_repo)
+        user = _resolve_user(self._user_repo())
         managers["family"].require_access(payload.family_id, user)
         transaction_manager = managers["transactions"]
         try:
-            transaction = transaction_manager.plan(
+            transaction, _approval = transaction_manager.plan(
                 payload.family_id,
                 user,
                 action=payload.action,
@@ -263,6 +260,12 @@ class McpFamilyToolkit:
             transaction_id=transaction.id,
             action=transaction.action,
         )
+
+    # ---------------------------------------------------------------- helpers
+
+    def _user_repo(self) -> Any:
+        from octop.infra.db.repos.users import UserRepo
+        return UserRepo(self._db)
 
 
 # ----------------------------------------------------------- wiring helpers

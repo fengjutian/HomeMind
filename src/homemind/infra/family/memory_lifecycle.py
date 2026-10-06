@@ -34,6 +34,7 @@ from homemind.infra.db.repos.memory_candidates import (
 )
 from homemind.infra.family.context import FamilyContextManager, MemoryType
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.metrics import inc as _hm_inc
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
 
@@ -130,6 +131,9 @@ class MemoryLifecycleManager:
             content_hash=content_hash(content),
             confidence_delta=spec.confidence,
         )
+        _hm_inc("memory_candidate_create_total")
+        if is_sensitive(content):
+            _hm_inc("memory_candidate_sensitive_flagged_total")
         return candidate
 
     def approve_candidate(
@@ -184,12 +188,14 @@ class MemoryLifecycleManager:
     ) -> MemoryCandidateRow:
         self.family.require_manager(family_id, reviewer)
         candidate = self._pending_candidate(family_id, candidate_id)
-        return self.candidates.decide(
+        updated = self.candidates.decide(
             candidate.id,
             status=CANDIDATE_STATUS_REJECTED,
             reviewer_id=reviewer.id,
             rejection_reason=reason,
         )  # type: ignore[return-value]
+        _hm_inc("memory_candidate_reject_total")
+        return updated
 
     # ---------------------------------------------------------------- search
 
@@ -268,6 +274,7 @@ class MemoryLifecycleManager:
                 content_hash=row.content_hash,
                 confidence_delta=row.confidence_delta,
             )
+        _hm_inc("memory_candidate_merge_total")
         return decided, updated_target  # type: ignore[return-value]
 
     # ----------------------------------------------------------- maintenance

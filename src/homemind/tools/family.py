@@ -16,6 +16,7 @@ from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.albums import FamilyAlbumManager, OrganizationStrategy
 from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.context import FamilyContextManager
+from homemind.infra.family.device_runtime import DeviceRuntimeManager
 from homemind.infra.family.filesystem import FamilyFilesystemManager
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.permissions import FamilyPermissionEvaluator
@@ -33,6 +34,64 @@ from octop.infra.db.pool import DatabasePool
 from octop.infra.db.repos.providers import ProviderRepo
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.users.identity import User
+
+
+def _build_managers(
+    services: HomeMindServices,
+    user_repo: UserRepo,
+) -> dict[str, Any]:
+    """Construct the full family manager graph used by both the legacy
+    string-returning tools and the new Pydantic-typed MCP family tools.
+    """
+    families = FamilyManager(services.family_repo)
+    permissions = FamilyPermissionEvaluator(services.family_repo)
+    context = FamilyContextManager(
+        families, services.family_context_repo, permission_evaluator=permissions,
+    )
+    assets = FamilyAssetManager(
+        services.family_repo,
+        services.family_asset_repo,
+        permission_evaluator=permissions,
+    )
+    albums = FamilyAlbumManager(families, assets, services.family_album_repo)
+    photos = PhotoIntelligenceManager(
+        families,
+        assets,
+        services.family_context_repo,
+        services.photo_intelligence_repo,
+    )
+    search = FamilySearchManager(families, context, assets, photos)
+    tasks = FamilyTaskManager(families, services.family_task_repo)
+    filesystem = FamilyFilesystemManager(
+        families,
+        services.family_asset_repo,
+        services.family_transaction_repo,
+        permission_evaluator=permissions,
+    )
+    transactions = FamilyTransactionManager(
+        families,
+        context,
+        tasks,
+        services.family_transaction_repo,
+        user_repo,
+        filesystem,
+        permission_evaluator=permissions,
+    )
+    devices = DeviceRuntimeManager(families, services.family_device_repo)
+    return {
+        "family": families,
+        "permissions": permissions,
+        "context": context,
+        "assets": assets,
+        "albums": albums,
+        "photos": photos,
+        "search": search,
+        "tasks": tasks,
+        "filesystem": filesystem,
+        "transactions": transactions,
+        "devices": devices,
+        "device_repo": services.family_device_repo,
+    }
 
 
 def _ok(value: Any) -> str:
@@ -583,10 +642,16 @@ def build_family_tools(
             "Find photos with a nearby perceptual hash.",
         ),
     ]
-    return [
+    legacy_tools = [
         StructuredTool.from_function(func=func, name=name, description=description)
         for name, func, description in specs
     ]
+    # Stage 11: append the four umbrella MCP-style tools so agents
+    # can pick between the granular string-returning helpers and the
+    # structured-input / structured-output MCP equivalents.
+    from homemind.tools.mcp_family_tools import wire_mcp_family_tools
+
+    return legacy_tools + wire_mcp_family_tools(db)
 
 
 def _transaction_result(transaction: Any, approval: Any | None) -> str:
