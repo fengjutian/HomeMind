@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from sqlite3 import IntegrityError
 from typing import Any
 
 from octop.infra.db.pool import DatabasePool
@@ -135,30 +136,39 @@ class FamilyTransactionRepo:
     ) -> FamilyTransactionRow:
         # Idempotency: if (family_id, idempotency_key) already maps to a
         # transaction, return the existing one instead of inserting a new
-        # row. SQLite/PG both enforce the partial unique index.
+        # row. SQLite/PG both enforce the partial unique index, so the
+        # INSERT may still raise ``IntegrityError`` when two concurrent
+        # ``plan()`` calls race past the SELECT — we catch that and
+        # return the surviving row.
         if idempotency_key:
             existing = self.find_by_idempotency_key(family_id, idempotency_key)
             if existing is not None:
                 return existing
         transaction_id, timestamp = new_ulid(), now_ts()
-        with self._db.transaction() as conn:
-            conn.execute(
-                "INSERT INTO homemind_family_transactions(transaction_id, family_id, "
-                "requested_by, action, payload_json, status, created_at, updated_at, "
-                "idempotency_key, preview_json) "
-                "VALUES (?, ?, ?, ?, ?, 'PLANNED', ?, ?, ?, ?)",
-                (
-                    transaction_id,
-                    family_id,
-                    requested_by,
-                    action,
-                    payload_json,
-                    timestamp,
-                    timestamp,
-                    idempotency_key,
-                    preview_json,
-                ),
-            )
+        try:
+            with self._db.transaction() as conn:
+                conn.execute(
+                    "INSERT INTO homemind_family_transactions(transaction_id, family_id, "
+                    "requested_by, action, payload_json, status, created_at, updated_at, "
+                    "idempotency_key, preview_json) "
+                    "VALUES (?, ?, ?, ?, ?, 'PLANNED', ?, ?, ?, ?)",
+                    (
+                        transaction_id,
+                        family_id,
+                        requested_by,
+                        action,
+                        payload_json,
+                        timestamp,
+                        timestamp,
+                        idempotency_key,
+                        preview_json,
+                    ),
+                )
+        except IntegrityError:
+            existing = self.find_by_idempotency_key(family_id, idempotency_key)
+            if existing is not None:
+                return existing
+            raise
         return self.get_transaction(transaction_id)  # type: ignore[return-value]
 
     def find_by_idempotency_key(
