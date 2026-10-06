@@ -45,12 +45,19 @@ export interface FamilyTask {
 export interface FamilyMemory {
   id: string;
   family_id: string;
+  subject_type: string;
+  subject_id: string | null;
   content: string;
   memory_type: string;
   importance: number;
+  confidence: number;
   visibility: string;
+  source_type: string;
+  source_id: string | null;
+  expires_at: number | null;
   status: string;
   created_at: number;
+  updated_at: number;
 }
 
 export interface FamilySearchResult {
@@ -95,6 +102,43 @@ export interface FamilyInviteRedeemResponse {
   family_id: string;
   role: string;
   display_name: string;
+}
+
+export interface FamilyDevice {
+  id: string;
+  family_id: string;
+  name: string;
+  device_type: string;
+  platform: string | null;
+  status: string;
+  address: string | null;
+  capabilities: string[];
+  last_seen: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface FamilyDevicePairingResponse {
+  code: string;
+  expires_at: number;
+  device_name: string;
+  device_type: string;
+}
+
+export interface FamilyDeviceCommand {
+  id: string;
+  device_id: string;
+  family_id: string;
+  capability: string;
+  payload: Record<string, unknown>;
+  requested_by: number;
+  transaction_id: string | null;
+  expires_at: number;
+  status: string;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  created_at: number;
+  updated_at: number;
 }
 
 export interface FamilyEvent {
@@ -326,6 +370,69 @@ export const homeMindFamilyApi = {
       `${root}/invites/redeem`,
       json(body),
     ),
+  listDevices: (familyId: string) =>
+    request<FamilyDevice[]>(`${root}/${familyId}/devices`),
+  getDevice: (familyId: string, deviceId: string) =>
+    request<FamilyDevice>(`${root}/${familyId}/devices/${deviceId}`),
+  createDevicePairing: (
+    familyId: string,
+    body: {
+      name: string;
+      device_type: string;
+      platform?: string;
+      capabilities?: string[];
+    },
+  ) =>
+    request<FamilyDevicePairingResponse>(
+      `${root}/${familyId}/devices`,
+      json(body),
+    ),
+  updateDevice: (
+    familyId: string,
+    deviceId: string,
+    body: {
+      name?: string;
+      platform?: string;
+      capabilities?: string[];
+    },
+  ) =>
+    request<FamilyDevice>(
+      `${root}/${familyId}/devices/${deviceId}`,
+      mutate("PATCH", body),
+    ),
+  deleteDevice: (familyId: string, deviceId: string) =>
+    request<void>(
+      `${root}/${familyId}/devices/${deviceId}`,
+      mutate("DELETE"),
+    ),
+  rotateDeviceToken: (familyId: string, deviceId: string) =>
+    request<{ token: string }>(
+      `${root}/${familyId}/devices/${deviceId}/rotate-token`,
+      { method: "POST" },
+    ),
+  revokeDeviceToken: (familyId: string, deviceId: string) =>
+    request<void>(
+      `${root}/${familyId}/devices/${deviceId}/revoke-token`,
+      { method: "POST" },
+    ),
+  listDeviceCommands: (familyId: string, deviceId: string) =>
+    request<FamilyDeviceCommand[]>(
+      `${root}/${familyId}/devices/${deviceId}/commands`,
+    ),
+  enqueueDeviceCommand: (
+    familyId: string,
+    deviceId: string,
+    body: {
+      capability: string;
+      payload?: Record<string, unknown>;
+      expires_in_seconds?: number;
+      transaction_id?: string;
+    },
+  ) =>
+    request<FamilyDeviceCommand>(
+      `${root}/${familyId}/devices/${deviceId}/commands`,
+      json(body),
+    ),
   listSpaces: (familyId: string) =>
     request<FamilySpace[]>(`${root}/${familyId}/spaces`),
   createSpace: (
@@ -538,8 +645,26 @@ export const homeMindFamilyApi = {
       end_at: number;
       location?: string;
       description?: string;
+      metadata?: Record<string, unknown>;
     },
   ) => request<FamilyEvent>(`${root}/${familyId}/events`, json(body)),
+  updateEvent: (
+    familyId: string,
+    eventId: string,
+    body: Partial<{
+      event_type: string;
+      title: string;
+      start_at: number;
+      end_at: number;
+      location: string | null;
+      description: string;
+      metadata: Record<string, unknown>;
+    }>,
+  ) =>
+    request<FamilyEvent>(
+      `${root}/${familyId}/events/${eventId}`,
+      mutate("PATCH", body),
+    ),
   deleteEvent: (familyId: string, eventId: string) =>
     request<void>(`${root}/${familyId}/events/${eventId}`, mutate("DELETE")),
   listMemories: (familyId: string, query = "") =>
@@ -548,18 +673,57 @@ export const homeMindFamilyApi = {
         query ? `?query=${encodeURIComponent(query)}` : ""
       }`,
     ),
-  createMemory: (familyId: string, content: string) =>
+  createMemory: (
+    familyId: string,
+    body: {
+      content: string;
+      subject_type?: "FAMILY" | "MEMBER" | "EVENT" | "ASSET";
+      subject_id?: string;
+      memory_type?: string;
+      importance?: number;
+      confidence?: number;
+      visibility?: "PUBLIC" | "FAMILY" | "PRIVATE" | "SENSITIVE";
+      source_type?: string;
+      expires_at?: number;
+    },
+  ) =>
     request<FamilyMemory>(
       `${root}/${familyId}/memories`,
       json({
         subject_type: "FAMILY",
-        content,
         memory_type: "FACT",
         importance: 0.5,
         confidence: 0.8,
         visibility: "FAMILY",
         source_type: "MANUAL",
+        ...body,
       }),
+    ),
+  updateMemory: (
+    familyId: string,
+    memoryId: string,
+    body: Partial<{
+      content: string;
+      memory_type: string;
+      importance: number;
+      confidence: number;
+      visibility: "PUBLIC" | "FAMILY" | "PRIVATE" | "SENSITIVE";
+      expires_at: number | null;
+      status: "ACTIVE" | "DISABLED" | "ARCHIVED";
+    }>,
+  ) =>
+    request<FamilyMemory>(
+      `${root}/${familyId}/memories/${memoryId}`,
+      mutate("PATCH", body),
+    ),
+  deleteMemory: (familyId: string, memoryId: string) =>
+    request<void>(
+      `${root}/${familyId}/memories/${memoryId}`,
+      mutate("DELETE"),
+    ),
+  searchMemoriesFts: (familyId: string, query: string, limit = 20) =>
+    request<FamilyMemory[]>(
+      `${root}/${familyId}/memories/search?q=${encodeURIComponent(query)}&limit=${limit}`,
     ),
   search: (familyId: string, query: string) =>
     request<FamilySearchResult[]>(

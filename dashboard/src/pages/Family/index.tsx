@@ -32,11 +32,15 @@ import { useServerTimezone } from "../../hooks/useServerTimezone";
 import PageShell from "../../layouts/PageShell";
 import { formatServerDateTime } from "../../utils/formatMessageTime";
 import AccessPanel from "./AccessPanel";
+import ActiveFamilySwitcher from "./ActiveFamilySwitcher";
 import AssetsPanel from "./AssetsPanel";
+import DevicesPanel from "./DevicesPanel";
+import EventsPanel from "./EventsPanel";
 import FamilyAssetPreview from "./FamilyAssetPreview";
 import FileManagerPanel from "./FileManagerPanel";
 import GovernancePanel from "./GovernancePanel";
 import InvitesPanel from "./InvitesPanel";
+import MemoryPanel from "./MemoryPanel";
 import PhotoIntelligencePanel from "./PhotoIntelligencePanel";
 import TaskPanel from "./TaskPanel";
 
@@ -58,6 +62,7 @@ const { Text, Title } = Typography;
 
 const MORE_TAB_KEYS = new Set([
   "memories",
+  "events",
   "assets",
   "access",
   "photos",
@@ -252,14 +257,9 @@ export default function FamilyPage() {
         subtitle={t("family.subtitle", "管理家庭成员、相册、任务与共同记忆")}
         actions={
           <Space>
-            <Select
-              value={familyId}
-              className={styles.familySelect}
-              options={families.map((family) => ({
-                value: family.id,
-                label: family.name,
-              }))}
-              onChange={setFamilyId}
+            <ActiveFamilySwitcher
+              families={families}
+              onChange={(next) => setFamilyId(next ?? "")}
             />
             <Button
               icon={<Settings size={16} />}
@@ -290,6 +290,10 @@ export default function FamilyPage() {
                     label: t("family.tabs.memories", "家庭记忆"),
                   },
                   {
+                    key: "events",
+                    label: t("family.tabs.events", "家庭事件"),
+                  },
+                  {
                     key: "assets",
                     label: t("family.tabs.assets", "家庭资产"),
                   },
@@ -313,6 +317,10 @@ export default function FamilyPage() {
                   {
                     key: "invites",
                     label: t("family.tabs.invites", "成员邀请"),
+                  },
+                  {
+                    key: "devices",
+                    label: t("family.tabs.devices", "设备"),
                   },
                   {
                     key: "search",
@@ -777,46 +785,20 @@ export default function FamilyPage() {
               key: "memories",
               label: t("family.tabs.memories", "家庭记忆"),
               children: (
-                <Card className={styles.panelCard}>
-                  <Form
-                    className={styles.quickForm}
-                    layout="inline"
-                    onFinish={async (values: { content: string }) => {
-                      await homeMindFamilyApi.createMemory(
-                        familyId,
-                        values.content,
-                      );
-                      await loadFamilyData();
-                    }}
-                  >
-                    <Form.Item
-                      name="content"
-                      rules={[{ required: true }]}
-                      style={{ flex: 1 }}
-                    >
-                      <Input
-                        placeholder={t(
-                          "family.memoryContent",
-                          "记录一件家庭共同记忆",
-                        )}
-                      />
-                    </Form.Item>
-                    <Button
-                      icon={<Plus size={16} />}
-                      type="primary"
-                      htmlType="submit"
-                    >
-                      {t("common.add", "添加")}
-                    </Button>
-                  </Form>
-                  {listCard(
-                    memories,
-                    (row) => row.content,
-                    (row) => (
-                      <Tag>{row.memory_type}</Tag>
-                    ),
-                  )}
-                </Card>
+                <MemoryPanel
+                  familyId={familyId}
+                  onMemoriesChanged={loadFamilyData}
+                />
+              ),
+            },
+            {
+              key: "events",
+              label: t("family.tabs.events", "家庭事件"),
+              children: (
+                <EventsPanel
+                  familyId={familyId}
+                  onEventsChanged={loadFamilyData}
+                />
               ),
             },
             {
@@ -855,6 +837,11 @@ export default function FamilyPage() {
               key: "invites",
               label: t("family.tabs.invites", "成员邀请"),
               children: <InvitesPanel familyId={familyId} />,
+            },
+            {
+              key: "devices",
+              label: t("family.tabs.devices", "设备"),
+              children: <DevicesPanel familyId={familyId} />,
             },
             {
               key: "search",
