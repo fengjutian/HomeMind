@@ -24,12 +24,14 @@ Security invariants enforced here (Stage 5):
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
 import posixpath
 import secrets
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
@@ -173,11 +175,18 @@ class DeviceRuntimeManager:
         *,
         command_lease_seconds: int = DEFAULT_COMMAND_LEASE_SECONDS,
         heartbeat_timeout_seconds: int = DEFAULT_HEARTBEAT_TIMEOUT_SECONDS,
+        on_command_result: Callable[[str, str, dict[str, Any]], None] | None = None,
     ) -> None:
         self.family = family
         self.repo = repo
         self.command_lease_seconds = command_lease_seconds
         self.heartbeat_timeout_seconds = heartbeat_timeout_seconds
+        # Called after a command reaches a terminal state, with
+        # ``(command_id, status, result)``. The transaction layer wires
+        # this to resume a transaction that parked in
+        # ``AWAITING_DEVICE``. Optional so the runtime keeps working with
+        # no transaction layer at all.
+        self.on_command_result = on_command_result
 
     # ---------------------------------------------------------------- pairing
 
@@ -622,6 +631,16 @@ class DeviceRuntimeManager:
                 if status == "SUCCEEDED"
                 else "device_command_failed_total",
             )
+            # A transaction that submitted this command is parked and
+            # waiting for exactly this call. Resuming it here rather than
+            # from a poller is what makes the approval-to-result path
+            # end-to-end.
+            if self.on_command_result is not None:
+                with contextlib.suppress(Exception):
+                    # A failure to resume must not lose the device's own
+                    # report: the command row is already terminal, and
+                    # the transaction sweep will escalate it.
+                    self.on_command_result(command.id, status, dict(result))
         return updated
 
     def acknowledge_command(

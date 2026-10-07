@@ -100,6 +100,31 @@ DEFAULT_ACTION_EFFECTS: tuple[tuple[str, PermissionEffect], ...] = (
     ("task.create", PermissionEffect.ALLOW),
     ("event.create", PermissionEffect.REQUIRE_CONFIRMATION),
     ("memory.create", PermissionEffect.REQUIRE_CONFIRMATION),
+    # Stage 3/6 additions. Without a default every one of these resolves
+    # to the catch-all DENY, which would make the whole action surface
+    # inert until a family hand-granted a row per action — the features
+    # would exist and never run.
+    #
+    # Low-risk edits are simply ALLOW; anything that touches a device,
+    # a shared calendar, a document library or a bulk of family photos
+    # asks for approval first. The risk of a specific command is still
+    # computed by its handler; this is only the floor.
+    ("task.update", PermissionEffect.ALLOW),
+    ("task.cancel", PermissionEffect.ALLOW),
+    ("event.update", PermissionEffect.ALLOW),
+    ("event.delete", PermissionEffect.REQUIRE_CONFIRMATION),
+    ("memory.update", PermissionEffect.REQUIRE_CONFIRMATION),
+    ("memory.deprecate", PermissionEffect.REQUIRE_CONFIRMATION),
+    ("album.create", PermissionEffect.ALLOW),
+    ("album.add_asset", PermissionEffect.ALLOW),
+    ("album.remove_asset", PermissionEffect.ALLOW),
+    ("calendar.create_event", PermissionEffect.REQUIRE_CONFIRMATION),
+    ("calendar.update_event", PermissionEffect.REQUIRE_CONFIRMATION),
+    ("calendar.cancel_event", PermissionEffect.REQUIRE_CONFIRMATION),
+    ("device.command", PermissionEffect.REQUIRE_CONFIRMATION),
+    ("knowledge.reindex", PermissionEffect.REQUIRE_CONFIRMATION),
+    ("asset.batch_move", PermissionEffect.REQUIRE_CONFIRMATION),
+    ("asset.move_to_trash", PermissionEffect.REQUIRE_CONFIRMATION),
     ("filesystem.copy", PermissionEffect.REQUIRE_CONFIRMATION),
     ("filesystem.move", PermissionEffect.REQUIRE_CONFIRMATION),
     ("filesystem.rename", PermissionEffect.REQUIRE_CONFIRMATION),

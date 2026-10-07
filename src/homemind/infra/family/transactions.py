@@ -52,6 +52,10 @@ class TransactionStatus(StrEnum):
     APPROVED = "APPROVED"
     EXECUTING = "EXECUTING"
     VERIFYING = "VERIFYING"
+    #: An approved ``device.command`` has been submitted and is waiting
+    #: for the device to report. Not a terminal state and not a failure:
+    #: the command may well have run, and only the device knows.
+    AWAITING_DEVICE = "AWAITING_DEVICE"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     FAILED_REQUIRES_REVIEW = "FAILED_REQUIRES_REVIEW"
@@ -72,6 +76,12 @@ RETRYABLE_FROM_STATUSES: frozenset[TransactionStatus] = frozenset(
 
 
 DEFAULT_LEASE_TTL_SECONDS = 60
+
+#: How long an approved device command may wait for its result before a
+#: human is asked to look. Long enough for a household tablet that is
+#: asleep overnight, short enough that a silently broken device does
+#: not leave a transaction pending forever.
+DEFAULT_DEVICE_AWAIT_TTL_SECONDS = 900
 DEFAULT_APPROVAL_TTL_SECONDS = 24 * 60 * 60
 
 
@@ -89,6 +99,7 @@ class FamilyTransactionManager:
         action_registry: FamilyActionRegistry | None = None,
         lease_ttl_seconds: int = DEFAULT_LEASE_TTL_SECONDS,
         approval_ttl_seconds: int = DEFAULT_APPROVAL_TTL_SECONDS,
+        device_await_ttl_seconds: int = DEFAULT_DEVICE_AWAIT_TTL_SECONDS,
     ) -> None:
         self.family = family
         self.context = context
@@ -105,6 +116,7 @@ class FamilyTransactionManager:
         )
         self.lease_ttl_seconds = lease_ttl_seconds
         self.approval_ttl_seconds = approval_ttl_seconds
+        self.device_await_ttl_seconds = device_await_ttl_seconds
 
     # --------------------------------------------------------------- planning
 
@@ -202,7 +214,8 @@ class FamilyTransactionManager:
             ttl = getattr(user, "_approval_ttl_override", None) or self.approval_ttl_seconds
             expires_at = self._now_epoch() + int(ttl)
             approval = self.repo.create_approval(
-                transaction, approval_expires_at=expires_at,
+                transaction,
+                approval_expires_at=expires_at,
             )
             self._audit(transaction, user.id, "WAITING_APPROVAL", approval="PENDING")
             return transaction, approval  # type: ignore[return-value]
@@ -295,9 +308,7 @@ class FamilyTransactionManager:
         _hm_inc("transaction_reject_total")
         return transaction
 
-    def cancel(
-        self, family_id: str, transaction_id: str, user: User
-    ) -> FamilyTransactionRow:
+    def cancel(self, family_id: str, transaction_id: str, user: User) -> FamilyTransactionRow:
         """Requester cancels their own pending transaction."""
         self.family.require_access(family_id, user)
         transaction = self._transaction(family_id, transaction_id)
@@ -330,9 +341,7 @@ class FamilyTransactionManager:
         _hm_inc("transaction_cancel_total")
         return updated
 
-    def retry(
-        self, family_id: str, transaction_id: str, user: User
-    ) -> FamilyTransactionRow:
+    def retry(self, family_id: str, transaction_id: str, user: User) -> FamilyTransactionRow:
         """Re-run a FAILED / FAILED_REQUIRES_REVIEW transaction."""
         self.family.require_manager(family_id, user)
         transaction = self._transaction(family_id, transaction_id)
@@ -462,6 +471,13 @@ class FamilyTransactionManager:
             )
             return failed or transaction
 
+        # A device command has been *submitted*, not completed. Park it
+        # and let the device's own result report finish the job: holding
+        # this lease open instead would expire it on a sleeping tablet
+        # and the recovery sweep would read that timeout as "never ran".
+        if getattr(handler, "awaits_device_result", False):
+            return self._park_for_device(transaction, requester, result, executed_at)
+
         # Verify step: handlers report their own observations.
         verifying = self.repo.transition(
             transaction.id,
@@ -484,7 +500,9 @@ class FamilyTransactionManager:
                 from_status=TransactionStatus.VERIFYING.value,
                 to_status=TransactionStatus.FAILED_REQUIRES_REVIEW,
                 verification_json=json.dumps(
-                    {"error": str(exc)}, ensure_ascii=False, sort_keys=True,
+                    {"error": str(exc)},
+                    ensure_ascii=False,
+                    sort_keys=True,
                 ),
                 verified_at=self._now_epoch(),
             )
@@ -498,16 +516,19 @@ class FamilyTransactionManager:
 
         # If the handler reports ``verified=False``, mark for review so
         # a human can reconcile instead of marking it silently COMPLETED.
-        verified_flag = bool(verification.get("verified", True)) if isinstance(
-            verification, dict
-        ) else True
+        verified_flag = (
+            bool(verification.get("verified", True)) if isinstance(verification, dict) else True
+        )
         if not verified_flag:
             needs_review = self.repo.transition(
                 transaction.id,
                 from_status=TransactionStatus.VERIFYING.value,
                 to_status=TransactionStatus.FAILED_REQUIRES_REVIEW,
                 verification_json=json.dumps(
-                    verification, ensure_ascii=False, sort_keys=True, default=str,
+                    verification,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    default=str,
                 ),
                 verified_at=self._now_epoch(),
             )
@@ -520,7 +541,10 @@ class FamilyTransactionManager:
             to_status=TransactionStatus.COMPLETED,
             result_json=json.dumps(result, ensure_ascii=False, sort_keys=True, default=str),
             verification_json=json.dumps(
-                verification, ensure_ascii=False, sort_keys=True, default=str,
+                verification,
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
             ),
             verified_at=self._now_epoch(),
         )
@@ -530,14 +554,160 @@ class FamilyTransactionManager:
                 "family transaction lost its VERIFYING state",
             )
         target = (
-            result.get("id")
-            or result.get("task_id")
-            or result.get("event_id")
-            or result.get("memory_id")
-            or result.get("destination_path")
-        ) if isinstance(result, dict) else None
+            (
+                result.get("id")
+                or result.get("task_id")
+                or result.get("event_id")
+                or result.get("memory_id")
+                or result.get("destination_path")
+            )
+            if isinstance(result, dict)
+            else None
+        )
         self._audit(completed, requester.id, "SUCCESS", target=target)
         return completed
+
+    def _park_for_device(
+        self,
+        transaction: FamilyTransactionRow,
+        requester: User,
+        result: dict[str, Any],
+        executed_at: int,
+    ) -> FamilyTransactionRow:
+        """Move an executed device command into ``AWAITING_DEVICE``.
+
+        The command id goes on the row so the device's result endpoint
+        can find this transaction without parsing payloads. The deadline
+        is what keeps a silent device from parking it forever.
+        """
+        command_id = str(result.get("command_id", "")) if isinstance(result, dict) else ""
+        if not command_id:
+            # A handler that declares it awaits a device must name the
+            # command; without one nothing could ever resume this row.
+            failed = self.repo.transition(
+                transaction.id,
+                from_status=TransactionStatus.EXECUTING.value,
+                to_status=TransactionStatus.FAILED,
+                error="handler awaits a device result but returned no command_id",
+                result_json=json.dumps(result, ensure_ascii=False, sort_keys=True, default=str),
+                lease_owner=None,
+                lease_expires_at=None,
+                executed_at=executed_at,
+            )
+            self._audit(failed or transaction, requester.id, "FAILED")
+            return failed or transaction
+
+        deadline = (
+            int(result.get("expires_at"))
+            if isinstance(result, dict) and result.get("expires_at") is not None
+            else executed_at + self.device_await_ttl_seconds
+        )
+        parked = self.repo.transition(
+            transaction.id,
+            from_status=TransactionStatus.EXECUTING.value,
+            to_status=TransactionStatus.AWAITING_DEVICE.value,
+            result_json=json.dumps(result, ensure_ascii=False, sort_keys=True, default=str),
+            lease_owner=None,
+            lease_expires_at=None,
+            executed_at=executed_at,
+            device_command_id=command_id,
+            device_deadline_at=deadline,
+        )
+        if parked is None:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "family transaction lost its EXECUTING state",
+            )
+        self._audit(parked, requester.id, "AWAITING_DEVICE", target=command_id)
+        _hm_inc("transaction_awaiting_device_total")
+        return parked
+
+    def resume_after_device_result(
+        self,
+        device_command_id: str,
+        *,
+        verification: dict[str, Any],
+        verified: bool,
+    ) -> FamilyTransactionRow | None:
+        """Close out a parked transaction when its device reports.
+
+        ``verified=False`` parks the transaction for human review rather
+        than failing it: the command ran but the world is not in the
+        state the handler expected, which is precisely the case a person
+        has to reconcile.
+        """
+        transaction = self.repo.get_by_device_command(device_command_id)
+        if transaction is None or transaction.status != TransactionStatus.AWAITING_DEVICE:
+            # A command queued without a transaction, or one already
+            # resumed. Reporting the result is still recorded by the
+            # device path; there is simply nothing here to close.
+            return None
+        target_status = (
+            TransactionStatus.COMPLETED.value
+            if verified
+            else TransactionStatus.FAILED_REQUIRES_REVIEW.value
+        )
+        updated = self.repo.transition(
+            transaction.id,
+            from_status=TransactionStatus.AWAITING_DEVICE.value,
+            to_status=target_status,
+            verification_json=json.dumps(
+                verification,
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            ),
+            verified_at=self._now_epoch(),
+        )
+        if updated is None:
+            # Another report (or a sweep) already moved it. Losing this
+            # race is fine — the row is no longer waiting.
+            return None
+        requester_id = transaction.requested_by
+        self._audit(
+            updated,
+            requester_id,
+            "SUCCESS" if verified else "NEEDS_REVIEW",
+            target=device_command_id,
+            detail={"verification": verification},
+        )
+        _hm_inc(
+            "transaction_device_completed_total"
+            if verified
+            else "transaction_device_needs_review_total"
+        )
+        return updated
+
+    def expire_overdue_device_awaits(self, *, now: int | None = None) -> int:
+        """Escalate device awaits whose deadline has passed.
+
+        Silence is not success and not failure. Escalating to
+        ``FAILED_REQUIRES_REVIEW`` says exactly what we know: we do not
+        know, and a person has to look.
+        """
+        overdue = self.repo.list_overdue_device_awaits(now=now)
+        escalated = 0
+        for transaction in overdue:
+            updated = self.repo.transition(
+                transaction.id,
+                from_status=TransactionStatus.AWAITING_DEVICE.value,
+                to_status=TransactionStatus.FAILED_REQUIRES_REVIEW.value,
+                error="the device did not report a result before the deadline",
+                verified_at=self._now_epoch(),
+            )
+            if updated is None:
+                continue
+            self._audit(
+                updated,
+                transaction.requested_by,
+                "NEEDS_REVIEW",
+                target=transaction.device_command_id,
+                detail={"reason": "device_result_timeout"},
+            )
+            escalated += 1
+        if escalated:
+            _hm_inc("transaction_device_await_expired_total", escalated)
+        return escalated
 
     def recover_running(self, *, now: int | None = None) -> list[FamilyTransactionRow]:
         """Boot-time recovery: scan EXECUTING/VERIFYING rows whose lease

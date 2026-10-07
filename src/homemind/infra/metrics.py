@@ -115,6 +115,12 @@ class HomeMindMetrics:
     family_task_claimed_total: int = 0
     family_task_recovered_total: int = 0
 
+    # device-backed transactions (Stage 6)
+    transaction_awaiting_device_total: int = 0
+    transaction_device_completed_total: int = 0
+    transaction_device_needs_review_total: int = 0
+    transaction_device_await_expired_total: int = 0
+
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def inc(self, name: str, n: int = 1) -> None:

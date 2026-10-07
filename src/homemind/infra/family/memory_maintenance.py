@@ -175,6 +175,15 @@ class MaintenanceRunner:
             except Exception:
                 logger.exception("MaintenanceRunner: notification expiry sweep crashed")
         if self._transaction_manager is not None:
+            # A device command whose device never reported is neither a
+            # success nor a failure. Escalating it says exactly that.
+            try:
+                totals["device_awaits_expired"] = (
+                    self._transaction_manager.expire_overdue_device_awaits()
+                )
+            except Exception:
+                logger.exception("MaintenanceRunner: device await sweep crashed")
+        if self._transaction_manager is not None:
             # Stale approvals must not linger forever: an expired
             # approval is cancelled so the dashboard stops showing a
             # pending badge nobody can act on.

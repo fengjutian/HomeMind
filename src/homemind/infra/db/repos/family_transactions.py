@@ -33,6 +33,11 @@ class FamilyTransactionRow:
     executed_at: int | None = None
     verified_at: int | None = None
     cancelled_at: int | None = None
+    # Set while an approved device command waits for its result report.
+    # NULL for every other action, which is what the partial unique index
+    # keys on.
+    device_command_id: str | None = None
+    device_deadline_at: int | None = None
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyTransactionRow:
@@ -69,6 +74,8 @@ class FamilyTransactionRow:
             executed_at=_int(row_dict.get("executed_at")),
             verified_at=_int(row_dict.get("verified_at")),
             cancelled_at=_int(row_dict.get("cancelled_at")),
+            device_command_id=row_dict.get("device_command_id"),
+            device_deadline_at=_int(row_dict.get("device_deadline_at")),
         )
 
         # ``from_row`` is shared by every read path. Defensive defaults
@@ -116,7 +123,9 @@ class FamilyApprovalRow:
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyApprovalRow:
-        expires = row.get("approval_expires_at") if hasattr(row, "get") else row["approval_expires_at"]  # type: ignore[index]
+        expires = (
+            row.get("approval_expires_at") if hasattr(row, "get") else row["approval_expires_at"]
+        )  # type: ignore[index]
         expires_int: int | None = None
         if expires is not None:
             try:
@@ -124,11 +133,14 @@ class FamilyApprovalRow:
             except (TypeError, ValueError):
                 expires_int = None
         return cls(
-            id=str(row["approval_id"]), transaction_id=str(row["transaction_id"]),
-            family_id=str(row["family_id"]), status=str(row["status"]),
+            id=str(row["approval_id"]),
+            transaction_id=str(row["transaction_id"]),
+            family_id=str(row["family_id"]),
+            status=str(row["status"]),
             requested_by=int(row["requested_by"]),
             decided_by=int(row["decided_by"]) if row["decided_by"] is not None else None,
-            reason=row["reason"], created_at=int(row["created_at"]),
+            reason=row["reason"],
+            created_at=int(row["created_at"]),
             decided_at=int(row["decided_at"]) if row["decided_at"] is not None else None,
             approval_expires_at=expires_int,
         )
@@ -150,10 +162,15 @@ class FamilyAuditRow:
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyAuditRow:
         return cls(
-            id=str(row["audit_id"]), family_id=str(row["family_id"]),
-            user_id=int(row["user_id"]), transaction_id=row["transaction_id"],
-            action=str(row["action"]), target=row["target"], result=str(row["result"]),
-            approval=row["approval"], detail_json=str(row["detail_json"]),
+            id=str(row["audit_id"]),
+            family_id=str(row["family_id"]),
+            user_id=int(row["user_id"]),
+            transaction_id=row["transaction_id"],
+            action=str(row["action"]),
+            target=row["target"],
+            result=str(row["result"]),
+            approval=row["approval"],
+            detail_json=str(row["detail_json"]),
             created_at=int(row["created_at"]),
         )
 
@@ -212,7 +229,9 @@ class FamilyTransactionRepo:
         return self.get_transaction(transaction_id)  # type: ignore[return-value]
 
     def find_by_idempotency_key(
-        self, family_id: str, idempotency_key: str,
+        self,
+        family_id: str,
+        idempotency_key: str,
     ) -> FamilyTransactionRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
@@ -246,7 +265,11 @@ class FamilyTransactionRepo:
         return FamilyTransactionRow.from_row(row) if row else None
 
     def set_transaction(
-        self, transaction_id: str, status: str, *, result_json: str | None = None,
+        self,
+        transaction_id: str,
+        status: str,
+        *,
+        result_json: str | None = None,
         error: str | None = None,
     ) -> FamilyTransactionRow:
         with self._db.transaction() as conn:
@@ -273,6 +296,8 @@ class FamilyTransactionRepo:
         verified_at: int | None = None,
         cancelled_at: int | None = None,
         increment_attempt: bool = False,
+        device_command_id: str | None = None,
+        device_deadline_at: int | None = None,
     ) -> FamilyTransactionRow | None:
         """Atomic compare-and-swap status transition.
 
@@ -291,25 +316,40 @@ class FamilyTransactionRepo:
         ]
         params: list[object] = [to_status, now_ts()]
         if result_json is not None:
-            sets.append("result_json = ?"); params.append(result_json)
+            sets.append("result_json = ?")
+            params.append(result_json)
         if verification_json is not None:
-            sets.append("verification_json = ?"); params.append(verification_json)
+            sets.append("verification_json = ?")
+            params.append(verification_json)
         if error is not None:
-            sets.append("error = ?"); params.append(error)
+            sets.append("error = ?")
+            params.append(error)
         if lease_owner is not None:
-            sets.append("lease_owner = ?"); params.append(lease_owner)
+            sets.append("lease_owner = ?")
+            params.append(lease_owner)
         if lease_expires_at is not None:
-            sets.append("lease_expires_at = ?"); params.append(lease_expires_at)
+            sets.append("lease_expires_at = ?")
+            params.append(lease_expires_at)
         if approved_at is not None:
-            sets.append("approved_at = ?"); params.append(approved_at)
+            sets.append("approved_at = ?")
+            params.append(approved_at)
         if executed_at is not None:
-            sets.append("executed_at = ?"); params.append(executed_at)
+            sets.append("executed_at = ?")
+            params.append(executed_at)
         if verified_at is not None:
-            sets.append("verified_at = ?"); params.append(verified_at)
+            sets.append("verified_at = ?")
+            params.append(verified_at)
         if cancelled_at is not None:
-            sets.append("cancelled_at = ?"); params.append(cancelled_at)
+            sets.append("cancelled_at = ?")
+            params.append(cancelled_at)
         if increment_attempt:
             sets.append("attempt_count = attempt_count + 1")
+        if device_command_id is not None:
+            sets.append("device_command_id = ?")
+            params.append(device_command_id)
+        if device_deadline_at is not None:
+            sets.append("device_deadline_at = ?")
+            params.append(device_deadline_at)
         params.append(transaction_id)
         with self._db.transaction() as conn:
             cursor = conn.execute(
@@ -320,6 +360,58 @@ class FamilyTransactionRepo:
             if cursor.rowcount != 1:
                 return None
         return self.get_transaction(transaction_id)
+
+    def get_by_device_command(self, device_command_id: str) -> FamilyTransactionRow | None:
+        """The transaction waiting on a device command, if any.
+
+        The device's result endpoint uses this to find what to resume.
+        Returning ``None`` for an unknown command is normal: a command
+        queued without a transaction (a direct API call) has none, and
+        the result still needs recording.
+        """
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM homemind_family_transactions WHERE device_command_id = ?",
+                (device_command_id,),
+            ).fetchone()
+        return FamilyTransactionRow.from_row(row) if row else None
+
+    def list_awaiting_device(self, *, limit: int = 100) -> list[FamilyTransactionRow]:
+        """Transactions parked on a device command.
+
+        Returns both halves; compare ``device_deadline_at`` against the
+        current time to tell "still waiting" from "overdue". A single
+        query beats two because a caller sweeping the overdue set does
+        not need the healthy rows at all.
+        """
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_transactions "
+                "WHERE status = 'AWAITING_DEVICE' AND device_command_id IS NOT NULL "
+                "ORDER BY device_deadline_at ASC, created_at ASC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return map_rows(rows, FamilyTransactionRow)
+
+    def list_overdue_device_awaits(
+        self, *, now: int | None = None, limit: int = 100
+    ) -> list[FamilyTransactionRow]:
+        """Parked transactions whose device never answered.
+
+        These become ``FAILED_REQUIRES_REVIEW``: the command may or may
+        not have run, and a human has to look. Treating the silence as
+        failure would be a lie; treating it as success would be worse.
+        """
+        timestamp = now_ts() if now is None else now
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_transactions "
+                "WHERE status = 'AWAITING_DEVICE' AND device_deadline_at IS NOT NULL "
+                "AND device_deadline_at <= ? "
+                "ORDER BY device_deadline_at ASC LIMIT ?",
+                (timestamp, limit),
+            ).fetchall()
+        return map_rows(rows, FamilyTransactionRow)
 
     def list_transactions(
         self,
@@ -344,7 +436,10 @@ class FamilyTransactionRepo:
         return map_rows(rows, FamilyTransactionRow)
 
     def list_running_with_expired_lease(
-        self, *, now: int, statuses: tuple[str, ...] = ("EXECUTING", "VERIFYING"),
+        self,
+        *,
+        now: int,
+        statuses: tuple[str, ...] = ("EXECUTING", "VERIFYING"),
     ) -> list[FamilyTransactionRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
@@ -374,7 +469,10 @@ class FamilyTransactionRepo:
         )
 
     def release_lease(
-        self, transaction_id: str, *, to_status: str,
+        self,
+        transaction_id: str,
+        *,
+        to_status: str,
     ) -> FamilyTransactionRow | None:
         return self.transition(
             transaction_id,
@@ -450,7 +548,8 @@ class FamilyTransactionRepo:
     def list_approvals(self, family_id: str, status: str | None) -> list[FamilyApprovalRow]:
         sql, params = "SELECT * FROM homemind_family_approvals WHERE family_id = ?", [family_id]
         if status is not None:
-            sql += " AND status = ?"; params.append(status)
+            sql += " AND status = ?"
+            params.append(status)
         sql += " ORDER BY created_at DESC"
         with self._db.connect() as conn:
             rows = conn.execute(sql, params).fetchall()
@@ -470,9 +569,16 @@ class FamilyTransactionRepo:
         return self.get_approval(approval_id)  # type: ignore[return-value]
 
     def add_audit(
-        self, family_id: str, user_id: int, action: str, result: str, *,
-        transaction_id: str | None, target: str | None = None,
-        approval: str | None = None, detail_json: str = "{}",
+        self,
+        family_id: str,
+        user_id: int,
+        action: str,
+        result: str,
+        *,
+        transaction_id: str | None,
+        target: str | None = None,
+        approval: str | None = None,
+        detail_json: str = "{}",
     ) -> FamilyAuditRow:
         audit_id = new_ulid()
         with self._db.transaction() as conn:
@@ -480,8 +586,18 @@ class FamilyTransactionRepo:
                 "INSERT INTO homemind_family_audit_log(audit_id, family_id, user_id, "
                 "transaction_id, action, target, result, approval, detail_json, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (audit_id, family_id, user_id, transaction_id, action, target, result,
-                 approval, detail_json, now_ts()),
+                (
+                    audit_id,
+                    family_id,
+                    user_id,
+                    transaction_id,
+                    action,
+                    target,
+                    result,
+                    approval,
+                    detail_json,
+                    now_ts(),
+                ),
             )
         return self.get_audit(audit_id)  # type: ignore[return-value]
 
@@ -496,6 +612,7 @@ class FamilyTransactionRepo:
         with self._db.connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM homemind_family_audit_log WHERE family_id = ? "
-                "ORDER BY created_at DESC, id DESC", (family_id,),
+                "ORDER BY created_at DESC, id DESC",
+                (family_id,),
             ).fetchall()
         return map_rows(rows, FamilyAuditRow)

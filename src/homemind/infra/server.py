@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from homemind.infra.active_family import ActiveFamilyResolver
@@ -16,6 +17,8 @@ from homemind.infra.family.asset_job_runner import AssetJobRunner
 from homemind.infra.family.asset_jobs import AssetJobManager
 from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.context import FamilyContextManager
+from homemind.infra.family.device_runtime import DeviceRuntimeManager
+from homemind.infra.family.device_transactions import resume_device_transaction
 from homemind.infra.family.events import FamilyEventBus
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
@@ -28,6 +31,7 @@ from homemind.infra.family.reminder_runner import ReminderRunner
 from homemind.infra.family.reminders import FamilyReminderManager
 from homemind.infra.family.scan_job import FamilyAssetScanJob
 from homemind.infra.family.search_indexer import FamilySearchIndexer
+from homemind.infra.family.task_agent import FamilyTaskAgentExecutor
 from homemind.infra.family.task_scheduler import FamilyTaskScheduler, TaskSchedulerRunner
 from homemind.infra.family.tasks import FamilyTaskManager
 from homemind.infra.family.thumbnails import ThumbnailService
@@ -210,6 +214,22 @@ class HomeMindServer(OctopServer):
             asset_repo=hm.family_asset_repo,
             search_indexer=self._search_indexer(hm),
         )
+        # One transaction manager and one device runtime for the whole
+        # process. They have to be the *same* instances: the runtime
+        # resumes a parked transaction through a callback the manager
+        # owns, and a second pair would park rows nothing ever resumes.
+        transactions = FamilyTransactionManager(
+            family_manager,
+            context_manager,
+            FamilyTaskManager(family_manager, hm.family_task_repo),
+            hm.family_transaction_repo,
+            self.services.user_repo,
+        )
+        device_runtime = DeviceRuntimeManager(
+            family_manager,
+            hm.family_device_repo,
+            on_command_result=resume_device_transaction(transactions, hm.family_device_repo),
+        )
         self._memory_maintenance = MaintenanceRunner(
             db=self.services.db,
             family_repo=hm.family_repo,
@@ -220,13 +240,8 @@ class HomeMindServer(OctopServer):
             family_manager=family_manager,
             context_manager=context_manager,
             notification_manager=notifications,
-            transaction_manager=FamilyTransactionManager(
-                family_manager,
-                context_manager,
-                FamilyTaskManager(family_manager, hm.family_task_repo),
-                hm.family_transaction_repo,
-                self.services.user_repo,
-            ),
+            transaction_manager=transactions,
+            device_manager=device_runtime,
         )
         await self._memory_maintenance.start()
 
@@ -328,21 +343,65 @@ class HomeMindServer(OctopServer):
         await self._reminder_runner.start()
 
     async def _start_task_scheduler(self) -> None:
-        """Start the family-task scheduler.
+        """Start the family-task scheduler with its agent executor.
 
-        Wired without an executor by default: a deployment that has no
-        agent bridge cannot run agent tasks, and the runner reports that
-        honestly as a task failure rather than silently claiming work it
-        will never finish.
+        Wired with the executor only when an agent manager exists. A
+        deployment without agents still runs the scheduler: a claimed
+        task fails loudly with "no executor is wired", which is
+        visible, rather than never being claimed at all, which is not.
         """
         if self.services is None:
             return
         run_migrations(self.services.db)
         hm = HomeMindServices.from_pool(self.services.db)
         self._task_scheduler_runner = TaskSchedulerRunner(
-            scheduler=FamilyTaskScheduler(FamilyManager(hm.family_repo), hm.family_task_repo)
+            scheduler=FamilyTaskScheduler(FamilyManager(hm.family_repo), hm.family_task_repo),
+            executor=self._task_executor(hm),
         )
         await self._task_scheduler_runner.start()
+
+    def _task_executor(self, services: HomeMindServices) -> Any:
+        """The agent executor, or ``None`` when no agent manager is wired.
+
+        Reached through ``app_runtime`` because the agent registry is a
+        boot-time singleton; before boot there is nothing to call.
+        """
+        if self.app_runtime is None:
+            return None
+        agent_manager = getattr(self.app_runtime, "agent_registry", None)
+        if agent_manager is None:
+            return None
+        families = FamilyManager(services.family_repo)
+        return FamilyTaskAgentExecutor(
+            families,
+            agent_manager,
+            family_context=self._task_family_context(families, services),
+        )
+
+    def _task_family_context(
+        self, families: FamilyManager, services: HomeMindServices
+    ) -> Callable[[Any], str]:
+        """Render the family background a scheduled agent is allowed to see.
+
+        The same manager the interactive path uses, so a scheduled task
+        cannot see more than the person who created it would.
+        """
+        manager = FamilyContextManager(
+            families,
+            services.family_context_repo,
+            asset_repo=services.family_asset_repo,
+            search_indexer=self._search_indexer(services),
+        )
+
+        def render(task: Any) -> str:
+            try:
+                resolved = manager.resolve(task.family_id, self._user_by_id(task.created_by))
+            except Exception:  # noqa: BLE001 — context is a nicety, not a gate
+                logger.warning("HomeMind: could not render family context for task %s", task.id)
+                return ""
+            return resolved.summary or ""
+
+        return render
 
     async def stop(self) -> None:
         try:

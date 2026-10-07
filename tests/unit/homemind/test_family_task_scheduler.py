@@ -430,7 +430,7 @@ def test_a_finished_recurring_task_produces_exactly_one_next_run(env) -> None:  
     env["scheduler"].finish(
         task.id, owner="worker", result=TaskExecutionResult(status=TASK_STATUS_DONE)
     )
-    children = env["repo"].list(env["family"].id, status=TASK_STATUS_SCHEDULED)
+    children = env["repo"].list_for_family(env["family"].id, status=TASK_STATUS_SCHEDULED)
     assert len(children) == 1
     assert children[0].parent_task_id == task.id
     assert children[0].recurrence_rule == "FREQ=DAILY"
@@ -443,7 +443,7 @@ def test_a_non_recurring_task_produces_no_next_run(env) -> None:  # noqa: ANN001
     env["scheduler"].finish(
         task.id, owner="worker", result=TaskExecutionResult(status=TASK_STATUS_DONE)
     )
-    assert env["repo"].list(env["family"].id, status=TASK_STATUS_SCHEDULED) == []
+    assert env["repo"].list_for_family(env["family"].id, status=TASK_STATUS_SCHEDULED) == []
 
 
 def test_natural_language_recurrence_is_refused(env) -> None:  # noqa: ANN001
