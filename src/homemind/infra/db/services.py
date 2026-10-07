@@ -14,6 +14,7 @@ from homemind.infra.db.repos.family_devices import FamilyDeviceRepo
 from homemind.infra.db.repos.family_invites import FamilyInviteRepo
 from homemind.infra.db.repos.family_tasks import FamilyTaskRepo
 from homemind.infra.db.repos.family_transactions import FamilyTransactionRepo
+from homemind.infra.db.repos.knowledge_documents import KnowledgeRepo
 from homemind.infra.db.repos.memory_candidates import (
     MemoryCandidateRepo,
     MemoryEvidenceRepo,
@@ -40,6 +41,7 @@ class HomeMindServices:
     asset_job_repo: AssetJobRepo
     search_index_repo: SearchIndexRepo
     face_candidate_repo: FaceCandidateRepo
+    knowledge_repo: KnowledgeRepo
 
     @classmethod
     def from_pool(cls, db: DatabasePool) -> HomeMindServices:
@@ -59,4 +61,5 @@ class HomeMindServices:
             asset_job_repo=AssetJobRepo(db),
             search_index_repo=SearchIndexRepo(db),
             face_candidate_repo=FaceCandidateRepo(db),
+            knowledge_repo=KnowledgeRepo(db),
         )

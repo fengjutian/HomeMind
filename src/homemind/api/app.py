@@ -16,6 +16,7 @@ from homemind.api.routers import (
     families,
     filesystem,
     homemind_mcp,
+    knowledge,
     memory_candidates,
     observability,
     photos,
@@ -115,6 +116,11 @@ def build_app(server: OctopServer) -> FastAPI:
         asset_jobs.router,
         prefix="/api/homemind/families",
         tags=["homemind-asset-jobs"],
+    )
+    app.include_router(
+        knowledge.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-knowledge"],
     )
 
     app.include_router(

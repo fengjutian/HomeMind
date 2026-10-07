@@ -251,6 +251,25 @@ export const homeMindPagesApi = {
   ) =>
     `${root}/${familyId}/assets/${assetId}/thumbnail?width=${width}&height=${height}`,
 
+  // --- face candidates (Stage C4) ---
+  listFaceCandidates: (
+    familyId: string,
+    status: "PENDING" | "CONFIRMED" | "REJECTED" = "PENDING",
+  ) =>
+    request<FaceCandidate[]>(
+      `${root}/${familyId}/face-candidates${qs({ status })}`,
+    ),
+  confirmFaceCandidate: (familyId: string, candidateId: string) =>
+    request<FaceCandidate>(
+      `${root}/${familyId}/face-candidates/${candidateId}/confirm`,
+      mutate("POST"),
+    ),
+  rejectFaceCandidate: (familyId: string, candidateId: string) =>
+    request<FaceCandidate>(
+      `${root}/${familyId}/face-candidates/${candidateId}/reject`,
+      mutate("POST"),
+    ),
+
   // --- memory candidates (Stage 3) ---
   listMemoryCandidates: (familyId: string, status?: string) =>
     request<MemoryCandidate[]>(

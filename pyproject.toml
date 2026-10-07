@@ -96,6 +96,9 @@ dev = [
 [project.scripts]
 octop = "octop.cli.main:cli"
 homemind = "homemind.cli:cli"
+# Separate entry point: a device runtime is installed on a NAS that has
+# no HomeMind server, no dashboard and no Octop config — only this agent.
+homemind-device-runtime = "homemind.device_runtime.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/octop", "src/homemind"]
