@@ -103,6 +103,12 @@ class HomeMindMetrics:
     invite_revoke_total: int = 0
     invite_rejected_total: int = 0  # expired / already-used / bad token
 
+    # calendar reminders (Stage 1)
+    reminder_scheduled_total: int = 0
+    reminder_delivered_total: int = 0
+    reminder_delivery_failed_total: int = 0
+    reminder_recovered_total: int = 0
+
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def inc(self, name: str, n: int = 1) -> None:

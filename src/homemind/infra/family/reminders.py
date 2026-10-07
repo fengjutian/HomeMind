@@ -1,4 +1,4 @@
-"""Family reminder domain service.
+﻿"""Family reminder domain service.
 
 Reminders are *derived* state. A calendar event that moves, a task whose
 due date changes, a device that goes offline -- each of those must
@@ -33,6 +33,7 @@ from homemind.infra.db.repos.family_reminders import (
     FamilyReminderRow,
 )
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from octop.infra.db.pool import DatabasePool
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
@@ -130,7 +131,7 @@ class FamilyReminderManager:
         """
         self.family.require_access(family_id, user)
         if target_type not in TARGET_TYPES:
-            raise OctopError(ErrorCode.INVALID_INPUT, "invalid reminder target type")
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "invalid reminder target type")
         member = self._resolve_recipient(family_id, recipient_member_id)
         fire_at = remind_at - lead_seconds
         dedupe = build_dedupe_key(
@@ -156,7 +157,7 @@ class FamilyReminderManager:
         for row in existing:
             if row.dedupe_key == dedupe:
                 return row
-        raise OctopError(ErrorCode.CONFLICT, "reminder already exists")
+        raise HomeMindError(HomeMindErrorCode.FAMILY_CONFLICT, "reminder already exists")
 
     def list_for_family(
         self,

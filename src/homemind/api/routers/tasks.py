@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.reminders import FamilyReminderManager
 from homemind.infra.family.tasks import FamilyTaskManager, TaskStatus
 from octop.api.deps import current_user, get_server
 from octop.infra.server import OctopServer
@@ -54,7 +55,14 @@ def _manager(server: OctopServer) -> FamilyTaskManager:
     assert server.services is not None
     run_migrations(server.services.db)
     services = HomeMindServices.from_pool(server.services.db)
-    return FamilyTaskManager(FamilyManager(services.family_repo), services.family_task_repo)
+    families = FamilyManager(services.family_repo)
+    return FamilyTaskManager(
+        families,
+        services.family_task_repo,
+        # A due-date change re-derives the task's reminder, so the family
+        # is not told about a deadline that has already moved.
+        reminders=FamilyReminderManager(families, services.family_reminder_repo),
+    )
 
 
 @router.post(

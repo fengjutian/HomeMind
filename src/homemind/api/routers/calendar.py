@@ -21,6 +21,7 @@ from homemind.infra.family.calendar import (
     FamilyCalendarManager,
 )
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.reminders import FamilyReminderManager
 from octop.api.deps import current_user, get_server
 from octop.infra.server import OctopServer
 from octop.infra.users.identity import User
@@ -159,10 +160,14 @@ def _manager(server: OctopServer) -> FamilyCalendarManager:
     assert server.services is not None
     run_migrations(server.services.db)
     services = HomeMindServices.from_pool(server.services.db)
+    families = FamilyManager(services.family_repo)
     return FamilyCalendarManager(
-        FamilyManager(services.family_repo),
+        families,
         services.family_calendar_repo,
         server_timezone=server_timezone(server),
+        # Wired so editing an event re-derives its reminders; without it
+        # a moved meeting would still remind the family about the old time.
+        reminders=FamilyReminderManager(families, services.family_reminder_repo),
     )
 
 
