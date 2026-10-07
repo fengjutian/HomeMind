@@ -7,7 +7,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
 from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 
@@ -20,6 +20,7 @@ from homemind.infra.db.repos.photo_intelligence import (
 )
 from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.privacy import DataCategory, ExternalOperation
 from octop.infra.users.identity import User
 
 
@@ -93,11 +94,81 @@ class PhotoIntelligenceManager:
         assets: FamilyAssetManager,
         context: FamilyContextRepo,
         repo: PhotoIntelligenceRepo,
+        privacy_guard: Any | None = None,
     ) -> None:
         self.family = family
         self.assets = assets
         self.context = context
         self.repo = repo
+        # Optional external-processing boundary. Every outbound
+        # provider call below goes through it; when it is absent (tests,
+        # a plain Octop deployment) the calls still work but nothing
+        # enforces the family's privacy settings.
+        self.privacy_guard = privacy_guard
+
+    def _authorize_external(
+        self,
+        family_id: str,
+        user: User,
+        *,
+        operation: Any,
+        provider_id: str,
+        data_categories: frozenset[str],
+        asset_id: str,
+        model: str = "",
+    ) -> None:
+        """Ask the privacy guard whether this call may leave the house.
+
+        Raises ``HomeMindError`` when it may not. A missing guard is a
+        no-op so an unconfigured install keeps working.
+        """
+
+        if self.privacy_guard is None:
+            return
+        decision = self.privacy_guard.authorize_external_call(
+            family_id,
+            user,
+            operation=operation,
+            provider_id=provider_id,
+            data_categories=data_categories,
+            asset_id=asset_id,
+            model=model,
+        )
+        decision.require()
+
+    def _audit_outbound(
+        self,
+        family_id: str,
+        user: User,
+        *,
+        asset_id: str,
+        vision: VisionProvider | None,
+        embedding: EmbeddingProvider | None,
+        geocoder: ReverseGeocodingProvider | None,
+    ) -> None:
+        """Record that data actually left the house, and what kind.
+
+        Only identifiers and category names are written — never the
+        payload, never the file path, never a credential.
+        """
+        if self.privacy_guard is None:
+            return
+        for operation, provider, categories in (
+            (ExternalOperation.VISION, vision, frozenset({DataCategory.PHOTO.value})),
+            (ExternalOperation.EMBEDDING, embedding, frozenset({DataCategory.PHOTO.value})),
+            (ExternalOperation.GEOCODING, geocoder, frozenset({DataCategory.GPS.value})),
+        ):
+            if provider is None:
+                continue
+            self.privacy_guard.audit_call(
+                family_id,
+                user,
+                operation=operation,
+                provider_id=provider.name,
+                asset_id=asset_id,
+                data_categories=categories,
+                result={"ok": True},
+            )
 
     def analyze(
         self,
@@ -114,6 +185,37 @@ class PhotoIntelligenceManager:
         if asset.asset_type != "PHOTO":
             raise ValueError("photo intelligence requires a photo asset")
         path = self._local_path(asset.uri)
+
+        # Privacy gate *before* any provider is touched, not after.
+        if vision is not None:
+            self._authorize_external(
+                family_id, user,
+                operation=ExternalOperation.VISION,
+                provider_id=vision.name,
+                data_categories=frozenset({DataCategory.PHOTO.value}),
+                asset_id=asset_id,
+            )
+        if embedding is not None:
+            self._authorize_external(
+                family_id, user,
+                operation=ExternalOperation.EMBEDDING,
+                provider_id=embedding.name,
+                data_categories=frozenset({DataCategory.PHOTO.value}),
+                asset_id=asset_id,
+            )
+        if face_recognition is not None:
+            # Face data is biometric: it needs the family's explicit
+            # sensitive opt-in on top of the ordinary gates.
+            self._authorize_external(
+                family_id, user,
+                operation=ExternalOperation.VISION,
+                provider_id=face_recognition.name,
+                data_categories=frozenset(
+                    {DataCategory.PHOTO.value, DataCategory.FACE.value}
+                ),
+                asset_id=asset_id,
+            )
+
         vision_result = vision.analyze(path) if vision else VisionResult("", [], [], [])
         if face_recognition is not None:
             self.family.require_manager(family_id, user)
@@ -135,10 +237,24 @@ class PhotoIntelligenceManager:
             and metadata.latitude is not None
             and metadata.longitude is not None
         ):
+            # GPS leaves the house here, so it is gated like any other
+            # outbound call rather than being assumed safe because it
+            # is "just" a coordinate.
+            self._authorize_external(
+                family_id, user,
+                operation=ExternalOperation.GEOCODING,
+                provider_id=geocoder.name,
+                data_categories=frozenset({DataCategory.GPS.value}),
+                asset_id=asset_id,
+            )
             location_name = geocoder.reverse(metadata.latitude, metadata.longitude)
         vector = [float(value) for value in embedding.embed_image(path)] if embedding else None
         if vector == []:
             raise ValueError("photo embedding cannot be empty")
+        self._audit_outbound(
+            family_id, user, asset_id=asset_id,
+            vision=vision, embedding=embedding, geocoder=geocoder,
+        )
         row = self.repo.upsert(
             asset_id=asset_id,
             family_id=family_id,

@@ -27,6 +27,7 @@ from homemind.infra.family.photo_providers import (
     OpenAICompatibleVisionProvider,
     require_provider,
 )
+from homemind.infra.family.privacy import ExternalProcessingGuard
 from homemind.infra.family.search import FamilySearchManager, SearchKind
 from homemind.infra.family.search_indexer import FamilySearchIndexer
 from homemind.infra.family.tasks import FamilyTaskManager, TaskStatus
@@ -74,6 +75,7 @@ def _build_managers(
         assets,
         services.family_context_repo,
         services.photo_intelligence_repo,
+        privacy_guard=ExternalProcessingGuard(services),
     )
     search = FamilySearchManager(families, context, assets, photos)
     tasks = FamilyTaskManager(families, services.family_task_repo)

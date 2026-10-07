@@ -21,6 +21,7 @@ from homemind.infra.family.photo_providers import (
     OpenAICompatibleVisionProvider,
     require_provider,
 )
+from homemind.infra.family.privacy import ExternalProcessingGuard
 from octop.api.deps import current_user, get_server
 from octop.infra.server import OctopServer
 from octop.infra.users.identity import User
@@ -90,6 +91,10 @@ def _manager(server: OctopServer) -> PhotoIntelligenceManager:
         assets,
         services.family_context_repo,
         services.photo_intelligence_repo,
+        # Every outbound vision / embedding / geocoding call is gated
+        # by this guard, so the family's privacy settings are actually
+        # enforced rather than merely stored.
+        privacy_guard=ExternalProcessingGuard(services),
     )
 
 
