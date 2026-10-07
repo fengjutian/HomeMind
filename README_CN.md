@@ -555,6 +555,30 @@ cd dashboard && npx tsc -b
 
 单独执行：`make test`、`make lint`、`make typecheck`、`make format`。
 
+### 从源码运行桌面端
+
+桌面端开发需要 Go 1.25+ 和 Wails v3 `v3.0.0-beta.13`：
+
+```powershell
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.13
+```
+
+先在仓库根目录启动后端，再从第二个 PowerShell 启动桌面外壳：
+
+```powershell
+# 终端一
+uv run --frozen homemind run
+```
+
+```powershell
+# 终端二
+cd desktop\src
+$env:OCTOP_DESKTOP_URL = "http://127.0.0.1:8088"
+wails3 dev
+```
+
+必须在同一终端中设置 `OCTOP_DESKTOP_URL` 并执行 `wails3 dev`。后端已经可访问时，桌面窗口通常数秒内即可就绪。桌面发行版内置便携运行时。构建细节见 [desktop/README.md](desktop/README.md)。
+
 
 ## 🔒 安全与隐私
 
@@ -563,6 +587,20 @@ cd dashboard && npx tsc -b
 - **敏感信息脱敏与工具审批**：离开工作区前自动脱敏敏感数据；高风险工具或 Shell 命令需依据护栏规则显式审批。
 - **工具护栏**：可在 `~/.octop/security/tool_guard/` 编辑 Shell 命令规则。
 - **无厂商锁定**：可自由切换 LLM 供应商、存储后端与 IM 通道。
+
+## 🧰 故障排查
+
+### `uv` 无法下载依赖
+
+先用 `uv sync --frozen` 重试。如果锁文件中的依赖源不可访问，可临时切换镜像并执行 `uv sync`；安装完成后使用 `uv run --no-sync homemind run` 启动。
+
+### 桌面端一直显示“Checking the runtime”
+
+先确认 `http://127.0.0.1:8088` 可以访问，再在同一终端设置 `OCTOP_DESKTOP_URL` 并运行 `wails3 dev`。如果日志出现 `/api/homemind/families//events`，说明桌面端已经连上后端，但尚未选择当前家庭；请在“家庭中心”创建或选择家庭。
+
+### PowerShell 无法执行 Make
+
+仓库 Makefile 使用 `/bin/bash`。请改用 Git Bash 或 WSL，或者直接在 PowerShell 中执行本文列出的 `uv` 与 `npm` 命令。
 
 ## 🤝 参与贡献
 

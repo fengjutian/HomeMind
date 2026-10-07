@@ -505,6 +505,43 @@ tests/         unit/ + integration/
 
 **Prerequisites:** Python 3.12+, Node 18+, [uv](https://docs.astral.sh/uv/)
 
+### Windows PowerShell source startup
+
+From the repository root:
+
+```powershell
+uv sync --frozen
+cd dashboard
+npm ci
+cd ..
+uv run --frozen octop init
+```
+
+Start the backend and frontend in separate terminals:
+
+```powershell
+# Terminal 1: backend (http://127.0.0.1:8088)
+uv run --frozen homemind run
+```
+
+```powershell
+# Terminal 2: frontend (http://127.0.0.1:5173)
+cd dashboard
+npm run dev
+```
+
+If PyPI access times out, temporarily select a reachable mirror:
+
+```powershell
+$env:UV_DEFAULT_INDEX = "https://pypi.tuna.tsinghua.edu.cn/simple"
+uv sync
+uv run --no-sync homemind run
+```
+
+Prefer `--frozen` so `uv` honors `uv.lock`. Use `--no-sync` only after all dependencies are installed.
+
+### Make targets
+
 ```bash
 # Backend
 make install          # pip install -e ".[dev]"
@@ -518,6 +555,30 @@ cd dashboard && npx tsc -b
 
 Individual targets: `make test`, `make lint`, `make typecheck`, `make format`.
 
+### Desktop shell from source
+
+Desktop development requires Go 1.25+ and Wails v3 `v3.0.0-beta.13`:
+
+```powershell
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.13
+```
+
+Start the backend from the repository root, then launch the desktop shell from a second PowerShell window:
+
+```powershell
+# Terminal 1
+uv run --frozen homemind run
+```
+
+```powershell
+# Terminal 2
+cd desktop\src
+$env:OCTOP_DESKTOP_URL = "http://127.0.0.1:8088"
+wails3 dev
+```
+
+Set `OCTOP_DESKTOP_URL` and run `wails3 dev` in the same terminal. When the backend is available, the desktop normally becomes ready within seconds. Packaged desktop releases include their own portable runtime. See [desktop/README.md](desktop/README.md) for build details.
+
 ## 🔒 Security & privacy
 
 - **Local-first**: Config, chats, workspaces, and credentials live under `~/.octop/` on your machine.
@@ -525,6 +586,20 @@ Individual targets: `make test`, `make lint`, `make typecheck`, `make format`.
 - **PII redaction & tool approval**: sensitive data is redacted before it leaves the workspace, and risky tools or shell commands require explicit approval under the guardrail rules.
 - **Tool guardrails**: User-editable shell command rules under `~/.octop/security/tool_guard/`.
 - **No vendor lock-in**: Swap LLM providers, storage backends, and channels without rewriting agents.
+
+## 🧰 Troubleshooting
+
+### `uv` cannot download a dependency
+
+Retry with `uv sync --frozen`. If the locked index is unavailable, temporarily select another index, run `uv sync`, and start with `uv run --no-sync homemind run` after installation completes.
+
+### The desktop stays on “Checking the runtime”
+
+Verify that `http://127.0.0.1:8088` is reachable, then set `OCTOP_DESKTOP_URL` and run `wails3 dev` in the same terminal. A request such as `/api/homemind/families//events` means the desktop is connected but no active family is selected; create or select one in Family Center.
+
+### Make is unavailable in PowerShell
+
+The Makefile uses `/bin/bash`. Use Git Bash or WSL, or run the documented `uv` and `npm` commands directly in PowerShell.
 
 ## 🤝 Contributing
 
