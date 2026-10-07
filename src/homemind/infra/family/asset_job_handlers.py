@@ -27,6 +27,7 @@ from urllib.request import url2pathname
 from homemind.infra.db.repos.asset_jobs import (
     JOB_TYPE_EMBEDDING,
     JOB_TYPE_FACE_MATCH,
+    JOB_TYPE_KNOWLEDGE_INDEX,
     JOB_TYPE_METADATA,
     JOB_TYPE_REINDEX,
     JOB_TYPE_SCAN,
@@ -173,6 +174,55 @@ def make_reindex_item_handler(
         if asset.family_id != family_id:
             raise ValueError("asset does not belong to this family")
         search_indexer.index_asset(family_id, asset)  # type: ignore[attr-defined]
+
+    return handle
+
+
+def make_knowledge_index_item_handler(
+    *,
+    asset_repo: FamilyAssetRepo,
+    knowledge: object,
+    ocr_provider: object | None,
+    privacy_guard: object | None,
+    user: User,
+    family_id: str,
+) -> object:
+    """Handler for ``KNOWLEDGE_INDEX``: parse one document end to end.
+
+    Item granularity is what makes a long library workable: a 500-file
+    re-index retries the three files that failed rather than all five
+    hundred. The family id is threaded into every call so a stale job
+    cannot index another household's document.
+    """
+
+    def handle(item: AssetJobItemRow) -> None:
+        if not item.asset_id:
+            raise ValueError("knowledge index item is not bound to an asset")
+        asset = asset_repo.get(item.asset_id)
+        if asset is None:
+            # Deleted after queueing. Dropping its document is the
+            # correct outcome, not a failure — a removed photo must
+            # stop answering queries.
+            forget = getattr(knowledge, "forget_asset", None)
+            if callable(forget):
+                forget(family_id, item.asset_id)
+            return
+        if asset.family_id != family_id:
+            raise ValueError("asset does not belong to this family")
+        document = knowledge.index_asset(  # type: ignore[attr-defined]
+            family_id,
+            item.asset_id,
+            user,
+            ocr_provider=ocr_provider,
+            privacy_guard=privacy_guard,
+        )
+        # A file this build cannot read is a recorded outcome, not a
+        # crash: the manager returns UNSUPPORTED/FAILED instead of
+        # raising precisely so one unreadable file does not look like
+        # an outage.
+        status = getattr(document, "status", "")
+        if status == "FAILED":
+            raise ValueError(f"indexing failed: {getattr(document, 'error', '') or 'unknown'}")
 
     return handle
 
@@ -360,6 +410,9 @@ def build_handler(
     provider_repo: Any | None = None,
     face_manager: Any | None = None,
     family_manager: Any | None = None,
+    knowledge: Any | None = None,
+    ocr_provider: Any | None = None,
+    privacy_guard: Any | None = None,
     user: User | None = None,
     family_id: str,
     created_by_user_id: int,
@@ -374,6 +427,19 @@ def build_handler(
     if job.job_type in {JOB_TYPE_VISION, JOB_TYPE_EMBEDDING} and user is None:
         raise NotImplementedError(
             f"{job.job_type} job requires an acting user",
+        )
+    if job.job_type == JOB_TYPE_KNOWLEDGE_INDEX:
+        if knowledge is None:
+            raise NotImplementedError("KNOWLEDGE_INDEX job requires a knowledge manager")
+        if user is None:
+            raise NotImplementedError("KNOWLEDGE_INDEX job requires an acting user")
+        return make_knowledge_index_item_handler(
+            asset_repo=asset_repo,
+            knowledge=knowledge,
+            ocr_provider=ocr_provider,
+            privacy_guard=privacy_guard,
+            user=user,
+            family_id=family_id,
         )
     if job.job_type == JOB_TYPE_SCAN:
         return make_scan_item_handler(
@@ -404,6 +470,7 @@ def build_handler(
         JOB_TYPE_VISION,
         JOB_TYPE_EMBEDDING,
         JOB_TYPE_FACE_MATCH,
+        JOB_TYPE_KNOWLEDGE_INDEX,
     }:
         raise NotImplementedError(f"{job.job_type} job requires an acting user")
     if job.job_type == JOB_TYPE_FACE_MATCH:

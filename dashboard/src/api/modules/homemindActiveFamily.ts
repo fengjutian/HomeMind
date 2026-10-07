@@ -1,6 +1,6 @@
 import { request } from "../request";
 
-const root = "/api/homemind/me/active-family";
+const root = "/homemind/me/active-family";
 
 export interface ActiveFamilyResponse {
   family_id: string | null;

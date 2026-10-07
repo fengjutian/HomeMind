@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -20,10 +21,12 @@ from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.device_runtime import DeviceRuntimeManager
 from homemind.infra.family.device_transactions import resume_device_transaction
 from homemind.infra.family.events import FamilyEventBus
+from homemind.infra.family.knowledge import KnowledgeManager
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
 from homemind.infra.family.memory_maintenance import MaintenanceRunner
 from homemind.infra.family.notifications import NotificationManager
+from homemind.infra.family.ocr import build_default_ocr_provider
 from homemind.infra.family.permissions import FamilyPermissionEvaluator
 from homemind.infra.family.photo_intelligence import PhotoIntelligenceManager
 from homemind.infra.family.privacy import ExternalProcessingGuard
@@ -38,6 +41,8 @@ from homemind.infra.family.thumbnails import ThumbnailService
 from homemind.infra.family.transactions import FamilyTransactionManager
 from homemind.tools.family import build_family_tools
 from octop.infra.server import OctopServer
+
+logger = logging.getLogger(__name__)
 
 
 class HomeMindServer(OctopServer):
@@ -275,6 +280,7 @@ class HomeMindServer(OctopServer):
         hm = HomeMindServices.from_pool(self.services.db)
         family_manager = FamilyManager(hm.family_repo)
         search_indexer = self._search_indexer(hm)
+        privacy_guard = ExternalProcessingGuard(hm)
         photo_intelligence = PhotoIntelligenceManager(
             family_manager,
             FamilyAssetManager(
@@ -288,7 +294,7 @@ class HomeMindServer(OctopServer):
             # through this guard, so the family's privacy settings are
             # enforced on the background path too — not only in the
             # request handlers.
-            privacy_guard=ExternalProcessingGuard(hm),
+            privacy_guard=privacy_guard,
             # Face matches become reviewable candidates, never labels.
             candidates=hm.face_candidate_repo,
         )
@@ -317,6 +323,18 @@ class HomeMindServer(OctopServer):
             photo_intelligence=photo_intelligence,
             face_manager=photo_intelligence,
             provider_repo=self.services.provider_repo,
+            # Document indexing runs here rather than inside an HTTP
+            # request: OCR plus chunking plus embedding is minutes of
+            # work for one scanned contract.
+            knowledge=KnowledgeManager(
+                family_manager,
+                FamilyAssetManager(hm.family_repo, hm.family_asset_repo),
+                hm.knowledge_repo,
+            ),
+            ocr_provider=build_default_ocr_provider(),
+            # Every outbound recognition call passes the guard, so the
+            # family's privacy settings bind on the background path too.
+            privacy_guard=privacy_guard,
             user_factory=self._user_by_id,
             event_bus=lambda: self._family_event_bus,
         )

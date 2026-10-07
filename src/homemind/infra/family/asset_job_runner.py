@@ -51,6 +51,9 @@ class AssetJobRunner:
         search_indexer: Any | None = None,
         photo_intelligence: Any | None = None,
         face_manager: Any | None = None,
+        knowledge: Any | None = None,
+        ocr_provider: Any | None = None,
+        privacy_guard: Any | None = None,
         provider_repo: Any | None = None,
         user_factory: Callable[[int], Any] | None = None,
         poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
@@ -65,6 +68,9 @@ class AssetJobRunner:
         self._search_indexer = search_indexer
         self._photo_intelligence = photo_intelligence
         self._face_manager = face_manager
+        self._knowledge = knowledge
+        self._ocr_provider = ocr_provider
+        self._privacy_guard = privacy_guard
         self._provider_repo = provider_repo
         # A job runs as a user for permission purposes; a worker has no
         # session, so the runner asks for one by id.
@@ -148,6 +154,9 @@ class AssetJobRunner:
                 photo_intelligence=self._photo_intelligence,
                 face_manager=self._face_manager,
                 provider_repo=self._provider_repo,
+                knowledge=self._knowledge,
+                ocr_provider=self._ocr_provider,
+                privacy_guard=self._privacy_guard,
                 family_manager=self._family_manager,
                 user=self._resolve_user(int(family.owner_user_id)),
                 family_id=job.family_id,

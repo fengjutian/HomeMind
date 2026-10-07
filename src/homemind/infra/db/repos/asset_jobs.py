@@ -25,6 +25,11 @@ JOB_TYPE_VISION = "VISION"
 JOB_TYPE_EMBEDDING = "EMBEDDING"
 JOB_TYPE_FACE_MATCH = "FACE_MATCH"
 JOB_TYPE_REINDEX = "REINDEX"
+#: Parse and embed one registered document. Kept separate from the
+#: SEARCH ``REINDEX`` above: that one rebuilds the unified search row,
+#: this one runs OCR, chunking and embeddings for a file, which is
+#: minutes of work and must not block an HTTP request.
+JOB_TYPE_KNOWLEDGE_INDEX = "KNOWLEDGE_INDEX"
 
 JOB_TYPES: frozenset[str] = frozenset(
     {
@@ -35,6 +40,7 @@ JOB_TYPES: frozenset[str] = frozenset(
         JOB_TYPE_EMBEDDING,
         JOB_TYPE_FACE_MATCH,
         JOB_TYPE_REINDEX,
+        JOB_TYPE_KNOWLEDGE_INDEX,
     }
 )
 
@@ -538,6 +544,7 @@ __all__ = [
     "JOB_TYPES",
     "JOB_TYPE_EMBEDDING",
     "JOB_TYPE_FACE_MATCH",
+    "JOB_TYPE_KNOWLEDGE_INDEX",
     "JOB_TYPE_METADATA",
     "JOB_TYPE_REINDEX",
     "JOB_TYPE_SCAN",

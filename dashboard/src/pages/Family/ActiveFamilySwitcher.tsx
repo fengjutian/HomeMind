@@ -25,8 +25,9 @@ export default function ActiveFamilySwitcher({
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (loading) return;
     onChange?.(familyId);
-  }, [familyId, onChange]);
+  }, [familyId, loading, onChange]);
 
   const switchTo = async (next: string) => {
     if (next === familyId) return;

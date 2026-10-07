@@ -143,9 +143,7 @@ class FamilyTaskAgentExecutor:
         ]
         if task.description:
             parts.append(f"Details: {task.description}")
-        context = self._family_context(task) if self._family_context is not None else ""
-        if context:
-            parts.append(context)
+        parts.extend(self._context_parts(task))
         parts.append(
             "Reply with a short summary of what you did. If part of this "
             "needs human approval, say so plainly: that part will be "
@@ -155,6 +153,25 @@ class FamilyTaskAgentExecutor:
             "thread_id": thread_id,
             "input": {"role": "user", "content": "\n\n".join(parts)},
         }
+
+    def _context_parts(self, task: FamilyTaskRow) -> list[str]:
+        """Family background for the prompt, or nothing.
+
+        A failure here is swallowed on purpose: the context is extra
+        detail, and losing it must not stop the family from having
+        their task done. The task runs with less background rather than
+        not at all.
+        """
+        if self._family_context is None:
+            return []
+        try:
+            context = self._family_context(task)
+        except Exception:  # noqa: BLE001 — context is a nicety, not a gate
+            logger.warning(
+                "TaskExecutor: family context unavailable for task %s", task.id
+            )
+            return []
+        return [f"Family context:\n{context}"] if context else []
 
     def _interpret(self, response: Any) -> AgentRunResult:
         """Read the agent's answer for a transaction reference.
