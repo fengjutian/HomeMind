@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -13,15 +14,23 @@ from urllib.request import url2pathname
 
 from PIL import Image
 
+from homemind.infra.db.repos.face_candidates import (
+    CANDIDATE_PENDING,
+    FaceCandidateRepo,
+    FaceCandidateRow,
+)
 from homemind.infra.db.repos.family_context import FamilyContextRepo
 from homemind.infra.db.repos.photo_intelligence import (
     PhotoIntelligenceRepo,
     PhotoIntelligenceRow,
 )
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.privacy import DataCategory, ExternalOperation
 from octop.infra.users.identity import User
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -82,9 +91,7 @@ class FaceRecognitionProvider(Protocol):
 
 
 class PhotoReranker(Protocol):
-    def rerank(
-        self, query: str, results: list[PhotoSearchResult]
-    ) -> list[PhotoSearchResult]: ...
+    def rerank(self, query: str, results: list[PhotoSearchResult]) -> list[PhotoSearchResult]: ...
 
 
 class PhotoIntelligenceManager:
@@ -95,6 +102,8 @@ class PhotoIntelligenceManager:
         context: FamilyContextRepo,
         repo: PhotoIntelligenceRepo,
         privacy_guard: Any | None = None,
+        candidates: FaceCandidateRepo | None = None,
+        face_provider: FaceRecognitionProvider | None = None,
     ) -> None:
         self.family = family
         self.assets = assets
@@ -105,6 +114,10 @@ class PhotoIntelligenceManager:
         # a plain Octop deployment) the calls still work but nothing
         # enforces the family's privacy settings.
         self.privacy_guard = privacy_guard
+        # Face-match proposals live in their own review queue. Optional so
+        # a deployment that never runs FACE_MATCH does not need the table.
+        self.candidates = candidates
+        self._face_provider = face_provider
 
     def _authorize_external(
         self,
@@ -142,7 +155,7 @@ class PhotoIntelligenceManager:
         user: User,
         *,
         asset_id: str,
-        vision: VisionProvider | None,
+        vision: VisionProvider | FaceRecognitionProvider | None,
         embedding: EmbeddingProvider | None,
         geocoder: ReverseGeocodingProvider | None,
     ) -> None:
@@ -189,7 +202,8 @@ class PhotoIntelligenceManager:
         # Privacy gate *before* any provider is touched, not after.
         if vision is not None:
             self._authorize_external(
-                family_id, user,
+                family_id,
+                user,
                 operation=ExternalOperation.VISION,
                 provider_id=vision.name,
                 data_categories=frozenset({DataCategory.PHOTO.value}),
@@ -197,7 +211,8 @@ class PhotoIntelligenceManager:
             )
         if embedding is not None:
             self._authorize_external(
-                family_id, user,
+                family_id,
+                user,
                 operation=ExternalOperation.EMBEDDING,
                 provider_id=embedding.name,
                 data_categories=frozenset({DataCategory.PHOTO.value}),
@@ -207,12 +222,11 @@ class PhotoIntelligenceManager:
             # Face data is biometric: it needs the family's explicit
             # sensitive opt-in on top of the ordinary gates.
             self._authorize_external(
-                family_id, user,
+                family_id,
+                user,
                 operation=ExternalOperation.VISION,
                 provider_id=face_recognition.name,
-                data_categories=frozenset(
-                    {DataCategory.PHOTO.value, DataCategory.FACE.value}
-                ),
+                data_categories=frozenset({DataCategory.PHOTO.value, DataCategory.FACE.value}),
                 asset_id=asset_id,
             )
 
@@ -241,7 +255,8 @@ class PhotoIntelligenceManager:
             # outbound call rather than being assumed safe because it
             # is "just" a coordinate.
             self._authorize_external(
-                family_id, user,
+                family_id,
+                user,
                 operation=ExternalOperation.GEOCODING,
                 provider_id=geocoder.name,
                 data_categories=frozenset({DataCategory.GPS.value}),
@@ -252,8 +267,12 @@ class PhotoIntelligenceManager:
         if vector == []:
             raise ValueError("photo embedding cannot be empty")
         self._audit_outbound(
-            family_id, user, asset_id=asset_id,
-            vision=vision, embedding=embedding, geocoder=geocoder,
+            family_id,
+            user,
+            asset_id=asset_id,
+            vision=vision,
+            embedding=embedding,
+            geocoder=geocoder,
         )
         row = self.repo.upsert(
             asset_id=asset_id,
@@ -272,6 +291,163 @@ class PhotoIntelligenceManager:
         )
         self._link_matching_events(family_id, asset_id, asset.captured_at, location_name)
         return row
+
+    def _require_candidates(self) -> FaceCandidateRepo:
+        """The face-match review queue, or a clear error.
+
+        Optional at construction so a deployment that never runs
+        FACE_MATCH does not need the table, but every code path that does
+        run it must have it.
+        """
+        if self.candidates is None:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "face matching is not available on this installation",
+            )
+        return self.candidates
+
+    def match_faces(
+        self,
+        family_id: str,
+        asset_id: str,
+        user: User,
+        *,
+        face_recognition: FaceRecognitionProvider | None = None,
+        auto_confirm_threshold: float = 0.95,
+    ) -> list[FaceCandidateRow]:
+        """Propose who appears in a photo, as reviewable candidates.
+
+        Nothing here labels a face. Results land in
+        ``homemind_family_face_candidates`` as ``PENDING`` and stay there
+        until a manager confirms or rejects them, because a provider
+        confidence is a probability and a family must be able to audit a
+        wrong one.
+
+        A match at or above ``auto_confirm_threshold`` is still only
+        proposed: the threshold exists so the dashboard can sort the queue,
+        not so the system can act on a biometric guess without a human.
+        """
+        asset = self.assets.get(family_id, asset_id, user)
+        if asset.asset_type != "PHOTO":
+            raise ValueError("face matching requires a photo asset")
+        references = self._face_reference_paths(family_id, user)
+        if not references:
+            # No reference photos: nothing to match against. Skipping is
+            # the honest outcome; failing would make every unconfigured
+            # family look broken.
+            return []
+        candidates = self._require_candidates()
+        provider = face_recognition or self._default_face_provider()
+        if provider is None:
+            raise ValueError("face matching requires a recognition provider")
+        self._authorize_external(
+            family_id,
+            user,
+            operation=ExternalOperation.VISION,
+            provider_id=provider.name,
+            data_categories=frozenset({DataCategory.PHOTO.value, DataCategory.FACE.value}),
+            asset_id=asset_id,
+        )
+        path = self._local_path(asset.uri)
+        recognized = provider.recognize(path, references)
+        self._validate_faces(family_id, recognized)
+        created: list[FaceCandidateRow] = []
+        for face in recognized:
+            member_id = face.member_id
+            if member_id is None:
+                # An unlabelled detection is a face, not a suggestion about
+                # a specific person; there is nothing for a manager to decide.
+                continue
+            created.append(
+                candidates.upsert_candidate(
+                    family_id=family_id,
+                    asset_id=asset_id,
+                    member_id=member_id,
+                    confidence=float(face.confidence),
+                ),
+            )
+        self._audit_outbound(
+            family_id,
+            user,
+            asset_id=asset_id,
+            vision=provider,
+            embedding=None,
+            geocoder=None,
+        )
+        return created
+
+    def _default_face_provider(self) -> FaceRecognitionProvider | None:
+        """The provider used when the caller does not supply one."""
+        return self._face_provider
+
+    def list_face_candidates(
+        self,
+        family_id: str,
+        user: User,
+        *,
+        status: str | None = CANDIDATE_PENDING,
+        limit: int = 100,
+    ) -> list[FaceCandidateRow]:
+        """The review queue. Any family member may see it; deciding is
+        manager-only."""
+        self.family.require_access(family_id, user)
+        return self._require_candidates().list_candidates(
+            family_id,
+            status=status,
+            limit=limit,
+        )
+
+    def confirm_face_candidate(
+        self,
+        family_id: str,
+        candidate_id: str,
+        user: User,
+    ) -> FaceCandidateRow:
+        """A manager accepts a proposed match."""
+        self.family.require_manager(family_id, user)
+        candidate = self._assert_candidate(family_id, candidate_id)
+        confirmed = self._require_candidates().confirm(candidate.id, user.id)
+        if confirmed is None:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "face candidate was already decided",
+            )
+        logger.info(
+            "PhotoIntelligence: face candidate %s confirmed for member %s",
+            candidate.id,
+            candidate.member_id,
+        )
+        return confirmed
+
+    def reject_face_candidate(
+        self,
+        family_id: str,
+        candidate_id: str,
+        user: User,
+    ) -> FaceCandidateRow:
+        """A manager rejects a proposed match; it is never re-offered."""
+        self.family.require_manager(family_id, user)
+        candidate = self._assert_candidate(family_id, candidate_id)
+        rejected = self._require_candidates().reject(candidate.id, user.id)
+        if rejected is None:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "face candidate was already decided",
+            )
+        return rejected
+
+    def _assert_candidate(
+        self,
+        family_id: str,
+        candidate_id: str,
+    ) -> FaceCandidateRow:
+        candidate = self._require_candidates().get(candidate_id)
+        if candidate is None or candidate.family_id != family_id:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "face candidate not found",
+            )
+        return candidate
 
     def set_face_reference(
         self,
@@ -294,9 +470,7 @@ class PhotoIntelligenceManager:
             created_by=user.id,
         )
 
-    def delete_face_reference(
-        self, family_id: str, asset_id: str, user: User
-    ) -> bool:
+    def delete_face_reference(self, family_id: str, asset_id: str, user: User) -> bool:
         self.family.require_manager(family_id, user)
         asset = self.assets.get(family_id, asset_id, user)
         return self.repo.delete_face_reference(asset.id)
@@ -316,10 +490,7 @@ class PhotoIntelligenceManager:
         if not query_vector:
             raise ValueError("query embedding cannot be empty")
         visible_ids = {
-            asset.id
-            for asset in self.assets.search(
-                family_id, user, asset_type="PHOTO", limit=500
-            )
+            asset.id for asset in self.assets.search(family_id, user, asset_type="PHOTO", limit=500)
         }
         results: list[PhotoSearchResult] = []
         for row in self.repo.list(family_id):
@@ -353,10 +524,7 @@ class PhotoIntelligenceManager:
         if target is None or target.perceptual_hash is None:
             return []
         visible_ids = {
-            asset.id
-            for asset in self.assets.search(
-                family_id, user, asset_type="PHOTO", limit=500
-            )
+            asset.id for asset in self.assets.search(family_id, user, asset_type="PHOTO", limit=500)
         }
         matches: list[tuple[str, int]] = []
         for row in self.repo.list(family_id):
@@ -380,12 +548,14 @@ class PhotoIntelligenceManager:
     ) -> None:
         if captured_at is None:
             return
-        for event in self.context.list_events(
-            family_id, start_at=captured_at, end_at=captured_at
-        ):
-            if event.location and location_name and (
-                event.location.casefold() not in location_name.casefold()
-                and location_name.casefold() not in event.location.casefold()
+        for event in self.context.list_events(family_id, start_at=captured_at, end_at=captured_at):
+            if (
+                event.location
+                and location_name
+                and (
+                    event.location.casefold() not in location_name.casefold()
+                    and location_name.casefold() not in event.location.casefold()
+                )
             ):
                 continue
             self.context.link_event_asset(event.id, asset_id)
@@ -398,9 +568,7 @@ class PhotoIntelligenceManager:
             if member is None or member.family_id != family_id:
                 raise ValueError("vision provider returned an invalid family member")
 
-    def _face_reference_paths(
-        self, family_id: str, user: User
-    ) -> list[FaceReference]:
+    def _face_reference_paths(self, family_id: str, user: User) -> list[FaceReference]:
         references: list[FaceReference] = []
         for row in self.repo.list_face_references(family_id):
             asset = self.assets.get(family_id, row.asset_id, user)
@@ -428,9 +596,7 @@ class PhotoIntelligenceManager:
         for row in range(8):
             offset = row * 9
             for column in range(8):
-                bits = (bits << 1) | int(
-                    pixels[offset + column] > pixels[offset + column + 1]
-                )
+                bits = (bits << 1) | int(pixels[offset + column] > pixels[offset + column + 1])
         return f"{bits:016x}"
 
     @staticmethod
@@ -439,6 +605,4 @@ class PhotoIntelligenceManager:
         right_norm = math.sqrt(sum(value * value for value in right))
         if left_norm == 0 or right_norm == 0:
             return 0.0
-        return sum(a * b for a, b in zip(left, right, strict=True)) / (
-            left_norm * right_norm
-        )
+        return sum(a * b for a, b in zip(left, right, strict=True)) / (left_norm * right_norm)

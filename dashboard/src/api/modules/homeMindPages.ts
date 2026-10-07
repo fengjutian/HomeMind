@@ -72,6 +72,63 @@ export interface AssetJobItem {
   error: string | null;
 }
 
+/**
+ * A proposed face match awaiting a manager's decision.
+ *
+ * `status` stays PENDING until someone confirms or rejects it. A pending
+ * candidate is a suggestion, not an identity, and the UI must present it
+ * that way — no auto-accept, whatever the confidence.
+ */
+export interface FaceCandidate {
+  candidate_id: string;
+  family_id: string;
+  asset_id: string;
+  member_id: string;
+  confidence: number;
+  status: "PENDING" | "CONFIRMED" | "REJECTED";
+  decided_by: number | null;
+  decided_at: number | null;
+  created_at: number;
+}
+
+/** Non-sensitive job configuration. Never carries an API key. */
+export interface AssetJobConfig {
+  vision_provider_id?: number;
+  vision_model?: string;
+  embedding_provider_id?: number;
+  embedding_model?: string;
+  geocoder?: string;
+  thumbnail_width?: number;
+  thumbnail_height?: number;
+  thumbnail_format?: "webp" | "jpeg";
+}
+
+export const ASSET_JOB_TYPES = [
+  "SCAN",
+  "METADATA",
+  "THUMBNAIL",
+  "VISION",
+  "EMBEDDING",
+  "FACE_MATCH",
+  "REINDEX",
+] as const;
+
+/** Job types that operate on registered assets rather than raw paths. */
+export const ASSET_SCOPED_JOB_TYPES: readonly string[] = [
+  "METADATA",
+  "THUMBNAIL",
+  "VISION",
+  "EMBEDDING",
+  "FACE_MATCH",
+  "REINDEX",
+];
+
+/** Job types whose handler must receive a provider + model to run. */
+export const PROVIDER_BACKED_JOB_TYPES: readonly string[] = [
+  "VISION",
+  "EMBEDDING",
+];
+
 export interface MemoryCandidate {
   id: string;
   family_id: string;
@@ -158,7 +215,13 @@ export const homeMindPagesApi = {
     ),
   createAssetJob: (
     familyId: string,
-    body: { job_type: string; source_id?: string; paths?: string[] },
+    body: {
+      job_type: string;
+      source_id?: string;
+      paths?: string[];
+      asset_ids?: string[];
+      config?: AssetJobConfig;
+    },
   ) => request<AssetJob>(`${root}/${familyId}/asset-jobs`, mutate("POST", body)),
   pauseAssetJob: (familyId: string, jobId: string) =>
     request<AssetJob>(

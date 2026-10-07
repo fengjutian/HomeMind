@@ -62,6 +62,7 @@ class AssetJobRow:
     job_type: str
     status: str
     cursor_json: str
+    config_json: str
     total_items: int
     processed_items: int
     succeeded_items: int
@@ -100,6 +101,7 @@ class AssetJobRow:
             job_type=str(data["job_type"]),
             status=str(data["status"]),
             cursor_json=str(data["cursor_json"]),
+            config_json=str(data["config_json"]),
             total_items=int(data["total_items"]),
             processed_items=int(data["processed_items"]),
             succeeded_items=int(data["succeeded_items"]),
@@ -166,15 +168,26 @@ class AssetJobRepo:
         requested_by: int,
         source_id: str | None = None,
         cursor_json: str = "{}",
+        config_json: str = "{}",
     ) -> AssetJobRow:
         job_id = new_ulid()
         ts = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
                 "INSERT INTO homemind_asset_jobs(job_id, family_id, source_id, job_type, "
-                "status, cursor_json, total_items, requested_by, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, 'PENDING', ?, 0, ?, ?, ?)",
-                (job_id, family_id, source_id, job_type, cursor_json, requested_by, ts, ts),
+                "status, cursor_json, config_json, total_items, requested_by, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, 'PENDING', ?, ?, 0, ?, ?, ?)",
+                (
+                    job_id,
+                    family_id,
+                    source_id,
+                    job_type,
+                    cursor_json,
+                    config_json,
+                    requested_by,
+                    ts,
+                    ts,
+                ),
             )
         return self.get_job(job_id)  # type: ignore[return-value]
 
@@ -208,7 +221,10 @@ class AssetJobRepo:
         return map_rows(rows, AssetJobRow)
 
     def add_items(
-        self, job_id: str, paths: list[str], asset_ids: dict[str, str] | None = None,
+        self,
+        job_id: str,
+        paths: list[str],
+        asset_ids: dict[str, str] | None = None,
     ) -> int:
         """Bulk-insert item rows. Batched so a 100k-file source never
         builds one enormous statement."""
@@ -349,7 +365,12 @@ class AssetJobRepo:
         return self.get_job(job_id)
 
     def renew_lease(
-        self, job_id: str, *, owner: str, ttl_seconds: int, now: int | None = None,
+        self,
+        job_id: str,
+        *,
+        owner: str,
+        ttl_seconds: int,
+        now: int | None = None,
     ) -> AssetJobRow | None:
         timestamp = now_ts() if now is None else now
         with self._db.transaction() as conn:
@@ -409,7 +430,10 @@ class AssetJobRepo:
     # ---------------------------------------------------------------- items
 
     def list_pending_items(
-        self, job_id: str, *, limit: int = 100,
+        self,
+        job_id: str,
+        *,
+        limit: int = 100,
     ) -> list[AssetJobItemRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
@@ -420,7 +444,10 @@ class AssetJobRepo:
         return map_rows(rows, AssetJobItemRow)
 
     def list_failed_items(
-        self, job_id: str, *, limit: int = 100,
+        self,
+        job_id: str,
+        *,
+        limit: int = 100,
     ) -> list[AssetJobItemRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
@@ -431,7 +458,11 @@ class AssetJobRepo:
         return map_rows(rows, AssetJobItemRow)
 
     def list_items(
-        self, job_id: str, *, status: str | None = None, limit: int = 200,
+        self,
+        job_id: str,
+        *,
+        status: str | None = None,
+        limit: int = 200,
     ) -> list[AssetJobItemRow]:
         clauses = ["job_id = ?"]
         params: list[Any] = [job_id]

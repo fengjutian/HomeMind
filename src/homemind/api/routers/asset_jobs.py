@@ -11,15 +11,19 @@ permission before opening a file.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from homemind.infra.db.migrate import run_migrations
-from homemind.infra.db.repos.asset_jobs import AssetJobItemRow
+from homemind.infra.db.repos.asset_jobs import (
+    JOB_TYPE_SCAN,
+    AssetJobItemRow,
+)
 from homemind.infra.db.services import HomeMindServices
+from homemind.infra.family.asset_job_config import AssetJobConfig
 from homemind.infra.family.asset_job_handlers import iter_source_paths
 from homemind.infra.family.asset_jobs import AssetJobManager, AssetJobSummary
 from homemind.infra.family.manager import FamilyManager
@@ -36,6 +40,16 @@ CurrentUser = Annotated[User, Depends(current_user)]
 
 
 class AssetJobCreateBody(BaseModel):
+    """Create a persistent asset job.
+
+    ``job_type`` selects which other fields are meaningful. A SCAN job
+    walks a registered source; every other type operates on assets that are
+    already registered and therefore needs ``asset_ids`` — not raw paths.
+    The API deliberately does not accept a caller-supplied absolute path for
+    an AI job: an unregistered path has no family, no permission check and
+    no recorded owner, so accepting one would defeat the asset boundary.
+    """
+
     job_type: str = Field(
         description="SCAN | METADATA | THUMBNAIL | VISION | EMBEDDING | FACE_MATCH | REINDEX",
     )
@@ -46,10 +60,47 @@ class AssetJobCreateBody(BaseModel):
     paths: list[str] | None = Field(
         default=None,
         description=(
-            "Explicit source paths. Mutually exclusive with ``source_id``; "
-            "prefer ``source_id`` for large directories so paths are streamed."
+            "Explicit source paths. Accepted only for SCAN and METADATA, where "
+            "each path is re-validated against a registered asset row. Prefer "
+            "``source_id`` for large directories so paths are streamed."
         ),
     )
+    asset_ids: list[str] | None = Field(
+        default=None,
+        description=(
+            "Registered asset ids to operate on. Required for THUMBNAIL, "
+            "VISION, EMBEDDING, FACE_MATCH and REINDEX. An id from another "
+            "family is rejected."
+        ),
+    )
+    config: AssetJobConfigBody | None = Field(
+        default=None,
+        description=(
+            "Non-sensitive job description. VISION requires "
+            "``vision_provider_id`` + ``vision_model``; EMBEDDING requires "
+            "``embedding_provider_id`` + ``embedding_model``. Never include an "
+            "API key — it is read live from the provider repository."
+        ),
+    )
+
+
+class AssetJobConfigBody(BaseModel):
+    """Request shape for the persisted job config (see AssetJobConfig)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    vision_provider_id: int | None = Field(default=None, ge=1)
+    vision_model: str | None = None
+    embedding_provider_id: int | None = Field(default=None, ge=1)
+    embedding_model: str | None = None
+    geocoder: str | None = None
+    thumbnail_width: int | None = Field(default=None, ge=1, le=2048)
+    thumbnail_height: int | None = Field(default=None, ge=1, le=2048)
+    thumbnail_format: Literal["webp", "jpeg"] | None = None
+
+    def to_domain(self) -> AssetJobConfig:
+        """Validate through the domain model, which also rejects secrets."""
+        return AssetJobConfig.from_json(self.model_dump_json())
 
 
 class AssetJobResponse(BaseModel):
@@ -86,15 +137,14 @@ def _family(services: HomeMindServices) -> FamilyManager:
 
 
 def _manager(services: HomeMindServices) -> AssetJobManager:
-    return AssetJobManager(_family(services), services.asset_job_repo)
+    return AssetJobManager(
+        _family(services),
+        services.asset_job_repo,
+        asset_repo=services.family_asset_repo,
+    )
 
 
 def _summary_response(summary: AssetJobSummary) -> AssetJobResponse:
-    percent = (
-        round(summary.processed_items * 100.0 / summary.total_items, 2)
-        if summary.total_items > 0
-        else 0.0
-    )
     return AssetJobResponse(
         job_id=summary.job_id,
         family_id=summary.family_id,
@@ -105,7 +155,7 @@ def _summary_response(summary: AssetJobSummary) -> AssetJobResponse:
         succeeded_items=summary.succeeded_items,
         skipped_items=summary.skipped_items,
         failed_items=summary.failed_items,
-        progress_percent=percent,
+        progress_percent=summary.progress_percent(),
         error_summary=summary.error_summary,
     )
 
@@ -140,36 +190,54 @@ async def create_asset_job(
     user: CurrentUser,
 ) -> AssetJobResponse:
     services = _services(server)
-    family = _family(services)
-    family.require_manager(family_id, user)
     manager = _manager(services)
+    # ``create_job`` enforces the manager role itself; this call exists only
+    # so an unknown family 404s instead of 403-ing on the way in.
+    _family(services).require_manager(family_id, user)
 
-    if body.source_id is None and not body.paths:
-        raise OctopError(
-            ErrorCode.NOT_FOUND, "provide either source_id or paths",
-        )
+    config = body.config.to_domain() if body.config is not None else None
+    is_scan = body.job_type == JOB_TYPE_SCAN
 
-    if body.source_id is not None:
-        source = services.family_asset_repo.get_source(body.source_id)
-        if source is None or source.family_id != family_id:
-            raise OctopError(ErrorCode.NOT_FOUND, "family asset source not found")
-        # Streamed: the generator is consumed in batches by the manager.
-        paths = iter_source_paths(
-            source.directory_uri, recursive=bool(source.recursive),
-        )
-        job = manager.create_job(
-            family_id,
-            user,
-            job_type=body.job_type,
-            paths=paths,
-            source_id=body.source_id,
-        )
+    if is_scan:
+        if body.source_id is not None:
+            source = services.family_asset_repo.get_source(body.source_id)
+            if source is None or source.family_id != family_id:
+                raise OctopError(ErrorCode.NOT_FOUND, "family asset source not found")
+            # Streamed: the generator is consumed in batches by the manager.
+            job = manager.create_job(
+                family_id,
+                user,
+                job_type=body.job_type,
+                paths=iter_source_paths(
+                    source.directory_uri,
+                    recursive=bool(source.recursive),
+                ),
+                source_id=body.source_id,
+                config=config,
+            )
+        else:
+            job = manager.create_job(
+                family_id,
+                user,
+                job_type=body.job_type,
+                paths=body.paths or [],
+                config=config,
+            )
     else:
+        # Every non-scan type works on registered assets. An unregistered
+        # path has no family and no permission check, so it is not an
+        # accepted input here — ``asset_ids`` is.
+        if not body.asset_ids:
+            raise OctopError(
+                ErrorCode.NOT_FOUND,
+                "asset_ids are required for this job type",
+            )
         job = manager.create_job(
             family_id,
             user,
             job_type=body.job_type,
-            paths=body.paths or [],
+            asset_ids=body.asset_ids,
+            config=config,
         )
     return _summary_response(AssetJobSummary.from_row(job))
 
@@ -197,7 +265,10 @@ async def list_asset_jobs(
     summary="Fetch one asset job with progress",
 )
 async def get_asset_job(
-    family_id: str, job_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    job_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> AssetJobResponse:
     services = _services(server)
     return _summary_response(_manager(services).get_job(family_id, job_id, user))
@@ -219,7 +290,11 @@ async def list_asset_job_items(
 ) -> list[AssetJobItemResponse]:
     services = _services(server)
     rows = _manager(services).list_items(
-        family_id, job_id, user, status=status, limit=limit,
+        family_id,
+        job_id,
+        user,
+        status=status,
+        limit=limit,
     )
     return [_item_response(row) for row in rows]
 
@@ -230,7 +305,10 @@ async def list_asset_job_items(
     summary="Pause a job so it stops claiming new items",
 )
 async def pause_asset_job(
-    family_id: str, job_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    job_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> AssetJobResponse:
     services = _services(server)
     return _summary_response(_manager(services).pause_job(family_id, job_id, user))
@@ -242,7 +320,10 @@ async def pause_asset_job(
     summary="Resume a paused job from its cursor",
 )
 async def resume_asset_job(
-    family_id: str, job_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    job_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> AssetJobResponse:
     services = _services(server)
     return _summary_response(_manager(services).resume_job(family_id, job_id, user))
@@ -254,7 +335,10 @@ async def resume_asset_job(
     summary="Cancel an unfinished asset job",
 )
 async def cancel_asset_job(
-    family_id: str, job_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    job_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> AssetJobResponse:
     services = _services(server)
     return _summary_response(_manager(services).cancel_job(family_id, job_id, user))
@@ -270,7 +354,10 @@ async def cancel_asset_job(
     ),
 )
 async def retry_asset_job(
-    family_id: str, job_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    job_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> AssetJobResponse:
     services = _services(server)
     return _summary_response(_manager(services).retry_job(family_id, job_id, user))
@@ -321,14 +408,13 @@ async def get_asset_thumbnail(
     )
     if result is None:
         return Response(status_code=404)
-    media_type = (
-        "image/webp" if result.format == "WEBP" else "image/jpeg"
-    )
+    media_type = "image/webp" if result.format == "WEBP" else "image/jpeg"
     return FileResponse(result.path, media_type=media_type)
 
 
 __all__ = [
     "router",
+    "AssetJobConfigBody",
     "AssetJobCreateBody",
     "AssetJobItemResponse",
     "AssetJobResponse",

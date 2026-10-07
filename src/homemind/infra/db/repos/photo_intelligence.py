@@ -65,9 +65,7 @@ class PhotoIntelligenceRepo:
     def __init__(self, db: DatabasePool) -> None:
         self._db = db
 
-    def upsert(
-        self, *, asset_id: str, family_id: str, **values: object
-    ) -> PhotoIntelligenceRow:
+    def upsert(self, *, asset_id: str, family_id: str, **values: object) -> PhotoIntelligenceRow:
         with self._db.transaction() as conn:
             conn.execute(
                 "INSERT INTO homemind_family_photo_intelligence(asset_id, family_id, description, "
@@ -140,9 +138,7 @@ class PhotoIntelligenceRepo:
             raise RuntimeError("face reference upsert failed")
         return FaceReferenceRow.from_row(row)
 
-    def list_face_references(
-        self, family_id: str
-    ) -> builtins.list[FaceReferenceRow]:
+    def list_face_references(self, family_id: str) -> builtins.list[FaceReferenceRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM homemind_family_face_references WHERE family_id = ? "

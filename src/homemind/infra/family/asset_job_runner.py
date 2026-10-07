@@ -24,6 +24,7 @@ from homemind.infra.family.asset_job_handlers import build_handler
 from homemind.infra.family.asset_jobs import AssetJobManager, ItemHandler
 from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.thumbnails import ThumbnailService
 from homemind.infra.metrics import inc as _hm_inc
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,12 @@ class AssetJobRunner:
         asset_manager: FamilyAssetManager,
         family_manager: FamilyManager,
         asset_repo: Any,
+        thumbnail_service: ThumbnailService | None = None,
+        search_indexer: Any | None = None,
+        photo_intelligence: Any | None = None,
+        face_manager: Any | None = None,
+        provider_repo: Any | None = None,
+        user_factory: Callable[[int], Any] | None = None,
         poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
         worker_id: str | None = None,
         event_bus: Callable[[], Any] | None = None,
@@ -54,6 +61,14 @@ class AssetJobRunner:
         self._asset_manager = asset_manager
         self._family_manager = family_manager
         self._asset_repo = asset_repo
+        self._thumbnail_service = thumbnail_service
+        self._search_indexer = search_indexer
+        self._photo_intelligence = photo_intelligence
+        self._face_manager = face_manager
+        self._provider_repo = provider_repo
+        # A job runs as a user for permission purposes; a worker has no
+        # session, so the runner asks for one by id.
+        self._user_factory = user_factory
         self._poll_interval = poll_interval_seconds
         self._worker_id = worker_id or _worker_id()
         self._event_bus_source = event_bus
@@ -93,13 +108,16 @@ class AssetJobRunner:
                 logger.exception("AssetJobRunner: drain failed")
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(
-                    self._stop_event.wait(), timeout=self._poll_interval,
+                    self._stop_event.wait(),
+                    timeout=self._poll_interval,
                 )
 
     async def drain_once(self) -> int:
         """Claim and run one job. Returns 1 when work was done."""
         job = self._manager._repo.claim_next_job(  # noqa: SLF001 — same-package access
-            None, owner=self._worker_id, ttl_seconds=self._manager.lease_seconds,
+            None,
+            owner=self._worker_id,
+            ttl_seconds=self._manager.lease_seconds,
         )
         if job is None:
             return 0
@@ -115,27 +133,52 @@ class AssetJobRunner:
                 error_summary="family no longer exists",
             )
             logger.warning(
-                "AssetJobRunner: job %s references a missing family", job.id,
+                "AssetJobRunner: job %s references a missing family",
+                job.id,
             )
             return 1
 
         try:
             handler: ItemHandler = build_handler(  # type: ignore[assignment]
-                job.job_type,
+                job,
                 asset_manager=self._asset_manager,
                 asset_repo=self._asset_repo,
+                thumbnail_service=self._thumbnail_service,
+                search_indexer=self._search_indexer,
+                photo_intelligence=self._photo_intelligence,
+                face_manager=self._face_manager,
+                provider_repo=self._provider_repo,
+                family_manager=self._family_manager,
+                user=self._resolve_user(int(family.owner_user_id)),
                 family_id=job.family_id,
                 created_by_user_id=int(family.owner_user_id),
             )
         except NotImplementedError:
             logger.warning(
-                "AssetJobRunner: no handler for job type %s", job.job_type,
+                "AssetJobRunner: no handler for job type %s",
+                job.job_type,
             )
             self._manager._repo.set_status(  # noqa: SLF001 — same-package access
                 job.id,
                 to_status=JOB_STATUS_FAILED,
                 from_status=JOB_STATUS_RUNNING,
                 error_summary=f"no handler for job type {job.job_type}",
+            )
+            _hm_inc("asset_job_failed_total")
+            return 1
+        except Exception:
+            # A job whose *config* is unusable (deleted provider, unknown
+            # version) must fail on its own without killing the worker loop.
+            logger.exception(
+                "AssetJobRunner: job %s (%s) could not be prepared",
+                job.id,
+                job.job_type,
+            )
+            self._manager._repo.set_status(  # noqa: SLF001 — same-package access
+                job.id,
+                to_status=JOB_STATUS_FAILED,
+                from_status=JOB_STATUS_RUNNING,
+                error_summary="job configuration could not be loaded",
             )
             _hm_inc("asset_job_failed_total")
             return 1
@@ -146,8 +189,26 @@ class AssetJobRunner:
         await self._emit_terminal_event(job.id, job.family_id, job.job_type)
         return 1
 
+    def _resolve_user(self, user_id: int) -> Any:
+        """Load the acting user, or ``None`` when no factory is wired.
+
+        Only the AI job types need one — they call into services that take a
+        ``User`` for permission checks. A deployment without a user factory
+        still drains SCAN / METADATA / THUMBNAIL / REINDEX.
+        """
+        if self._user_factory is None:
+            return None
+        try:
+            return self._user_factory(user_id)
+        except Exception:  # noqa: BLE001 — a bad lookup must not kill the loop
+            logger.exception("AssetJobRunner: could not load user %s", user_id)
+            return None
+
     async def _emit_terminal_event(
-        self, job_id: str, family_id: str, job_type: str,
+        self,
+        job_id: str,
+        family_id: str,
+        job_type: str,
     ) -> None:
         """Tell the family's dashboards how the job ended.
 

@@ -47,7 +47,13 @@ from homemind.infra.db.repos.asset_jobs import (
     AssetJobRepo,
     AssetJobRow,
 )
+from homemind.infra.db.repos.family_assets import FamilyAssetRepo
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
+from homemind.infra.family.asset_job_config import (
+    AssetJobConfig,
+    validate_config_for_job_type,
+)
+from homemind.infra.family.asset_job_handlers import SkipItem
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.metrics import inc as _hm_inc
 from octop.infra.users.identity import User
@@ -82,6 +88,10 @@ class AssetJobSummary:
     failed_items: int
     error_summary: str | None
 
+    def progress_percent(self) -> float:
+        """Completion percentage, including the zero-item case."""
+        return _progress_percent(self)
+
     @classmethod
     def from_row(cls, row: AssetJobRow) -> AssetJobSummary:
         return cls(
@@ -99,8 +109,14 @@ class AssetJobSummary:
 
 
 def _progress_percent(summary: AssetJobSummary) -> float:
+    """Completion as a percentage.
+
+    A job with zero items is 100%, not 0%: it is already finished, and
+    reporting 0 would render an indefinite progress bar for a scan of an
+    empty directory.
+    """
     if summary.total_items <= 0:
-        return 0.0
+        return 100.0 if summary.status == JOB_STATUS_COMPLETED else 0.0
     return round(summary.processed_items * 100.0 / summary.total_items, 2)
 
 
@@ -112,6 +128,7 @@ class AssetJobManager:
         family: FamilyManager,
         repo: AssetJobRepo,
         *,
+        asset_repo: FamilyAssetRepo | None = None,
         batch_size: int = DEFAULT_BATCH_SIZE,
         lease_seconds: int = DEFAULT_LEASE_SECONDS,
         max_concurrency: int = DEFAULT_MAX_CONCURRENCY,
@@ -120,6 +137,10 @@ class AssetJobManager:
     ) -> None:
         self._family = family
         self._repo = repo
+        # Needed to turn an ``asset_id`` into a path at creation time. Kept
+        # optional so a caller that only drives SCAN (and therefore already
+        # owns its path stream) does not have to wire a second repo.
+        self._asset_repo = asset_repo
         self.batch_size = batch_size
         self.lease_seconds = lease_seconds
         self.max_concurrency = max(1, max_concurrency)
@@ -134,40 +155,79 @@ class AssetJobManager:
         user: User,
         *,
         job_type: str,
-        paths: Iterable[str],
-        asset_ids: dict[str, str] | None = None,
+        paths: Iterable[str] = (),
+        asset_ids: Iterable[str] | dict[str, str] | None = None,
         source_id: str | None = None,
         cursor: dict[str, Any] | None = None,
+        config: AssetJobConfig | None = None,
     ) -> AssetJobRow:
-        """Create a job and seed its items from ``paths``.
+        """Create a job and seed its items.
 
-        ``paths`` is consumed as a stream: it is written to the DB in
-        batches, never accumulated, so the caller may hand us a generator
-        over a 100k-file directory without materialising it.
+        Two input shapes, because the job types genuinely differ:
+
+        * ``SCAN`` walks a registered source, so the caller streams
+          ``paths``. The stream is consumed in batches, never accumulated,
+          so a 100k-file directory stays flat in memory.
+        * Every other type operates on assets that are already registered,
+          so the caller passes ``asset_ids`` and the manager resolves each
+          one to its stored path. That resolution is what makes "no
+          unregistered client path" enforceable: an ``asset_id`` from
+          another family fails here rather than at execution time.
+
+        ``config`` is the non-sensitive job description a worker reads back
+        after a restart. It is validated against ``job_type`` before the job
+        is written, so a VISION job missing its model is a 400 at creation
+        rather than a failure hours later in a worker thread.
         """
-        self._family.require_access(family_id, user)
+        # Manager-only, not merely "has access": queueing work writes rows
+        # and (for SCAN) indexes files, so it belongs to the same trust
+        # level as pause / resume / cancel / retry.
+        self._family.require_manager(family_id, user)
         if job_type not in JOB_TYPES:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, f"unsupported job type {job_type!r}",
+                HomeMindErrorCode.FAMILY_INVALID,
+                f"unsupported job type {job_type!r}",
             )
+        resolved_config = config or AssetJobConfig()
+        validate_config_for_job_type(job_type, resolved_config)
+
         job = self._repo.create_job(
             family_id,
             job_type=job_type,
             requested_by=user.id,
             source_id=source_id,
             cursor_json=json.dumps(cursor or {}, ensure_ascii=False, sort_keys=True),
+            config_json=resolved_config.to_json(),
         )
-        batch: list[str] = []
         total = 0
-        for path in paths:
-            batch.append(path)
-            if len(batch) >= self.batch_size:
-                total += self._repo.add_items(job.id, batch, asset_ids)
-                batch.clear()
-        if batch:
-            total += self._repo.add_items(job.id, batch, asset_ids)
+        if asset_ids is not None and not isinstance(asset_ids, dict):
+            resolved = self._resolve_asset_ids(family_id, asset_ids)
+            total = self._seed_pairs(job.id, resolved)
+        else:
+            lookup = asset_ids if isinstance(asset_ids, dict) else None
+            batch: list[str] = []
+            for path in paths:
+                batch.append(path)
+                if len(batch) >= self.batch_size:
+                    total += self._repo.add_items(job.id, batch, lookup)
+                    batch.clear()
+            if batch:
+                total += self._repo.add_items(job.id, batch, lookup)
         _hm_inc("asset_job_created_total")
         refreshed = self._repo.get_job(job.id) or job
+        if total == 0:
+            # "Nothing to do" is a result, not a job that never finishes.
+            # Completing here keeps the dashboard from showing a spinner
+            # for a scan of an empty directory or a reindex of a family
+            # that has no assets yet.
+            refreshed = (
+                self._repo.set_status(
+                    job.id,
+                    to_status=JOB_STATUS_COMPLETED,
+                    from_status=JOB_STATUS_PENDING,
+                )
+                or refreshed
+            )
         logger.info(
             "AssetJobManager: created %s job %s with %d items",
             job_type,
@@ -175,6 +235,42 @@ class AssetJobManager:
             total,
         )
         return refreshed
+
+    def _resolve_asset_ids(
+        self,
+        family_id: str,
+        asset_ids: Iterable[str],
+    ) -> list[tuple[str, str]]:
+        """Map each ``asset_id`` to its stored path, rejecting foreign rows.
+
+        Returns ``(path, asset_id)`` pairs ready for :meth:`_seed_pairs`.
+        A missing or cross-family id is refused here: the alternative is a
+        worker that opens a path it was never authorised for.
+        """
+        resolved: list[tuple[str, str]] = []
+        if self._asset_repo is None:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "asset-scoped jobs require an asset repository",
+            )
+        for asset_id in asset_ids:
+            asset = self._asset_repo.get(asset_id)
+            if asset is None or asset.family_id != family_id:
+                raise HomeMindError(
+                    HomeMindErrorCode.FAMILY_INVALID,
+                    "asset does not belong to this family",
+                )
+            resolved.append((asset.uri, asset.id))
+        return resolved
+
+    def _seed_pairs(self, job_id: str, pairs: list[tuple[str, str]]) -> int:
+        """Insert ``(path, asset_id)`` rows in batches."""
+        total = 0
+        for start in range(0, len(pairs), self.batch_size):
+            chunk = pairs[start : start + self.batch_size]
+            lookup = dict(chunk)
+            total += self._repo.add_items(job_id, [path for path, _ in chunk], lookup)
+        return total
 
     # --------------------------------------------------------------- queries
 
@@ -193,7 +289,10 @@ class AssetJobManager:
         ]
 
     def get_job(
-        self, family_id: str, job_id: str, user: User,
+        self,
+        family_id: str,
+        job_id: str,
+        user: User,
     ) -> AssetJobSummary:
         self._family.require_access(family_id, user)
         return AssetJobSummary.from_row(self._assert_job(family_id, job_id))
@@ -214,7 +313,10 @@ class AssetJobManager:
     # -------------------------------------------------------------- controls
 
     def pause_job(
-        self, family_id: str, job_id: str, user: User,
+        self,
+        family_id: str,
+        job_id: str,
+        user: User,
     ) -> AssetJobSummary:
         """Stop claiming new items.
 
@@ -230,12 +332,16 @@ class AssetJobManager:
         )
         if paused is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_CONFLICT, "job cannot be paused in its state",
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "job cannot be paused in its state",
             )
         return AssetJobSummary.from_row(paused)
 
     def resume_job(
-        self, family_id: str, job_id: str, user: User,
+        self,
+        family_id: str,
+        job_id: str,
+        user: User,
     ) -> AssetJobSummary:
         self._family.require_manager(family_id, user)
         self._assert_job(family_id, job_id)
@@ -246,12 +352,16 @@ class AssetJobManager:
         )
         if resumed is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_CONFLICT, "job is not paused",
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "job is not paused",
             )
         return AssetJobSummary.from_row(resumed)
 
     def cancel_job(
-        self, family_id: str, job_id: str, user: User,
+        self,
+        family_id: str,
+        job_id: str,
+        user: User,
     ) -> AssetJobSummary:
         self._family.require_manager(family_id, user)
         self._assert_job(family_id, job_id)
@@ -262,13 +372,17 @@ class AssetJobManager:
         )
         if cancelled is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_CONFLICT, "job is already terminal",
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "job is already terminal",
             )
         _hm_inc("asset_job_cancelled_total")
         return AssetJobSummary.from_row(cancelled)
 
     def retry_job(
-        self, family_id: str, job_id: str, user: User,
+        self,
+        family_id: str,
+        job_id: str,
+        user: User,
     ) -> AssetJobSummary:
         """Reset only the failed items and requeue the job.
 
@@ -279,7 +393,8 @@ class AssetJobManager:
         job = self._assert_job(family_id, job_id)
         if job.status == JOB_STATUS_RUNNING:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_CONFLICT, "cannot retry a running job",
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "cannot retry a running job",
             )
         reset = self._repo.reset_failed_items(job_id)
         requeued = self._repo.set_status(
@@ -294,11 +409,14 @@ class AssetJobManager:
         )
         if requeued is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_CONFLICT, "job cannot be retried in its state",
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "job cannot be retried in its state",
             )
         _hm_inc("asset_job_retried_total")
         logger.info(
-            "AssetJobManager: retry %s reset %d failed items", job_id, reset,
+            "AssetJobManager: retry %s reset %d failed items",
+            job_id,
+            reset,
         )
         return AssetJobSummary.from_row(requeued)
 
@@ -320,11 +438,15 @@ class AssetJobManager:
         """
         lease_owner = owner or f"worker:{job_id}"
         job = self._repo.claim_job(
-            job_id, owner=lease_owner, ttl_seconds=self.lease_seconds, now=now,
+            job_id,
+            owner=lease_owner,
+            ttl_seconds=self.lease_seconds,
+            now=now,
         )
         if job is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_CONFLICT, "job is already claimed elsewhere",
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "job is already claimed elsewhere",
             )
         return self._drain(job, lease_owner, handler, now=now)
 
@@ -344,7 +466,9 @@ class AssetJobManager:
                 break
             if current.status in {JOB_STATUS_PAUSED, JOB_STATUS_CANCELLED}:
                 logger.info(
-                    "AssetJobManager: job %s moved to %s mid-run", job.id, current.status,
+                    "AssetJobManager: job %s moved to %s mid-run",
+                    job.id,
+                    current.status,
                 )
                 return AssetJobSummary.from_row(current)
             batch = self._repo.list_pending_items(job.id, limit=self.batch_size)
@@ -379,7 +503,9 @@ class AssetJobManager:
             raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "job vanished mid-run")
         if final.status == JOB_STATUS_RUNNING:
             finished = self._repo.set_status(
-                job.id, to_status=JOB_STATUS_COMPLETED, from_status=JOB_STATUS_RUNNING,
+                job.id,
+                to_status=JOB_STATUS_COMPLETED,
+                from_status=JOB_STATUS_RUNNING,
             )
             final = finished or final
         _hm_inc("asset_job_completed_total")
@@ -403,9 +529,21 @@ class AssetJobManager:
             return ITEM_STATUS_FAILED
         try:
             handler(item)
+        except SkipItem as exc:
+            # "Nothing to do" is a terminal success, not a failure: a video
+            # in a photo library has no thumbnail, and recording that as an
+            # error would make every mixed library look broken.
+            self._repo.mark_item(
+                item.id,
+                status=ITEM_STATUS_SKIPPED,
+                error=str(exc)[:500],
+            )
+            return ITEM_STATUS_SKIPPED
         except Exception as exc:  # noqa: BLE001 — isolate one bad item
             logger.warning(
-                "AssetJobManager: item %s failed: %s", item.id, exc,
+                "AssetJobManager: item %s failed: %s",
+                item.id,
+                exc,
             )
             self._repo.mark_item(item.id, status=ITEM_STATUS_FAILED, error=str(exc)[:500])
             return ITEM_STATUS_FAILED
@@ -424,10 +562,7 @@ class AssetJobManager:
             job_id,
             to_status=JOB_STATUS_FAILED,
             from_status=JOB_STATUS_RUNNING,
-            error_summary=(
-                f"failure ratio {ratio:.0%} exceeded "
-                f"{self.max_failure_ratio:.0%}"
-            ),
+            error_summary=(f"failure ratio {ratio:.0%} exceeded {self.max_failure_ratio:.0%}"),
             now=now,
         )
         _hm_inc("asset_job_failed_total")
@@ -500,7 +635,8 @@ class AssetJobManager:
         job = self._repo.get_job(job_id)
         if job is None or job.family_id != family_id:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "asset job not found",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "asset job not found",
             )
         return job
 

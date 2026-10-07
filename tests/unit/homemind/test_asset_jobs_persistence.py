@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -30,10 +31,16 @@ from homemind.infra.db.repos.asset_jobs import (
 )
 from homemind.infra.db.repos.families import FamilyRepo
 from homemind.infra.db.repos.family_assets import FamilyAssetRepo
+from homemind.infra.db.repos.family_context import FamilyContextRepo
+from homemind.infra.db.repos.search_index import KIND_ASSET, SearchIndexRepo, document_id_for
 from homemind.infra.errors import HomeMindError
+from homemind.infra.family.asset_job_config import AssetJobConfig
+from homemind.infra.family.asset_job_handlers import build_handler
 from homemind.infra.family.asset_jobs import AssetJobManager
+from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.manager import FamilyManager, MemberRole, SpaceType
 from homemind.infra.family.permissions import FamilyPermissionEvaluator
+from homemind.infra.family.search_indexer import FamilySearchIndexer
 from homemind.infra.family.thumbnails import (
     MAX_THUMBNAIL_DIMENSION,
     THUMBNAIL_FORMAT_JPEG,
@@ -45,6 +52,7 @@ from homemind.infra.family.thumbnails import (
 )
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
+from octop.infra.errors import OctopError
 from octop.infra.users.identity import Role, User
 
 
@@ -63,11 +71,14 @@ def _bootstrap(tmp_path: Path):
     family_repo = FamilyRepo(pool)
     family = FamilyManager(family_repo)
     fam = family.create_family(
-        user, name="Happy", timezone="Asia/Shanghai", locale="zh",
+        user,
+        name="Happy",
+        timezone="Asia/Shanghai",
+        locale="zh",
     )
     job_repo = AssetJobRepo(pool)
     asset_repo = FamilyAssetRepo(pool)
-    manager = AssetJobManager(family, job_repo, batch_size=2)
+    manager = AssetJobManager(family, job_repo, asset_repo=asset_repo, batch_size=2)
     return pool, manager, job_repo, asset_repo, family, user, other, fam.id
 
 
@@ -88,7 +99,10 @@ def test_create_job_streams_paths_without_materialising(tmp_path: Path) -> None:
             yield f"/photos/{index}.jpg"
 
     job = manager.create_job(
-        family_id, user, job_type="SCAN", paths=_stream(),
+        family_id,
+        user,
+        job_type="SCAN",
+        paths=_stream(),
     )
     assert produced == 1000
     assert job.total_items == 1000
@@ -99,7 +113,9 @@ def test_create_job_streams_paths_without_materialising(tmp_path: Path) -> None:
 def test_run_job_completes_and_counts(tmp_path: Path) -> None:
     pool, manager, job_repo, _assets, family, user, _other, family_id = _bootstrap(tmp_path)
     job = manager.create_job(
-        family_id, user, job_type="SCAN",
+        family_id,
+        user,
+        job_type="SCAN",
         paths=[f"/photos/{i}.jpg" for i in range(5)],
     )
     handled: list[str] = []
@@ -118,7 +134,9 @@ def test_run_job_completes_and_counts(tmp_path: Path) -> None:
 def test_single_failure_does_not_abort_the_batch(tmp_path: Path) -> None:
     pool, manager, job_repo, _assets, family, user, _other, family_id = _bootstrap(tmp_path)
     job = manager.create_job(
-        family_id, user, job_type="SCAN",
+        family_id,
+        user,
+        job_type="SCAN",
         paths=[f"/photos/{i}.jpg" for i in range(6)],
     )
 
@@ -140,7 +158,9 @@ def test_excessive_failure_ratio_fails_the_job(tmp_path: Path) -> None:
     pool, manager, job_repo, _assets, family, user, _other, family_id = _bootstrap(tmp_path)
     manager = AssetJobManager(family, job_repo, batch_size=10, max_failure_ratio=0.25)
     job = manager.create_job(
-        family_id, user, job_type="SCAN",
+        family_id,
+        user,
+        job_type="SCAN",
         paths=[f"/photos/{i}.jpg" for i in range(4)],
     )
 
@@ -159,16 +179,23 @@ def test_excessive_failure_ratio_fails_the_job(tmp_path: Path) -> None:
 def test_pause_stops_claiming_and_resume_continues(tmp_path: Path) -> None:
     pool, manager, job_repo, _assets, family, user, _other, family_id = _bootstrap(tmp_path)
     job = manager.create_job(
-        family_id, user, job_type="SCAN",
+        family_id,
+        user,
+        job_type="SCAN",
         paths=[f"/photos/{i}.jpg" for i in range(6)],
     )
     paused = manager.pause_job(family_id, job.id, user)
     assert paused.status == JOB_STATUS_PAUSED
 
     # A paused job must not be claimable.
-    assert job_repo.claim_next_job(
-        family_id, owner="w1", ttl_seconds=60,
-    ) is None
+    assert (
+        job_repo.claim_next_job(
+            family_id,
+            owner="w1",
+            ttl_seconds=60,
+        )
+        is None
+    )
 
     resumed = manager.resume_job(family_id, job.id, user)
     assert resumed.status == JOB_STATUS_PENDING
@@ -180,7 +207,10 @@ def test_pause_stops_claiming_and_resume_continues(tmp_path: Path) -> None:
 def test_cancel_stops_the_job(tmp_path: Path) -> None:
     pool, manager, job_repo, _assets, family, user, _other, family_id = _bootstrap(tmp_path)
     job = manager.create_job(
-        family_id, user, job_type="SCAN", paths=["/photos/a.jpg"],
+        family_id,
+        user,
+        job_type="SCAN",
+        paths=["/photos/a.jpg"],
     )
     cancelled = manager.cancel_job(family_id, job.id, user)
     assert cancelled.status == JOB_STATUS_CANCELLED
@@ -191,7 +221,9 @@ def test_cancel_stops_the_job(tmp_path: Path) -> None:
 def test_retry_only_resets_failed_items(tmp_path: Path) -> None:
     pool, manager, job_repo, _assets, family, user, _other, family_id = _bootstrap(tmp_path)
     job = manager.create_job(
-        family_id, user, job_type="SCAN",
+        family_id,
+        user,
+        job_type="SCAN",
         paths=[f"/photos/{i}.jpg" for i in range(4)],
     )
 
@@ -201,8 +233,7 @@ def test_retry_only_resets_failed_items(tmp_path: Path) -> None:
 
     manager.run_job(job.id, handle)
     succeeded_before = {
-        row.source_path
-        for row in job_repo.list_items(job.id, status=ITEM_STATUS_SUCCEEDED)
+        row.source_path for row in job_repo.list_items(job.id, status=ITEM_STATUS_SUCCEEDED)
     }
     retried = manager.retry_job(family_id, job.id, user)
     assert retried.status == JOB_STATUS_PENDING
@@ -223,7 +254,9 @@ def test_restart_resumes_from_cursor(tmp_path: Path) -> None:
 
     pool, manager, job_repo, _assets, family, user, _other, family_id = _bootstrap(tmp_path)
     job = manager.create_job(
-        family_id, user, job_type="SCAN",
+        family_id,
+        user,
+        job_type="SCAN",
         paths=[f"/photos/{i}.jpg" for i in range(6)],
     )
     # Simulate a worker that claimed the job then died before finishing.
@@ -235,9 +268,12 @@ def test_restart_resumes_from_cursor(tmp_path: Path) -> None:
     for item in batch:
         job_repo.mark_item(item.id, status=ITEM_STATUS_SUCCEEDED, error=None)
     job_repo.save_progress(
-        job.id, owner="dead-worker",
-        processed_delta=2, succeeded_delta=2,
-        skipped_delta=0, failed_delta=0,
+        job.id,
+        owner="dead-worker",
+        processed_delta=2,
+        succeeded_delta=2,
+        skipped_delta=0,
+        failed_delta=0,
     )
 
     # Restart: stale RUNNING rows come back as PENDING.
@@ -261,7 +297,10 @@ def test_restart_resumes_from_cursor(tmp_path: Path) -> None:
 def test_lease_prevents_two_workers_claiming_the_same_job(tmp_path: Path) -> None:
     pool, manager, job_repo, _assets, family, user, _other, family_id = _bootstrap(tmp_path)
     job = manager.create_job(
-        family_id, user, job_type="SCAN", paths=["/photos/a.jpg"],
+        family_id,
+        user,
+        job_type="SCAN",
+        paths=["/photos/a.jpg"],
     )
     first = job_repo.claim_job(job.id, owner="w1", ttl_seconds=300)
     second = job_repo.claim_job(job.id, owner="w2", ttl_seconds=300)
@@ -276,14 +315,21 @@ def test_progress_write_is_blocked_after_lease_theft(tmp_path: Path) -> None:
 
     pool, manager, job_repo, _assets, family, user, _other, family_id = _bootstrap(tmp_path)
     job = manager.create_job(
-        family_id, user, job_type="SCAN", paths=["/photos/a.jpg"],
+        family_id,
+        user,
+        job_type="SCAN",
+        paths=["/photos/a.jpg"],
     )
     job_repo.claim_job(job.id, owner="w1", ttl_seconds=1)
     # Steal it by advancing the clock past the lease.
     job_repo.claim_job(job.id, owner="w2", ttl_seconds=300, now=job.updated_at + 3600)
     stale = job_repo.save_progress(
-        job.id, owner="w1", processed_delta=99, succeeded_delta=99,
-        skipped_delta=0, failed_delta=0,
+        job.id,
+        owner="w1",
+        processed_delta=99,
+        succeeded_delta=99,
+        skipped_delta=0,
+        failed_delta=0,
     )
     assert stale is not None
     assert stale.processed_items == 0, "stale worker must not advance counters"
@@ -293,7 +339,9 @@ def test_progress_write_is_blocked_after_lease_theft(tmp_path: Path) -> None:
 def test_cursor_is_persisted(tmp_path: Path) -> None:
     pool, manager, job_repo, _assets, family, user, _other, family_id = _bootstrap(tmp_path)
     job = manager.create_job(
-        family_id, user, job_type="SCAN",
+        family_id,
+        user,
+        job_type="SCAN",
         paths=["/photos/a.jpg"],
         cursor={"offset": 128},
     )
@@ -341,11 +389,16 @@ def test_thumbnail_cache_key_cannot_traverse(tmp_path: Path) -> None:
 
     # A hostile family id must not steer the write outside the cache.
     hostile = service.cache_path(
-        "../../etc", asset, width=100, height=100, fmt="WEBP",
+        "../../etc",
+        asset,
+        width=100,
+        height=100,
+        fmt="WEBP",
     )
-    assert hostile.parent.parent == (tmp_path / "cache").resolve() or (
-        tmp_path / "cache"
-    ) in hostile.parents
+    assert (
+        hostile.parent.parent == (tmp_path / "cache").resolve()
+        or (tmp_path / "cache") in hostile.parents
+    )
     assert "etc" not in [part for part in hostile.parts if part == "etc"] or (
         hostile.parent.parent.name == "cache"
     )
@@ -369,15 +422,24 @@ def test_private_photo_thumbnail_denied_for_other_member(tmp_path: Path) -> None
     pool, manager, job_repo, asset_repo, family, user, other, family_id = _bootstrap(tmp_path)
     sibling = User(id=2, username="mama", role=Role.USER, display_name="妈妈")
     family.create_member(
-        family_id, user, display_name="Sibling", role=MemberRole.MEMBER,
+        family_id,
+        user,
+        display_name="Sibling",
+        role=MemberRole.MEMBER,
         user_id=sibling.id,
     )
     child = family.create_member(
-        family_id, user, display_name="Teen", role=MemberRole.CHILD,
+        family_id,
+        user,
+        display_name="Teen",
+        role=MemberRole.CHILD,
     )
     space = family.create_space(
-        family_id, user, name="Teen private",
-        space_type=SpaceType.PRIVATE, owner_member_id=child.id,
+        family_id,
+        user,
+        name="Teen private",
+        space_type=SpaceType.PRIVATE,
+        owner_member_id=child.id,
     )
     asset = _seed_asset(asset_repo, family_id, tmp_path, space_id=space.id)
     service = ThumbnailService(
@@ -397,7 +459,10 @@ def test_shared_photo_thumbnail_is_readable(tmp_path: Path) -> None:
     pool, manager, job_repo, asset_repo, family, user, _other, family_id = _bootstrap(tmp_path)
     sibling = User(id=2, username="mama", role=Role.USER, display_name="妈妈")
     family.create_member(
-        family_id, user, display_name="Sibling", role=MemberRole.MEMBER,
+        family_id,
+        user,
+        display_name="Sibling",
+        role=MemberRole.MEMBER,
         user_id=sibling.id,
     )
     asset = _seed_asset(asset_repo, family_id, tmp_path)
@@ -446,3 +511,281 @@ def _write_test_jpeg(path: Path) -> None:
     except ImportError:  # pragma: no cover - Pillow is a hard dependency
         pytest.skip("Pillow not installed")
     Image.new("RGB", (64, 48), (120, 90, 60)).save(path, "JPEG")
+
+
+# ============================================================================
+# Stage A — baseline contract for the five unimplemented job handlers.
+#
+# Every test below fails today for exactly one reason: the handler for
+# THUMBNAIL / VISION / EMBEDDING / FACE_MATCH / REINDEX does not exist, and
+# ``AssetJobCreateBody`` has nowhere to persist the provider + model config a
+# worker would need after a restart. They are written against the *target*
+# contract so Stage B/C can turn each one green without reshaping the test.
+# ============================================================================
+
+
+def _bootstrap_with_search(tmp_path: Path):
+    """Same bootstrap plus a real search index, so REINDEX is provable.
+
+    A unit test of ``FamilySearchIndexer`` proves the indexer works; it
+    does not prove any job calls it. These tests drain a job and then read
+    the index back, which is the only thing that makes REINDEX real.
+    """
+    pool, manager, job_repo, asset_repo, family, user, other, family_id = _bootstrap(tmp_path)
+    search_repo = SearchIndexRepo(pool)
+    indexer = FamilySearchIndexer(
+        search_repo,
+        family_repo=family.repo,
+        context_repo=FamilyContextRepo(pool),
+        asset_repo=asset_repo,
+    )
+    asset_manager = FamilyAssetManager(family.repo, asset_repo, search_indexer=indexer)
+    return (
+        pool,
+        manager,
+        job_repo,
+        asset_repo,
+        asset_manager,
+        search_repo,
+        indexer,
+        family,
+        user,
+        other,
+        family_id,
+    )
+
+
+# ------------------------------------------------------- handler existence
+
+
+@pytest.mark.parametrize(
+    "job_type",
+    ["THUMBNAIL", "VISION", "EMBEDDING", "FACE_MATCH", "REINDEX"],
+)
+def test_every_job_type_has_a_handler(tmp_path: Path, job_type: str) -> None:
+    """``build_handler`` must return a callable for every declared job type.
+
+    Handlers are built from the job *row* so they can read the persisted
+    config; this test goes through the same path the worker uses rather
+    than calling the factory with a bare type string. Every dependency a
+    type needs is supplied, so a failure here means the factory has no
+    branch for the type - not that a collaborator was forgotten.
+    """
+    pool, _m, job_repo, asset_repo, family, user, _other, family_id = _bootstrap(tmp_path)
+    asset_manager = FamilyAssetManager(family.repo, asset_repo)
+    row = _seed_job_row(job_repo, family_id, user.id, job_type)
+    handler = build_handler(
+        row,
+        asset_manager=asset_manager,
+        asset_repo=asset_repo,
+        thumbnail_service=ThumbnailService(family, tmp_path / "cache"),
+        search_indexer=FamilySearchIndexer(
+            SearchIndexRepo(pool),
+            family_repo=family.repo,
+            context_repo=FamilyContextRepo(pool),
+            asset_repo=asset_repo,
+        ),
+        photo_intelligence=object(),
+        provider_repo=_AnyProviderRepo(),
+        face_manager=object(),
+        family_manager=family,
+        user=user,
+        family_id=family_id,
+        created_by_user_id=user.id,
+    )
+    assert callable(handler), f"{job_type} must resolve to a callable handler"
+    pool.close()
+
+
+class _AnyProviderRepo:
+    """Answers every provider lookup; handler construction never calls it."""
+
+    def get(self, provider_id: int) -> object:
+        return None
+
+
+def _seed_job_row(job_repo, family_id: str, user_id: int, job_type: str):
+    """Create a job row directly, for tests that only need the factory."""
+    return job_repo.create_job(
+        family_id,
+        job_type=job_type,
+        requested_by=user_id,
+    )
+
+
+def test_asset_job_carries_persisted_config(tmp_path: Path) -> None:
+    """A job row must round-trip the non-sensitive config a worker needs.
+
+    Stage B moved this out of ``cursor_json`` into its own ``config_json``
+    column, so the payload survives a restart without a progress write
+    clobbering it.
+    """
+    pool, manager, job_repo, _ar, _f, user, _o, family_id = _bootstrap(tmp_path)
+    job = manager.create_job(
+        family_id,
+        user,
+        job_type="VISION",
+        asset_ids=[],
+        config=AssetJobConfig(vision_provider_id=12, vision_model="qwen-vl"),
+    )
+    reloaded = job_repo.get_job(job.id)
+    assert reloaded is not None
+    payload = json.loads(reloaded.config_json)
+    assert payload.get("version") == 1
+    assert "vision_provider_id" in payload
+    pool.close()
+
+
+# --------------------------------------------------------- per-type targets
+
+
+def test_thumbnail_job_renders_and_caches(tmp_path: Path) -> None:
+    """THUMBNAIL must produce a cache file for a registered image asset."""
+    pool, manager, job_repo, asset_repo, family, user, _o, family_id = _bootstrap(tmp_path)
+    asset = _seed_asset(asset_repo, family_id, tmp_path)
+    asset_manager = FamilyAssetManager(family.repo, asset_repo)
+    service = ThumbnailService(family, tmp_path / "cache", asset_repo=asset_repo)
+    job = manager.create_job(
+        family_id,
+        user,
+        job_type="THUMBNAIL",
+        asset_ids=[asset.id],
+    )
+    handler = build_handler(
+        job_repo.get_job(job.id),
+        asset_manager=asset_manager,
+        asset_repo=asset_repo,
+        thumbnail_service=service,
+        family_id=family_id,
+        created_by_user_id=user.id,
+    )
+    summary = manager.run_job(job.id, handler)
+    assert summary.status == JOB_STATUS_COMPLETED
+    assert summary.succeeded_items == 1
+    rendered = service.cache_path(family_id, asset, width=320, height=320, fmt="WEBP")
+    assert rendered.exists(), "the job must leave a rendered file behind"
+    pool.close()
+
+
+def test_reindex_job_writes_to_the_search_index(tmp_path: Path) -> None:
+    """REINDEX must reach the index — the whole point of the job type.
+
+    This is the write-path test the plan asks for: drain a job, then read
+    the index back. Without it a REINDEX job could "succeed" forever while
+    the index stays empty.
+    """
+    (
+        pool,
+        manager,
+        job_repo,
+        asset_repo,
+        asset_manager,
+        search_repo,
+        indexer,
+        family,
+        user,
+        _o,
+        family_id,
+    ) = _bootstrap_with_search(tmp_path)
+    asset = _seed_asset(asset_repo, family_id, tmp_path)
+    job = manager.create_job(
+        family_id,
+        user,
+        job_type="REINDEX",
+        asset_ids=[asset.id],
+    )
+    handler = build_handler(
+        job_repo.get_job(job.id),
+        asset_manager=asset_manager,
+        asset_repo=asset_repo,
+        search_indexer=indexer,
+        family_id=family_id,
+        created_by_user_id=user.id,
+    )
+    summary = manager.run_job(job.id, handler)
+    assert summary.status == JOB_STATUS_COMPLETED
+    assert summary.succeeded_items == 1
+    assert _index_has_asset(pool, family_id, asset.id)
+    pool.close()
+
+
+def test_job_cannot_read_another_familys_asset(tmp_path: Path) -> None:
+    """A job scoped to family A must refuse an asset owned by family B.
+
+    Stage B refuses this at creation time, so the cross-family id never
+    becomes a work item in the first place.
+    """
+    pool, manager, _jr, asset_repo, family, user, _o, family_id = _bootstrap(tmp_path)
+    other_family = family.create_family(
+        user,
+        name="Other",
+        timezone="Asia/Shanghai",
+        locale="zh",
+    )
+    foreign = _seed_asset(asset_repo, other_family.id, tmp_path)
+    with pytest.raises(HomeMindError):
+        manager.create_job(
+            family_id,
+            user,
+            job_type="REINDEX",
+            asset_ids=[foreign.id],
+        )
+    assert not _index_has_asset(pool, family_id, foreign.id)
+    pool.close()
+
+
+def _index_has_asset(pool: Any, family_id: str, asset_id: str) -> bool:
+    """True when an ASSET document for ``asset_id`` is in the index."""
+    document_id = document_id_for(family_id, KIND_ASSET, asset_id)
+    with pool.connect() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM homemind_search_documents WHERE document_id = ?",
+            (document_id,),
+        ).fetchone()
+    return row is not None
+
+
+# ------------------------------------------------------------ authorisation
+
+
+def test_plain_member_cannot_create_a_job(tmp_path: Path) -> None:
+    """Job management is manager-only; a plain member must be refused."""
+    pool, manager, _jr, _ar, family, user, other, family_id = _bootstrap(tmp_path)
+    family.create_member(
+        family_id,
+        user,
+        display_name="Sibling",
+        role=MemberRole.MEMBER,
+        user_id=other.id,
+    )
+    with pytest.raises(OctopError):
+        manager.create_job(family_id, other, job_type="SCAN", paths=["/photos/a.jpg"])
+    pool.close()
+
+
+def test_restart_restores_job_config(tmp_path: Path) -> None:
+    """A fresh manager over the same DB must still see the job's config.
+
+    Simulates a process restart: the pool is reopened, the manager rebuilt,
+    and the payload read back without any in-memory carry-over.
+    """
+    pool, manager, _jr, _ar, family, user, _o, family_id = _bootstrap(tmp_path)
+    job = manager.create_job(
+        family_id,
+        user,
+        job_type="EMBEDDING",
+        asset_ids=[],
+        config=AssetJobConfig(embedding_provider_id=13, embedding_model="bge-m3"),
+    )
+    pool.close()
+
+    reopened = SqlitePool(tmp_path / "octop.db")
+    fresh_repo = AssetJobRepo(reopened)
+    fresh_manager = AssetJobManager(family, fresh_repo)
+    reloaded = fresh_repo.get_job(job.id)
+    assert reloaded is not None
+    assert reloaded.job_type == "EMBEDDING"
+    payload = json.loads(reloaded.config_json)
+    assert "embedding_provider_id" in payload
+    assert fresh_manager is not None
+    reopened.close()

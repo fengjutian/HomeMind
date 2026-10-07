@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from homemind.infra.db.repos.asset_jobs import AssetJobRepo
+from homemind.infra.db.repos.face_candidates import FaceCandidateRepo
 from homemind.infra.db.repos.families import FamilyRepo
 from homemind.infra.db.repos.family_albums import FamilyAlbumRepo
 from homemind.infra.db.repos.family_assets import FamilyAssetRepo
@@ -38,6 +39,7 @@ class HomeMindServices:
     photo_intelligence_repo: PhotoIntelligenceRepo
     asset_job_repo: AssetJobRepo
     search_index_repo: SearchIndexRepo
+    face_candidate_repo: FaceCandidateRepo
 
     @classmethod
     def from_pool(cls, db: DatabasePool) -> HomeMindServices:
@@ -56,4 +58,5 @@ class HomeMindServices:
             photo_intelligence_repo=PhotoIntelligenceRepo(db),
             asset_job_repo=AssetJobRepo(db),
             search_index_repo=SearchIndexRepo(db),
+            face_candidate_repo=FaceCandidateRepo(db),
         )

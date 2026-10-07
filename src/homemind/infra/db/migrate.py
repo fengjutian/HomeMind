@@ -73,6 +73,8 @@ def run_migrations(db: DatabasePool) -> None:
         current = version
     if current >= 2:
         _reapply_unreleased_v2(db)
+    if current >= 15:
+        _reapply_unreleased_v15(db)
 
 
 def _reapply_unreleased_v2(db: DatabasePool) -> None:
@@ -92,3 +94,39 @@ def _reapply_unreleased_v2(db: DatabasePool) -> None:
     else:
         with db.connect() as conn:
             conn.executescript(sql)
+
+
+def _reapply_unreleased_v15(db: DatabasePool) -> None:
+    """Add ``config_json`` for databases that applied v15 before it existed.
+
+    v15 is unreleased, but a local database that already recorded it would
+    skip the file and never gain the column. Written as a column probe rather
+    than ``ADD COLUMN IF NOT EXISTS`` because SQLite does not support that
+    form; the probe is the portable equivalent and is a no-op once present.
+    """
+    if _has_column(db, "homemind_asset_jobs", "config_json"):
+        return
+    with db.connect() as conn:
+        conn.execute(
+            "ALTER TABLE homemind_asset_jobs ADD COLUMN config_json TEXT NOT NULL DEFAULT '{}'",
+        )
+
+
+def _has_column(db: DatabasePool, table: str, column: str) -> bool:
+    """True when ``table`` already has ``column``."""
+    try:
+        with db.connect() as conn:
+            if db.dialect == "postgresql":
+                row = conn.execute(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name = ? AND column_name = ?",
+                    (table, column),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT 1 FROM pragma_table_info(?) WHERE name = ?",
+                    (table, column),
+                ).fetchone()
+    except Exception:
+        return False
+    return row is not None

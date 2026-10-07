@@ -117,9 +117,7 @@ def _safe_segment(value: str) -> str:
     directory name. Length is capped so a caller cannot create an
     over-long component.
     """
-    cleaned = "".join(
-        char if (char.isalnum() or char in "-_") else "_" for char in str(value)
-    )
+    cleaned = "".join(char if (char.isalnum() or char in "-_") else "_" for char in str(value))
     return cleaned[:128] or "_"
 
 
@@ -192,7 +190,11 @@ class ThumbnailService:
         fmt = resolve_output_format(requested_format)
 
         destination = self.cache_path(
-            family_id, asset, width=target_width, height=target_height, fmt=fmt,
+            family_id,
+            asset,
+            width=target_width,
+            height=target_height,
+            fmt=fmt,
         )
         if destination.exists():
             return ThumbnailResult(
@@ -218,6 +220,48 @@ class ThumbnailService:
             height=rendered.height,
             format=rendered.format,
         )
+
+    def build_for_asset(
+        self,
+        family_id: str,
+        asset: FamilyAssetRow,
+        *,
+        width: int | None = None,
+        height: int | None = None,
+        requested_format: str | None = None,
+    ) -> ThumbnailResult | None:
+        """Render a thumbnail with no end user in the loop.
+
+        A background job runs as the system, not as the member who queued
+        it, so there is no ``User`` to evaluate a permission against. The
+        caller is responsible for having established that the asset belongs
+        to ``family_id`` — :meth:`get_or_build` does that check before it
+        reaches here, and so must any job handler.
+        """
+        target_width = clamp_dimension(width, fallback=DEFAULT_THUMBNAIL_WIDTH)
+        target_height = clamp_dimension(height, fallback=DEFAULT_THUMBNAIL_HEIGHT)
+        fmt = resolve_output_format(requested_format)
+        destination = self.cache_path(
+            family_id,
+            asset,
+            width=target_width,
+            height=target_height,
+            fmt=fmt,
+        )
+        if destination.exists():
+            return ThumbnailResult(
+                path=destination,
+                width=target_width,
+                height=target_height,
+                format=fmt,
+            )
+        try:
+            source = _open_asset_path(asset)
+        except ValueError:
+            return None
+        if not source.is_file():
+            return None
+        return self._render(source, destination, target_width, target_height, fmt)
 
     def _render(
         self,
@@ -251,7 +295,9 @@ class ThumbnailService:
                 actual_width, actual_height = thumbnail.size
         except Exception as exc:  # noqa: BLE001 — degrade, do not 500
             logger.info(
-                "thumbnail render failed for %s: %s", source.name, exc,
+                "thumbnail render failed for %s: %s",
+                source.name,
+                exc,
             )
             return None
         return ThumbnailResult(

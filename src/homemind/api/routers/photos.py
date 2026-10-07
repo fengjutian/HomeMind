@@ -10,6 +10,10 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from homemind.infra.db.migrate import run_migrations
+from homemind.infra.db.repos.face_candidates import (
+    CANDIDATE_PENDING,
+    FaceCandidateRow,
+)
 from homemind.infra.db.repos.photo_intelligence import PhotoIntelligenceRow
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.assets import FamilyAssetManager
@@ -95,6 +99,9 @@ def _manager(server: OctopServer) -> PhotoIntelligenceManager:
         # by this guard, so the family's privacy settings are actually
         # enforced rather than merely stored.
         privacy_guard=ExternalProcessingGuard(services),
+        # Face-match proposals need the review queue; without it the
+        # service would have nowhere to put a candidate.
+        candidates=services.face_candidate_repo,
     )
 
 
@@ -141,9 +148,7 @@ async def analyze_with_provider(
     user: CurrentUser,
 ) -> PhotoIntelligenceResponse:
     assert server.services is not None
-    vision_row = require_provider(
-        server.services.provider_repo.get(body.vision_provider_id)
-    )
+    vision_row = require_provider(server.services.provider_repo.get(body.vision_provider_id))
     vision = OpenAICompatibleVisionProvider(vision_row, body.vision_model)
     embedding = None
     if body.embedding_provider_id is not None:
@@ -152,9 +157,7 @@ async def analyze_with_provider(
         embedding_row = require_provider(
             server.services.provider_repo.get(body.embedding_provider_id)
         )
-        embedding = OpenAICompatibleEmbeddingProvider(
-            embedding_row, body.embedding_model
-        )
+        embedding = OpenAICompatibleEmbeddingProvider(embedding_row, body.embedding_model)
     row = await asyncio.to_thread(
         _manager(server).analyze,
         family_id,
@@ -162,9 +165,7 @@ async def analyze_with_provider(
         user,
         vision=vision,
         embedding=embedding,
-        geocoder=NominatimReverseGeocodingProvider()
-        if body.reverse_geocode
-        else None,
+        geocoder=NominatimReverseGeocodingProvider() if body.reverse_geocode else None,
         face_recognition=vision if body.recognize_faces else None,
     )
     return _response(row)
@@ -182,9 +183,7 @@ async def set_face_reference(
     server: Server,
     user: CurrentUser,
 ) -> None:
-    _manager(server).set_face_reference(
-        family_id, body.member_id, asset_id, user
-    )
+    _manager(server).set_face_reference(family_id, body.member_id, asset_id, user)
 
 
 @router.delete(
@@ -210,9 +209,7 @@ async def semantic_search(
     user: CurrentUser,
 ) -> list[SemanticPhotoResponse]:
     assert server.services is not None
-    provider = require_provider(
-        server.services.provider_repo.get(body.embedding_provider_id)
-    )
+    provider = require_provider(server.services.provider_repo.get(body.embedding_provider_id))
     embedding = OpenAICompatibleEmbeddingProvider(provider, body.embedding_model)
     rows = await asyncio.to_thread(
         _manager(server).search,
@@ -243,3 +240,101 @@ async def similar_photos(
             family_id, asset_id, user, max_distance=max_distance
         )
     ]
+
+
+# ---------------------------------------------------------- face candidates
+
+
+class FaceCandidateResponse(BaseModel):
+    """A proposed face match awaiting a manager's decision.
+
+    ``status`` is ``PENDING`` until a manager confirms or rejects it. A
+    pending candidate is a suggestion, not a label, and nothing downstream
+    may treat it as an identity.
+    """
+
+    candidate_id: str
+    family_id: str
+    asset_id: str
+    member_id: str
+    confidence: float = Field(description="Provider-reported confidence, 0..1.")
+    status: str = Field(description="PENDING | CONFIRMED | REJECTED")
+    decided_by: int | None = None
+    decided_at: int | None = None
+    created_at: int
+
+
+def _candidate_response(row: FaceCandidateRow) -> FaceCandidateResponse:
+    return FaceCandidateResponse(
+        candidate_id=row.id,
+        family_id=row.family_id,
+        asset_id=row.asset_id,
+        member_id=row.member_id,
+        confidence=row.confidence,
+        status=row.status,
+        decided_by=row.decided_by,
+        decided_at=row.decided_at,
+        created_at=row.created_at,
+    )
+
+
+@router.get(
+    "/{family_id}/face-candidates",
+    response_model=list[FaceCandidateResponse],
+    summary="List proposed face matches for review",
+    description=(
+        "Returns the review queue produced by FACE_MATCH jobs. Readable by "
+        "any family member; confirming or rejecting is manager-only. A "
+        "candidate is never applied automatically, whatever its confidence."
+    ),
+)
+async def list_face_candidates(
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
+    status: str | None = Query(default=CANDIDATE_PENDING),
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> list[FaceCandidateResponse]:
+    manager = _manager(server)
+    return [
+        _candidate_response(row)
+        for row in manager.list_face_candidates(family_id, user, status=status, limit=limit)
+    ]
+
+
+@router.post(
+    "/{family_id}/face-candidates/{candidate_id}/confirm",
+    response_model=FaceCandidateResponse,
+    summary="Confirm a proposed face match",
+    description=(
+        "Manager-only. A confirmed candidate may be used as a label; the "
+        "decision is recorded with who made it and when."
+    ),
+)
+async def confirm_face_candidate(
+    family_id: str,
+    candidate_id: str,
+    server: Server,
+    user: CurrentUser,
+) -> FaceCandidateResponse:
+    row = _manager(server).confirm_face_candidate(family_id, candidate_id, user)
+    return _candidate_response(row)
+
+
+@router.post(
+    "/{family_id}/face-candidates/{candidate_id}/reject",
+    response_model=FaceCandidateResponse,
+    summary="Reject a proposed face match",
+    description=(
+        "Manager-only. A rejected candidate is never re-offered "
+        "automatically, so re-running a FACE_MATCH job will not resurrect it."
+    ),
+)
+async def reject_face_candidate(
+    family_id: str,
+    candidate_id: str,
+    server: Server,
+    user: CurrentUser,
+) -> FaceCandidateResponse:
+    row = _manager(server).reject_face_candidate(family_id, candidate_id, user)
+    return _candidate_response(row)

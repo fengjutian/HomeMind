@@ -21,9 +21,12 @@ from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
 from homemind.infra.family.memory_maintenance import MaintenanceRunner
 from homemind.infra.family.permissions import FamilyPermissionEvaluator
+from homemind.infra.family.photo_intelligence import PhotoIntelligenceManager
+from homemind.infra.family.privacy import ExternalProcessingGuard
 from homemind.infra.family.scan_job import FamilyAssetScanJob
 from homemind.infra.family.search_indexer import FamilySearchIndexer
 from homemind.infra.family.tasks import FamilyTaskManager
+from homemind.infra.family.thumbnails import ThumbnailService
 from homemind.infra.family.transactions import FamilyTransactionManager
 from homemind.tools.family import build_family_tools
 from octop.infra.server import OctopServer
@@ -107,6 +110,17 @@ class HomeMindServer(OctopServer):
             photo_repo=services.photo_intelligence_repo,
         )
 
+    def _user_by_id(self, user_id: int) -> Any:
+        """Load a ``User`` for a background job's permission checks.
+
+        AI job handlers call services that take a ``User``; a worker has no
+        session, so the user is resolved from the running registry.
+        """
+        manager = self.user_manager
+        if manager is None:
+            return None
+        return manager.get_by_id(user_id)
+
     @property
     def memory_maintenance(self) -> MaintenanceRunner | None:
         return self._memory_maintenance
@@ -146,7 +160,8 @@ class HomeMindServer(OctopServer):
             return
         run_migrations(self.services.db)
         self._family_event_bus = FamilyEventBus(
-            HomeMindServices.from_pool(self.services.db), hub=hub,
+            HomeMindServices.from_pool(self.services.db),
+            hub=hub,
         )
 
     def _start_asset_scan_job(self) -> None:
@@ -203,15 +218,50 @@ class HomeMindServer(OctopServer):
         run_migrations(self.services.db)
         hm = HomeMindServices.from_pool(self.services.db)
         family_manager = FamilyManager(hm.family_repo)
+        search_indexer = self._search_indexer(hm)
+        photo_intelligence = PhotoIntelligenceManager(
+            family_manager,
+            FamilyAssetManager(
+                hm.family_repo,
+                hm.family_asset_repo,
+                search_indexer=search_indexer,
+            ),
+            hm.family_context_repo,
+            hm.photo_intelligence_repo,
+            # Every outbound vision / embedding call made by a job goes
+            # through this guard, so the family's privacy settings are
+            # enforced on the background path too — not only in the
+            # request handlers.
+            privacy_guard=ExternalProcessingGuard(hm),
+            # Face matches become reviewable candidates, never labels.
+            candidates=hm.face_candidate_repo,
+        )
         self._asset_job_runner = AssetJobRunner(
-            manager=AssetJobManager(family_manager, hm.asset_job_repo),
+            manager=AssetJobManager(
+                family_manager,
+                hm.asset_job_repo,
+                asset_repo=hm.family_asset_repo,
+            ),
             asset_manager=FamilyAssetManager(
                 hm.family_repo,
                 hm.family_asset_repo,
-                search_indexer=self._search_indexer(hm),
+                search_indexer=search_indexer,
             ),
             family_manager=family_manager,
             asset_repo=hm.family_asset_repo,
+            # Cache lives beside the rest of HomeMind's data, never beside
+            # the original file — the source tree may be a read-only NAS.
+            thumbnail_service=ThumbnailService(
+                family_manager,
+                self.paths.root / "homemind" / "thumbnails",
+                asset_repo=hm.family_asset_repo,
+                permission_evaluator=FamilyPermissionEvaluator(hm.family_repo),
+            ),
+            search_indexer=search_indexer,
+            photo_intelligence=photo_intelligence,
+            face_manager=photo_intelligence,
+            provider_repo=self.services.provider_repo,
+            user_factory=self._user_by_id,
             event_bus=lambda: self._family_event_bus,
         )
         await self._asset_job_runner.start()
