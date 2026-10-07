@@ -30,8 +30,6 @@ router = APIRouter()
 Server = Annotated[OctopServer, Depends(get_server)]
 CurrentUser = Annotated[User, Depends(current_user)]
 
-_TIMESTAMP = Field(description="UTC epoch seconds.")
-
 
 class CalendarCreateBody(BaseModel):
     name: str = Field(min_length=1, max_length=120)
@@ -75,8 +73,8 @@ class CalendarResponse(BaseModel):
 class CalendarEventCreateBody(BaseModel):
     calendar_id: str
     title: str = Field(min_length=1, max_length=200)
-    starts_at: int = _TIMESTAMP
-    ends_at: int = _TIMESTAMP
+    starts_at: int = Field(description="UTC epoch seconds.")
+    ends_at: int = Field(description="UTC epoch seconds.")
     description: str = Field(default="", max_length=5000)
     location: str | None = Field(default=None, max_length=300)
     all_day: bool = False
@@ -90,7 +88,9 @@ class CalendarEventCreateBody(BaseModel):
             "rejected; the stored value must stay machine-readable."
         ),
     )
-    recurrence_until: int | None = _TIMESTAMP
+    recurrence_until: int | None = Field(
+        default=None, description="UTC epoch seconds; must agree with an UNTIL in the rule."
+    )
     source_type: str = Field(default="MANUAL", description="MANUAL | TASK | EXTERNAL")
     source_id: str | None = None
 
@@ -154,6 +154,7 @@ class OccurrenceResponse(BaseModel):
     source_id: str | None
     occurrence_key: str
     is_recurring: bool
+    recurrence_rule: str | None = None
 
 
 def _manager(server: OctopServer) -> FamilyCalendarManager:
@@ -288,9 +289,7 @@ async def list_events(
     calendar_id: Annotated[str | None, Query()] = None,
     status: Annotated[str | None, Query(description="CONFIRMED | CANCELLED")] = None,
 ) -> object:
-    return _manager(server).list_events(
-        family_id, user, calendar_id=calendar_id, status=status
-    )
+    return _manager(server).list_events(family_id, user, calendar_id=calendar_id, status=status)
 
 
 @router.get(
@@ -298,9 +297,7 @@ async def list_events(
     response_model=CalendarEventResponse,
     summary="Read one calendar event",
 )
-async def get_event(
-    family_id: str, event_id: str, server: Server, user: CurrentUser
-) -> object:
+async def get_event(family_id: str, event_id: str, server: Server, user: CurrentUser) -> object:
     return _manager(server).get_event(family_id, event_id, user)
 
 

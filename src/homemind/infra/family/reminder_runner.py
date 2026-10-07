@@ -23,6 +23,7 @@ import os
 import socket
 from collections.abc import Callable
 
+from homemind.infra.family.events import FamilyEventBus
 from homemind.infra.family.reminders import FamilyReminderManager, ReminderDispatch
 from homemind.infra.metrics import inc as _hm_inc
 
@@ -52,7 +53,7 @@ class ReminderRunner:
         lease_seconds: int = DEFAULT_LEASE_SECONDS,
         max_attempts: int = MAX_DELIVERY_ATTEMPTS,
         worker_id: str | None = None,
-        event_bus: Callable[[], object] | None = None,
+        event_bus: Callable[[], FamilyEventBus | None] | None = None,
     ) -> None:
         self._manager = manager
         self._poll_interval = poll_interval_seconds

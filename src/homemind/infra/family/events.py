@@ -72,9 +72,7 @@ EVENT_TYPES: frozenset[str] = frozenset(
 )
 
 # Only a family manager gets the full audit view of a transaction.
-_MANAGER_ONLY_EVENTS: frozenset[str] = frozenset(
-    {EVENT_APPROVAL_CREATED, EVENT_APPROVAL_DECIDED}
-)
+_MANAGER_ONLY_EVENTS: frozenset[str] = frozenset({EVENT_APPROVAL_CREATED, EVENT_APPROVAL_DECIDED})
 
 
 @dataclass(frozen=True)
@@ -145,7 +143,8 @@ class FamilyEventBus:
 
         if event.event_type not in EVENT_TYPES:
             logger.warning(
-                "FamilyEventBus: unknown event type %r; dropping", event.event_type,
+                "FamilyEventBus: unknown event type %r; dropping",
+                event.event_type,
             )
             return 0
         timestamp = event.created_at or int(time.time())
@@ -196,10 +195,7 @@ class FamilyEventBus:
         if event.owner_member_id is not None and event.owner_member_id != member_id:
             # Scoped to a specific member (e.g. their own candidate).
             return False
-        return not (
-            event.event_type in _MANAGER_ONLY_EVENTS
-            and role not in {"OWNER", "ADMIN"}
-        )
+        return not (event.event_type in _MANAGER_ONLY_EVENTS and role not in {"OWNER", "ADMIN"})
 
     async def emit_many(self, events: list[FamilyEvent]) -> int:
         total = 0

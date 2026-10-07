@@ -109,7 +109,7 @@ def test_existing_homemind_routes_are_never_removed() -> None:
     surface = _homemind_surface()
     missing = sorted(_FROZEN_HOMEMIND_SURFACE - surface)
     assert missing == [], (
-        "HomeMind routes disappeared during the remaining-features work: " f"{missing}"
+        f"HomeMind routes disappeared during the remaining-features work: {missing}"
     )
 
 

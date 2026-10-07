@@ -1,4 +1,4 @@
-﻿"""Calendar, occurrence and reminder behaviour (Stage 1).
+"""Calendar, occurrence and reminder behaviour (Stage 1).
 
 The interesting cases here are the ones a naive implementation gets
 wrong: a weekly meeting that crosses a DST boundary, an all-day event,
@@ -16,6 +16,7 @@ import pytest
 
 from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
 from homemind.infra.db.services import HomeMindServices
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.calendar import (
     MAX_OCCURRENCES_PER_QUERY,
     FamilyCalendarManager,
@@ -27,7 +28,6 @@ from homemind.infra.family.reminder_runner import ReminderRunner
 from homemind.infra.family.reminders import FamilyReminderManager
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
-from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import Role, User
 
@@ -203,8 +203,7 @@ def test_weekly_event_keeps_local_time_across_a_dst_boundary(env) -> None:  # no
     )
     assert len(occurrences) == 3
     local_hours = [
-        datetime.fromtimestamp(o.starts_at, tz=UTC).astimezone(new_york).hour
-        for o in occurrences
+        datetime.fromtimestamp(o.starts_at, tz=UTC).astimezone(new_york).hour for o in occurrences
     ]
     assert local_hours == [9, 9, 9]
     # And the UTC instants genuinely differ, proving the rule was not
@@ -465,9 +464,7 @@ def test_calendar_of_another_family_is_not_found(env) -> None:  # noqa: ANN001
     owner = env["owner"]
     spouse = env["spouse"]
     families = env["families"]
-    other = families.create_family(
-        spouse, name="Neighbour", timezone="Asia/Shanghai", locale="zh"
-    )
+    other = families.create_family(spouse, name="Neighbour", timezone="Asia/Shanghai", locale="zh")
     calendar = env["calendars"].create_calendar(family_id := other.id, user=spouse, name="X")
     with pytest.raises(OctopError) as excinfo:
         env["calendars"].get_calendar(family_id, calendar.id, owner)
@@ -482,8 +479,12 @@ def test_reminder_is_created_once_even_when_scheduled_twice(env) -> None:  # noq
     owner = env["owner"]
     reminders = env["reminders"]
     task = env["services"].family_task_repo.create(
-        family.id, title="Buy formula", description="", assigned_member_id=None,
-        due_at=None, created_by=owner.id,
+        family.id,
+        title="Buy formula",
+        description="",
+        assigned_member_id=None,
+        due_at=None,
+        created_by=owner.id,
     )
     first = reminders.create(
         family.id, owner, target_type="TASK", target_id=task.id, remind_at=_epoch(2026, 5, 1)
@@ -580,9 +581,7 @@ def test_a_reminder_is_only_created_for_a_member_the_family_still_has(env) -> No
     env["families"].delete_member(family.id, env["member"].id, owner)
     calendars.update_event(family.id, event.id, owner, {"title": "Piano lesson (moved)"})
     live = [
-        r
-        for r in reminders.list_for_target("CALENDAR_EVENT", event.id)
-        if r.status == "PENDING"
+        r for r in reminders.list_for_target("CALENDAR_EVENT", event.id) if r.status == "PENDING"
     ]
     assert env["member"].id not in {r.recipient_member_id for r in live}
 
@@ -716,8 +715,12 @@ def test_delivery_resolves_the_target_title(env) -> None:  # noqa: ANN001
     reminders = env["reminders"]
     services = env["services"]
     task = services.family_task_repo.create(
-        family.id, title="Pick up the cake", description="chocolate", assigned_member_id=None,
-        due_at=None, created_by=owner.id,
+        family.id,
+        title="Pick up the cake",
+        description="chocolate",
+        assigned_member_id=None,
+        due_at=None,
+        created_by=owner.id,
     )
     reminders.repo.create(
         family.id,
@@ -734,7 +737,6 @@ def test_delivery_resolves_the_target_title(env) -> None:  # noqa: ANN001
 
 def test_delivery_of_a_deleted_target_fails_permanently(env) -> None:  # noqa: ANN001
     family = env["family"]
-    owner = env["owner"]
     reminders = env["reminders"]
     reminders.repo.create(
         family.id,
@@ -779,8 +781,12 @@ async def test_runner_delivers_a_due_reminder_and_marks_it_sent(env) -> None:  #
 
     bus = _Bus()
     task = services.family_task_repo.create(
-        family.id, title="Call the plumber", description="", assigned_member_id=None,
-        due_at=None, created_by=owner.id,
+        family.id,
+        title="Call the plumber",
+        description="",
+        assigned_member_id=None,
+        due_at=None,
+        created_by=owner.id,
     )
     reminders.repo.create(
         family.id,
@@ -814,8 +820,12 @@ async def test_runner_does_not_redeliver_a_sent_reminder(env) -> None:  # noqa: 
     services = env["services"]
     reminders = env["reminders"]
     task = services.family_task_repo.create(
-        family.id, title="Feed the cat", description="", assigned_member_id=None,
-        due_at=None, created_by=owner.id,
+        family.id,
+        title="Feed the cat",
+        description="",
+        assigned_member_id=None,
+        due_at=None,
+        created_by=owner.id,
     )
     reminders.repo.create(
         family.id,
@@ -846,8 +856,12 @@ async def test_runner_retries_a_failed_delivery_then_retires_it(env) -> None:  #
             raise RuntimeError("gateway down")
 
     task = services.family_task_repo.create(
-        family.id, title="Sign the form", description="", assigned_member_id=None,
-        due_at=None, created_by=owner.id,
+        family.id,
+        title="Sign the form",
+        description="",
+        assigned_member_id=None,
+        due_at=None,
+        created_by=owner.id,
     )
     reminders.repo.create(
         family.id,
@@ -878,8 +892,12 @@ async def test_runner_start_recovers_a_lease_left_by_a_dead_worker(env) -> None:
     services = env["services"]
     reminders = env["reminders"]
     task = services.family_task_repo.create(
-        family.id, title="Return the library book", description="", assigned_member_id=None,
-        due_at=None, created_by=owner.id,
+        family.id,
+        title="Return the library book",
+        description="",
+        assigned_member_id=None,
+        due_at=None,
+        created_by=owner.id,
     )
     reminders.repo.create(
         family.id,
@@ -893,9 +911,7 @@ async def test_runner_start_recovers_a_lease_left_by_a_dead_worker(env) -> None:
     reminders.repo.claim_due(owner="dead-worker", ttl_seconds=1, now=0)
     reminders.repo.claim_due(owner="dead-worker", ttl_seconds=1, now=1)
 
-    runner = ReminderRunner(
-        manager=reminders, poll_interval_seconds=3600, worker_id="new-worker"
-    )
+    runner = ReminderRunner(manager=reminders, poll_interval_seconds=3600, worker_id="new-worker")
     await runner.start()
     try:
         assert await runner.drain_once() == 1
@@ -905,9 +921,7 @@ async def test_runner_start_recovers_a_lease_left_by_a_dead_worker(env) -> None:
 
 @pytest.mark.asyncio
 async def test_runner_stop_is_idempotent(env) -> None:  # noqa: ANN001
-    runner = ReminderRunner(
-        manager=env["reminders"], poll_interval_seconds=0.01, worker_id="idle"
-    )
+    runner = ReminderRunner(manager=env["reminders"], poll_interval_seconds=0.01, worker_id="idle")
     await runner.start()
     await runner.stop()
     await runner.stop()

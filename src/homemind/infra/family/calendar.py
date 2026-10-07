@@ -1,4 +1,4 @@
-﻿"""Family calendar domain service.
+"""Family calendar domain service.
 
 Two problems live here that the repository deliberately does not solve:
 
@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from homemind.infra.db.repos.family_calendars import (
@@ -33,8 +33,8 @@ from homemind.infra.db.repos.family_calendars import (
     FamilyCalendarRepo,
     FamilyCalendarRow,
 )
-from homemind.infra.family.manager import FamilyManager
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
+from homemind.infra.family.manager import FamilyManager
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
 
@@ -79,8 +79,16 @@ def normalize_recurrence_rule(rule: str | None) -> str | None:
     return text
 
 
-def _build_rrule(rule: str, dtstart: datetime) -> object:
-    from dateutil.rrule import rrulestr  # noqa: PLC0415 — optional-cost import
+def _build_rrule(rule: str, dtstart: datetime) -> Any:
+    """Parse an RRULE into an expandable ``rrule``.
+
+    Typed as ``Any`` rather than ``rrulebase`` because ``rrulestr``
+    returns a union (rrule / rruleset / a bare dtstart for a rule-less
+    string) and only the rrule members expose ``after``.
+    """
+    from dateutil.rrule import (
+        rrulestr,  # noqa: PLC0415 — deferred: keeps import cost off the read path
+    )
 
     return rrulestr(rule, dtstart=dtstart)
 
@@ -128,6 +136,7 @@ class CalendarOccurrence:
     source_id: str | None
     occurrence_key: str
     is_recurring: bool
+    recurrence_rule: str | None = None
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -146,6 +155,7 @@ class CalendarOccurrence:
             "source_id": self.source_id,
             "occurrence_key": self.occurrence_key,
             "is_recurring": self.is_recurring,
+            "recurrence_rule": self.recurrence_rule,
         }
 
 
@@ -158,7 +168,7 @@ class FamilyCalendarManager:
         repo: FamilyCalendarRepo,
         *,
         server_timezone: str = "UTC",
-        reminders: "FamilyReminderManager | None" = None,
+        reminders: FamilyReminderManager | None = None,
     ) -> None:
         self.family = family
         self.repo = repo
@@ -313,9 +323,7 @@ class FamilyCalendarManager:
             raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "invalid calendar event status")
         return self.repo.list_events(family_id, calendar_id=calendar_id, status=status)
 
-    def get_event(
-        self, family_id: str, event_id: str, user: User
-    ) -> FamilyCalendarEventRow:
+    def get_event(self, family_id: str, event_id: str, user: User) -> FamilyCalendarEventRow:
         self.family.require_access(family_id, user)
         return self._event(family_id, event_id)
 
@@ -344,12 +352,14 @@ class FamilyCalendarManager:
             )
         if "starts_at" in values or "ends_at" in values:
             values = _apply_duration_preserving_move(event, values)
-            self._validate_window(int(values["starts_at"]), int(values["ends_at"]))
+            self._validate_window(_as_int(values["starts_at"]), _as_int(values["ends_at"]))
         updated = self.repo.update_event(event.id, expected_version=expected_version, **values)
         if updated is None:
             # Either the event vanished or another writer bumped the
             # version first. Both mean "your edit was not applied".
-            raise HomeMindError(HomeMindErrorCode.FAMILY_CONFLICT, "calendar event was modified by someone else")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT, "calendar event was modified by someone else"
+            )
         self._sync_reminders(updated)
         return updated
 
@@ -375,7 +385,9 @@ class FamilyCalendarManager:
             event.id, expected_version=expected_version, status="CANCELLED"
         )
         if updated is None:
-            raise HomeMindError(HomeMindErrorCode.FAMILY_CONFLICT, "calendar event was modified by someone else")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT, "calendar event was modified by someone else"
+            )
         self._sync_reminders(updated)
         return updated
 
@@ -407,7 +419,9 @@ class FamilyCalendarManager:
         """
         self.family.require_access(family_id, user)
         if window_end <= window_start:
-            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "window end must be after window start")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "window end must be after window start"
+            )
         span_days = (window_end - window_start) / 86400
         if span_days > MAX_OCCURRENCE_WINDOW_DAYS:
             raise HomeMindError(
@@ -464,9 +478,7 @@ class FamilyCalendarManager:
             for member in self.family.repo.list_members(event.family_id)
             if member.status == "ACTIVE"
         ]
-        self.reminders.sync_calendar_event_reminders(
-            event, recipient_member_ids=recipients
-        )
+        self.reminders.sync_calendar_event_reminders(event, recipient_member_ids=recipients)
 
     def _event_timezone(self, calendar: FamilyCalendarRow, override: str | None) -> str:
         """Calendar timezone, event override, else the server default."""
@@ -479,7 +491,9 @@ class FamilyCalendarManager:
     @staticmethod
     def _validate_window(starts_at: int, ends_at: int) -> None:
         if ends_at <= starts_at:
-            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "event end must be after its start")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "event end must be after its start"
+            )
 
     def _calendar(self, family_id: str, calendar_id: str) -> FamilyCalendarRow:
         calendar = self.repo.get_calendar(calendar_id)
@@ -534,9 +548,7 @@ def expand_occurrences(
     try:
         rule = _build_rrule(event.recurrence_rule, local_start)
     except Exception:  # noqa: BLE001 — a stored rule that no longer parses
-        logger.exception(
-            "FamilyCalendar: event %s has an unparseable recurrence rule", event.id
-        )
+        logger.exception("FamilyCalendar: event %s has an unparseable recurrence rule", event.id)
         return []
 
     out: list[CalendarOccurrence] = []
@@ -583,7 +595,17 @@ def _occurrence(
         source_id=event.source_id,
         occurrence_key=occurrence_key or str(event.starts_at),
         is_recurring=event.recurrence_rule is not None,
+        recurrence_rule=event.recurrence_rule,
     )
+
+
+def _as_int(value: object) -> int:
+    """Coerce a PATCH field to an epoch second.
+
+    Pydantic has already validated the shape; the ``object`` here is
+    just the looseness of ``dict[str, object]``.
+    """
+    return value if isinstance(value, int) else int(str(value))
 
 
 def _apply_duration_preserving_move(
@@ -598,11 +620,9 @@ def _apply_duration_preserving_move(
     has_start = values.get("starts_at") is not None
     has_end = values.get("ends_at") is not None
     if has_start and not has_end:
-        duration = max(0, event.ends_at - event.starts_at)
-        values["ends_at"] = int(values["starts_at"]) + duration  # type: ignore[arg-type]
+        values["ends_at"] = _as_int(values["starts_at"]) + max(0, event.ends_at - event.starts_at)
     elif has_end and not has_start:
-        duration = max(0, event.ends_at - event.starts_at)
-        values["starts_at"] = int(values["ends_at"]) - duration  # type: ignore[arg-type]
+        values["starts_at"] = _as_int(values["ends_at"]) - max(0, event.ends_at - event.starts_at)
     values.setdefault("starts_at", event.starts_at)
     values.setdefault("ends_at", event.ends_at)
     return values

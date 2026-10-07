@@ -1,4 +1,4 @@
-﻿"""Family reminder domain service.
+"""Family reminder domain service.
 
 Reminders are *derived* state. A calendar event that moves, a task whose
 due date changes, a device that goes offline -- each of those must
@@ -18,22 +18,24 @@ import hashlib
 import logging
 from dataclasses import dataclass
 
+from homemind.infra.db.repos.families import FamilyMemberRow
+from homemind.infra.db.repos.family_calendars import FamilyCalendarEventRow
 from homemind.infra.db.repos.family_reminders import (
     CHANNEL_IN_APP,
     STATUS_CANCELLED,
     STATUS_FAILED,
     STATUS_PENDING,
     STATUS_SENT,
-    TARGET_TYPES,
     TARGET_TYPE_APPROVAL,
     TARGET_TYPE_CALENDAR_EVENT,
     TARGET_TYPE_DEVICE,
     TARGET_TYPE_TASK,
+    TARGET_TYPES,
     FamilyReminderRepo,
     FamilyReminderRow,
 )
-from homemind.infra.family.manager import FamilyManager
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
+from homemind.infra.family.manager import FamilyManager
 from octop.infra.db.pool import DatabasePool
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
@@ -168,9 +170,7 @@ class FamilyReminderManager:
         target_type: str | None = None,
     ) -> list[FamilyReminderRow]:
         self.family.require_access(family_id, user)
-        return self.repo.list_for_family(
-            family_id, status=status, target_type=target_type
-        )
+        return self.repo.list_for_family(family_id, status=status, target_type=target_type)
 
     def list_for_target(self, target_type: str, target_id: str) -> list[FamilyReminderRow]:
         return self.repo.list_for_target(target_type, target_id)
@@ -205,7 +205,7 @@ class FamilyReminderManager:
 
     def sync_calendar_event_reminders(
         self,
-        event: object,
+        event: FamilyCalendarEventRow,
         *,
         recipient_member_ids: list[str],
         lead_seconds: int = 3600,
@@ -219,25 +219,25 @@ class FamilyReminderManager:
         horizon get fresh ones. Nothing is pre-generated beyond the
         horizon, so a weekly event does not seed five years of rows.
         """
-        from datetime import UTC, datetime, timedelta
+        from datetime import UTC, datetime
 
         from homemind.infra.family.calendar import expand_occurrences
 
         timestamp = now if now is not None else int(datetime.now(UTC).timestamp())
         horizon_end = timestamp + horizon_days * 86400
-        event_id = str(getattr(event, "id"))
-        family_id = str(getattr(event, "family_id"))
+        event_id = event.id
+        family_id = event.family_id
 
         # Cancel first: an occurrence that moved keeps the same
         # ``target_id`` but a different ``remind_at``, so its old row has
         # to go before the new dedupe key can be minted.
         self.repo.cancel_for_target(TARGET_TYPE_CALENDAR_EVENT, event_id)
 
-        if str(getattr(event, "status", "CONFIRMED")) != "CONFIRMED":
+        if event.status != "CONFIRMED":
             return []
 
         occurrences = expand_occurrences(
-            event,  # type: ignore[arg-type]
+            event,
             window_start=timestamp,
             window_end=horizon_end,
             remaining=200,
@@ -338,9 +338,7 @@ class FamilyReminderManager:
             if title is None:
                 # The target is gone. Cancelling is the honest outcome:
                 # delivering "your reminder" with no subject is worse.
-                self.repo.mark_failed(
-                    reminder.id, error="target no longer exists", permanent=True
-                )
+                self.repo.mark_failed(reminder.id, error="target no longer exists", permanent=True)
                 continue
             dispatches.append(
                 ReminderDispatch(
@@ -372,13 +370,13 @@ class FamilyReminderManager:
         """
         if attempt_count <= 0:
             return base
-        return min(cap, base * (2 ** min(attempt_count - 1, 10)))
+        return min(cap, base * (2 ** min(attempt_count - 1, 10)))  # type: ignore[no-any-return]
 
     # --------------------------------------------------------------- helpers
 
     def _resolve_recipient(
         self, family_id: str, recipient_member_id: str | None
-    ) -> object | None:
+    ) -> FamilyMemberRow | None:
         if recipient_member_id is None:
             return None
         member = self.family.repo.get_member(recipient_member_id)

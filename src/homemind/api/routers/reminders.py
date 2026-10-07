@@ -71,9 +71,7 @@ def _manager(server: OctopServer) -> FamilyReminderManager:
     assert server.services is not None
     run_migrations(server.services.db)
     services = HomeMindServices.from_pool(server.services.db)
-    return FamilyReminderManager(
-        FamilyManager(services.family_repo), services.family_reminder_repo
-    )
+    return FamilyReminderManager(FamilyManager(services.family_repo), services.family_reminder_repo)
 
 
 @router.post(
@@ -107,9 +105,7 @@ async def list_reminders(
     ] = None,
     target_type: Annotated[str | None, Query()] = None,
 ) -> object:
-    return _manager(server).list_for_family(
-        family_id, user, status=status, target_type=target_type
-    )
+    return _manager(server).list_for_family(family_id, user, status=status, target_type=target_type)
 
 
 @router.get(
@@ -117,9 +113,7 @@ async def list_reminders(
     response_model=ReminderSummaryResponse,
     summary="Count family reminders by status",
 )
-async def reminder_summary(
-    family_id: str, server: Server, user: CurrentUser
-) -> object:
+async def reminder_summary(family_id: str, server: Server, user: CurrentUser) -> object:
     return ReminderSummaryResponse(counts=_manager(server).summary(family_id, user))
 
 
