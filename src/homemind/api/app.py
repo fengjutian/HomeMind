@@ -9,6 +9,7 @@ from homemind.api.routers import (
     active_family,
     albums,
     asset_jobs,
+    calendar,
     context,
     dashboard,
     devices,
@@ -20,6 +21,7 @@ from homemind.api.routers import (
     memory_candidates,
     observability,
     photos,
+    reminders,
     runtime,
     search,
     search_index,
@@ -121,6 +123,16 @@ def build_app(server: OctopServer) -> FastAPI:
         knowledge.router,
         prefix="/api/homemind/families",
         tags=["homemind-knowledge"],
+    )
+    app.include_router(
+        calendar.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-calendar"],
+    )
+    app.include_router(
+        reminders.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-reminders"],
     )
 
     app.include_router(

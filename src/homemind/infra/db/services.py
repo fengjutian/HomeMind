@@ -9,9 +9,11 @@ from homemind.infra.db.repos.face_candidates import FaceCandidateRepo
 from homemind.infra.db.repos.families import FamilyRepo
 from homemind.infra.db.repos.family_albums import FamilyAlbumRepo
 from homemind.infra.db.repos.family_assets import FamilyAssetRepo
+from homemind.infra.db.repos.family_calendars import FamilyCalendarRepo
 from homemind.infra.db.repos.family_context import FamilyContextRepo
 from homemind.infra.db.repos.family_devices import FamilyDeviceRepo
 from homemind.infra.db.repos.family_invites import FamilyInviteRepo
+from homemind.infra.db.repos.family_reminders import FamilyReminderRepo
 from homemind.infra.db.repos.family_tasks import FamilyTaskRepo
 from homemind.infra.db.repos.family_transactions import FamilyTransactionRepo
 from homemind.infra.db.repos.knowledge_documents import KnowledgeRepo
@@ -30,9 +32,11 @@ class HomeMindServices:
     family_repo: FamilyRepo
     family_album_repo: FamilyAlbumRepo
     family_asset_repo: FamilyAssetRepo
+    family_calendar_repo: FamilyCalendarRepo
     family_context_repo: FamilyContextRepo
     family_device_repo: FamilyDeviceRepo
     family_invite_repo: FamilyInviteRepo
+    family_reminder_repo: FamilyReminderRepo
     family_task_repo: FamilyTaskRepo
     family_transaction_repo: FamilyTransactionRepo
     memory_candidate_repo: MemoryCandidateRepo
@@ -50,9 +54,11 @@ class HomeMindServices:
             family_repo=FamilyRepo(db),
             family_album_repo=FamilyAlbumRepo(db),
             family_asset_repo=FamilyAssetRepo(db),
+            family_calendar_repo=FamilyCalendarRepo(db),
             family_context_repo=FamilyContextRepo(db),
             family_device_repo=FamilyDeviceRepo(db),
             family_invite_repo=FamilyInviteRepo(db),
+            family_reminder_repo=FamilyReminderRepo(db),
             family_task_repo=FamilyTaskRepo(db),
             family_transaction_repo=FamilyTransactionRepo(db),
             memory_candidate_repo=MemoryCandidateRepo(db),

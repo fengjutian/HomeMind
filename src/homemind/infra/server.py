@@ -23,6 +23,8 @@ from homemind.infra.family.memory_maintenance import MaintenanceRunner
 from homemind.infra.family.permissions import FamilyPermissionEvaluator
 from homemind.infra.family.photo_intelligence import PhotoIntelligenceManager
 from homemind.infra.family.privacy import ExternalProcessingGuard
+from homemind.infra.family.reminder_runner import ReminderRunner
+from homemind.infra.family.reminders import FamilyReminderManager
 from homemind.infra.family.scan_job import FamilyAssetScanJob
 from homemind.infra.family.search_indexer import FamilySearchIndexer
 from homemind.infra.family.tasks import FamilyTaskManager
@@ -38,6 +40,7 @@ class HomeMindServer(OctopServer):
         self._asset_scan_job: FamilyAssetScanJob | None = None
         self._memory_maintenance: MaintenanceRunner | None = None
         self._asset_job_runner: AssetJobRunner | None = None
+        self._reminder_runner: ReminderRunner | None = None
         self._family_event_bus: FamilyEventBus | None = None
 
     def build_extra_agent_tools(self) -> list[Any]:
@@ -137,12 +140,17 @@ class HomeMindServer(OctopServer):
     def asset_job_runner(self) -> AssetJobRunner | None:
         return self._asset_job_runner
 
+    @property
+    def reminder_runner(self) -> ReminderRunner | None:
+        return self._reminder_runner
+
     async def start(self) -> None:
         await super().start()
         self._start_asset_scan_job()
         self._start_family_event_bus()
         await self._start_memory_maintenance()
         await self._start_asset_job_runner()
+        await self._start_reminder_runner()
 
     def _start_family_event_bus(self) -> None:
         """Bind the family event bus to Octop's WebSocket hub.
@@ -266,20 +274,44 @@ class HomeMindServer(OctopServer):
         )
         await self._asset_job_runner.start()
 
+    async def _start_reminder_runner(self) -> None:
+        """Start the single reminder delivery loop.
+
+        One runner per process. Claims are database leases, so a second
+        process would simply lose the races rather than double-send.
+        """
+        if self.services is None:
+            return
+        run_migrations(self.services.db)
+        hm = HomeMindServices.from_pool(self.services.db)
+        self._reminder_runner = ReminderRunner(
+            manager=FamilyReminderManager(
+                FamilyManager(hm.family_repo),
+                hm.family_reminder_repo,
+            ),
+            event_bus=lambda: self._family_event_bus,
+        )
+        await self._reminder_runner.start()
+
     async def stop(self) -> None:
         try:
-            if self._asset_job_runner is not None:
-                await self._asset_job_runner.stop()
-                self._asset_job_runner = None
+            if self._reminder_runner is not None:
+                await self._reminder_runner.stop()
+                self._reminder_runner = None
         finally:
             try:
-                if self._memory_maintenance is not None:
-                    await self._memory_maintenance.stop()
-                    self._memory_maintenance = None
+                if self._asset_job_runner is not None:
+                    await self._asset_job_runner.stop()
+                    self._asset_job_runner = None
             finally:
                 try:
-                    if self._asset_scan_job is not None:
-                        await self._asset_scan_job.shutdown()
-                        self._asset_scan_job = None
+                    if self._memory_maintenance is not None:
+                        await self._memory_maintenance.stop()
+                        self._memory_maintenance = None
                 finally:
-                    await super().stop()
+                    try:
+                        if self._asset_scan_job is not None:
+                            await self._asset_scan_job.shutdown()
+                            self._asset_scan_job = None
+                    finally:
+                        await super().stop()

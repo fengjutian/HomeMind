@@ -52,6 +52,7 @@ EVENT_DEVICE_ONLINE = "family.device.online"
 EVENT_DEVICE_OFFLINE = "family.device.offline"
 EVENT_INVITE_REDEEMED = "family.invite.redeemed"
 EVENT_MEMORY_CANDIDATE_CREATED = "family.memory_candidate.created"
+EVENT_REMINDER_DUE = "family.reminder.due"
 
 EVENT_TYPES: frozenset[str] = frozenset(
     {
@@ -66,6 +67,7 @@ EVENT_TYPES: frozenset[str] = frozenset(
         EVENT_DEVICE_OFFLINE,
         EVENT_INVITE_REDEEMED,
         EVENT_MEMORY_CANDIDATE_CREATED,
+        EVENT_REMINDER_DUE,
     }
 )
 
@@ -252,6 +254,7 @@ __all__ = [
     "EVENT_JOB_FAILED",
     "EVENT_JOB_PROGRESS",
     "EVENT_MEMORY_CANDIDATE_CREATED",
+    "EVENT_REMINDER_DUE",
     "EVENT_TRANSACTION_COMPLETED",
     "EVENT_TRANSACTION_FAILED",
     "EVENT_TYPES",
