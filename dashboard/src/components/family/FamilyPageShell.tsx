@@ -7,7 +7,7 @@
  * files is how pages drift apart, so it lives here once.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Button, Empty, Space, Spin, Typography } from "antd";
+import { Alert, Button, Empty, Grid, Space, Spin, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -15,6 +15,7 @@ import { useActiveFamily } from "../../hooks/useActiveFamily";
 import { homeMindFamilyApi } from "../../api/modules/homeMindFamily";
 
 const { Text } = Typography;
+const { useBreakpoint } = Grid;
 
 export interface FamilyPageShellProps {
   title: string;
@@ -41,14 +42,21 @@ export default function FamilyPageShell({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { familyId, loading } = useActiveFamily();
+  const screens = useBreakpoint();
+  // Below `sm` (576px) a family page is on a phone. The gutters and
+  // the header stack rather than shrink, because a squeezed
+  // two-column header at 360px is unreadable rather than compact.
+  const isPhone = screens.sm === false;
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ padding: isPhone ? 8 : 16 }}>
       <div
         style={{
           display: "flex",
-          alignItems: "center",
+          flexDirection: isPhone ? "column" : "row",
+          alignItems: isPhone ? "flex-start" : "center",
           justifyContent: "space-between",
+          gap: isPhone ? 8 : undefined,
           marginBottom: 12,
         }}
       >
@@ -57,10 +65,16 @@ export default function FamilyPageShell({
             {title}
           </Typography.Title>
           {subtitle ? (
-            <Text type="secondary">{subtitle}</Text>
+            <Text type="secondary" style={{ fontSize: isPhone ? 12 : undefined }}>
+              {subtitle}
+            </Text>
           ) : null}
         </div>
-        <Space>{actions}</Space>
+        {/* On a phone the actions get their own row and may wrap; a
+            single cramped row is what makes controls unreachable. */}
+        <Space wrap={isPhone} size={isPhone ? 4 : undefined}>
+          {actions}
+        </Space>
       </div>
       {loading ? (
         <div style={{ textAlign: "center", padding: 48 }}>

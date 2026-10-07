@@ -6721,5 +6721,96 @@
     "cancelEvent": "取消事件",
     "cancelConfirm": "确认取消这个事件？",
     "cancelled": "已取消"
+  },
+  "notifications": {
+    "taskDue": {
+      "title": "任务即将到期",
+      "body": "{{title}} 将在 {{due}} 到期"
+    },
+    "taskDone": {
+      "title": "任务已完成",
+      "body": "{{title}} 已标记完成"
+    },
+    "approvalWaiting": {
+      "title": "需要你审批",
+      "body": "{{action}} 正在等待你的审批"
+    },
+    "approvalDecided": {
+      "title": "审批已处理",
+      "body": "{{action}} 已被{{outcome}}"
+    },
+    "deviceOffline": {
+      "title": "设备离线",
+      "body": "{{name}} 已停止上报"
+    },
+    "assetJobDone": {
+      "title": "扫描已完成",
+      "body": "{{jobType}} 任务已完成"
+    },
+    "assetJobFailed": {
+      "title": "扫描需要处理",
+      "body": "{{jobType}} 任务中有 {{failedItems}} 项失败"
+    },
+    "knowledgeIndexFailed": {
+      "title": "文档未能索引",
+      "body": "有一个文档无法读取：{{reason}}"
+    },
+    "calendarReminder": {
+      "title": "即将开始",
+      "body": "{{title}} 快要开始了"
+    }
+  },
+  "notificationsBell": {
+    "title": "通知",
+    "all": "全部",
+    "unread": "未读",
+    "readAll": "全部已读",
+    "empty": "暂无通知",
+    "preferences": "通知偏好",
+    "mutedTypes": "免打扰的类型",
+    "quietHours": "免打扰时段",
+    "quietHoursHint": "以零点起的分钟数表示；结束早于开始表示跨午夜。",
+    "timezone": "时区"
+  },
+  "familyTaskBoard": {
+    "title": "家庭任务看板",
+    "newTask": "新建任务",
+    "create": "创建",
+    "created": "已创建",
+    "empty": "空",
+    "todo": "待办",
+    "scheduled": "计划中",
+    "inProgress": "执行中",
+    "waitingApproval": "等待审批",
+    "blocked": "被阻塞",
+    "failed": "失败",
+    "done": "完成",
+    "cancel": "取消",
+    "cancelConfirm": "取消这个任务？",
+    "cancelled": "已取消",
+    "retry": "重试",
+    "retried": "已重新排队",
+    "title_": "标题",
+    "description": "说明",
+    "taskType": "类型",
+    "typeDevice": "设备/系统",
+    "typeAgent": "由 Agent 执行",
+    "agent": "执行 Agent",
+    "agentHint": "Agent ID",
+    "scheduleAt": "执行时间",
+    "recurrence": "重复规则",
+    "recurrenceHint": "RFC 5545 RRULE；每次运行只生成下一个",
+    "daily": "每天",
+    "weekly": "每周",
+    "weekdays": "每个工作日",
+    "monthly": "每月",
+    "priority": "优先级",
+    "maxAttempts": "最大尝试",
+    "attempts": "尝试",
+    "attemptsTitle": "执行记录",
+    "noAttempts": "还没有执行过",
+    "startedAt": "开始",
+    "completedAt": "完成",
+    "transaction": "关联事务"
   }
 }

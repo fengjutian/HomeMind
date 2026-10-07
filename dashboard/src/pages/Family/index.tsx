@@ -33,6 +33,7 @@ import PageShell from "../../layouts/PageShell";
 import { formatServerDateTime } from "../../utils/formatMessageTime";
 import AccessPanel from "./AccessPanel";
 import ActiveFamilySwitcher from "./ActiveFamilySwitcher";
+import FamilyNotificationsBell from "../../components/family/FamilyNotificationsBell";
 import AssetsPanel from "./AssetsPanel";
 import DevicesPanel from "./DevicesPanel";
 import EventsPanel from "./EventsPanel";
@@ -257,6 +258,7 @@ export default function FamilyPage() {
         subtitle={t("family.subtitle", "管理家庭成员、相册、任务与共同记忆")}
         actions={
           <Space>
+            <FamilyNotificationsBell />
             <ActiveFamilySwitcher
               families={families}
               onChange={(next) => setFamilyId(next ?? "")}

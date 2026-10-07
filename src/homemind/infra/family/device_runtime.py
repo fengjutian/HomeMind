@@ -352,6 +352,16 @@ class DeviceRuntimeManager:
             _hm_inc("device_marked_offline_total", count)
         return count
 
+    def list_stale_online_devices(self, *, now: int | None = None) -> list[FamilyDeviceRow]:
+        """Devices that read as online but whose heartbeat has lapsed.
+
+        Read-only, so the notification path can name them before (or
+        instead of) flipping them.
+        """
+        return self.repo.list_stale_online_devices(
+            heartbeat_timeout_seconds=self.heartbeat_timeout_seconds, now=now,
+        )
+
     def list_recent_commands(
         self, family_id: str, device_id: str, user: User, *, limit: int = 50,
     ) -> list[FamilyDeviceCommandRow]:

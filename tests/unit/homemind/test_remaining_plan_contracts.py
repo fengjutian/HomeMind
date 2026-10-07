@@ -1,4 +1,4 @@
-"""Stage 0 contract guards for the remaining-features plan.
+﻿"""Stage 0 contract guards for the remaining-features plan.
 
 The calendar / notification / task-scheduler work that follows adds
 tables and routes. These tests pin the surface that already shipped so a
@@ -103,6 +103,21 @@ _FROZEN_HOMEMIND_SURFACE: frozenset[tuple[str, str]] = frozenset(
 )
 
 
+#: Action names that resolved before Stage 3. Stage 3 adds to this set;
+#: it must never remove from it.
+_LEGACY_TRANSACTION_ACTIONS: frozenset[str] = frozenset(
+    {
+        "event.create",
+        "filesystem.copy",
+        "filesystem.delete",
+        "filesystem.move",
+        "filesystem.rename",
+        "memory.create",
+        "task.create",
+    }
+)
+
+
 def test_existing_homemind_routes_are_never_removed() -> None:
     """A later stage may add routes; it may not drop an existing one."""
 
@@ -180,17 +195,12 @@ def test_registered_transaction_action_names_stay_available(tmp_path: Path) -> N
             audit=services.family_transaction_repo,
         ),
     )
-    assert registry.actions() == [
-        "event.create",
-        "filesystem.copy",
-        "filesystem.delete",
-        "filesystem.move",
-        "filesystem.rename",
-        "memory.create",
-        "task.create",
-    ]
-    assert registry.get("task.create") is not None
-    assert registry.get("filesystem.delete") is not None
+    # Subset check, not equality: Stage 3 grows this set on purpose, and
+    # the contract is only that a name which once resolved keeps
+    # resolving for existing clients.
+    assert set(registry.actions()) >= _LEGACY_TRANSACTION_ACTIONS
+    for action in _LEGACY_TRANSACTION_ACTIONS:
+        assert registry.get(action) is not None, action
 
 
 def test_empty_action_registry_registers_nothing() -> None:

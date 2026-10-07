@@ -1,11 +1,17 @@
 /**
- * HomeMind tasks page (Stage 8).
+ * Family task list (Stage 8) — mobile-aware.
  *
- * Separate from `/tasks`, which is Octop's Cron Jobs — this is the
- * family's own to-dos.
+ * The manual to-do path stays as simple as it was: type a title, press
+ * add, tick it off. What changed for Stage 7 is that the page works at
+ * 360px — the input and its button share one row rather than wrapping
+ * into two, because a button below the fold is a button nobody taps.
+ *
+ * The schedulable board lives at `/task-board`; this page stays the
+ * quick list so a family member who just wants to add "buy milk" never
+ * meets a state machine.
  */
 import { useCallback, useState } from "react";
-import { App, Button, Card, Checkbox, Empty, Input, Segmented, Space } from "antd";
+import { App, Button, Card, Checkbox, Empty, Grid, Input, Segmented, Space } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { useActiveFamily } from "../../hooks/useActiveFamily";
@@ -15,12 +21,16 @@ import FamilyPageShell, {
   useFamilyQuery,
 } from "../../components/family/FamilyPageShell";
 
+const { useBreakpoint } = Grid;
+
 export default function FamilyTasks() {
   const { t } = useTranslation();
   const { message } = App.useApp();
   const { familyId } = useActiveFamily();
   const [title, setTitle] = useState("");
   const [filter, setFilter] = useState("OPEN");
+  const screens = useBreakpoint();
+  const isPhone = screens.sm === false;
 
   const fetcher = useCallback((id: string) => homeMindFamilyApi.listTasks(id), []);
   const { data, loading, error, reload } = useFamilyQuery(familyId, fetcher);
@@ -60,6 +70,7 @@ export default function FamilyTasks() {
       title={t("family.tasks.title", "家庭任务")}
       actions={
         <Segmented
+          size={isPhone ? "small" : "middle"}
           value={filter}
           onChange={(value) => setFilter(String(value))}
           options={[
@@ -71,34 +82,34 @@ export default function FamilyTasks() {
       }
     >
       <>
-      <QueryError error={error} />
-      <Card size="small">
-        <Space.Compact style={{ width: "100%", marginBottom: 12 }}>
-          <Input
-            value={title}
-            placeholder={t("family.tasks.placeholder", "要做什么?")}
-            onChange={(event) => setTitle(event.target.value)}
-            onPressEnter={() => void add()}
-          />
-          <Button type="primary" onClick={() => void add()}>
-            {t("family.tasks.add", "添加")}
-          </Button>
-        </Space.Compact>
-        {loading && !data ? null : visible.length === 0 ? (
-          <Empty description={t("family.tasks.empty", "暂无任务")} />
-        ) : (
-          visible.map((task) => (
-            <div key={task.id} style={{ padding: "4px 0" }}>
-              <Checkbox
-                checked={task.status === "DONE"}
-                onChange={() => void toggle(task.id, task.status)}
-              >
-                {task.title}
-              </Checkbox>
-            </div>
-          ))
-        )}
-      </Card>
+        <QueryError error={error} />
+        <Card size="small">
+          <Space.Compact style={{ width: "100%", marginBottom: 12 }}>
+            <Input
+              value={title}
+              placeholder={t("family.tasks.placeholder", "要做什么？")}
+              onChange={(event) => setTitle(event.target.value)}
+              onPressEnter={() => void add()}
+            />
+            <Button type="primary" onClick={() => void add()}>
+              {t("family.tasks.add", "添加")}
+            </Button>
+          </Space.Compact>
+          {loading && !data ? null : visible.length === 0 ? (
+            <Empty description={t("family.tasks.empty", "暂无任务")} />
+          ) : (
+            visible.map((task) => (
+              <div key={task.id} style={{ padding: "4px 0" }}>
+                <Checkbox
+                  checked={task.status === "DONE"}
+                  onChange={() => void toggle(task.id, task.status)}
+                >
+                  {task.title}
+                </Checkbox>
+              </div>
+            ))
+          )}
+        </Card>
       </>
     </FamilyPageShell>
   );

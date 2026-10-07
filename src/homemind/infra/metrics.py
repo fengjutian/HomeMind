@@ -109,6 +109,12 @@ class HomeMindMetrics:
     reminder_delivery_failed_total: int = 0
     reminder_recovered_total: int = 0
 
+    # scheduled family tasks (Stage 4)
+    family_task_finished_total: int = 0
+    family_task_failed_total: int = 0
+    family_task_claimed_total: int = 0
+    family_task_recovered_total: int = 0
+
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def inc(self, name: str, n: int = 1) -> None:

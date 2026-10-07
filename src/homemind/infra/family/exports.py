@@ -495,7 +495,7 @@ class FamilyExportManager:
                     "status": task.status,
                     "due_at": task.due_at,
                 }
-                for task in self._services.family_task_repo.list(family_id)
+                for task in self._services.family_task_repo.list_for_family(family_id)
             ],
             "albums": [
                 {"album_id": album.id, "name": album.name, "description": album.description}

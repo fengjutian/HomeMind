@@ -19,12 +19,14 @@ from homemind.api.routers import (
     homemind_mcp,
     knowledge,
     memory_candidates,
+    notifications,
     observability,
     photos,
     reminders,
     runtime,
     search,
     search_index,
+    task_scheduler,
     tasks,
     transactions,
 )
@@ -95,6 +97,11 @@ def build_app(server: OctopServer) -> FastAPI:
         tags=["homemind-tasks"],
     )
     app.include_router(
+        task_scheduler.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-task-scheduler"],
+    )
+    app.include_router(
         albums.router,
         prefix="/api/homemind/families",
         tags=["homemind-albums"],
@@ -133,6 +140,11 @@ def build_app(server: OctopServer) -> FastAPI:
         reminders.router,
         prefix="/api/homemind/families",
         tags=["homemind-reminders"],
+    )
+    app.include_router(
+        notifications.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-notifications"],
     )
 
     app.include_router(

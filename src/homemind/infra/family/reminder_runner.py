@@ -24,6 +24,7 @@ import socket
 from collections.abc import Callable
 
 from homemind.infra.family.events import FamilyEventBus
+from homemind.infra.family.notifications import NotificationManager
 from homemind.infra.family.reminders import FamilyReminderManager, ReminderDispatch
 from homemind.infra.metrics import inc as _hm_inc
 
@@ -49,6 +50,7 @@ class ReminderRunner:
         self,
         *,
         manager: FamilyReminderManager,
+        notifications: NotificationManager | None = None,
         poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
         lease_seconds: int = DEFAULT_LEASE_SECONDS,
         max_attempts: int = MAX_DELIVERY_ATTEMPTS,
@@ -56,6 +58,10 @@ class ReminderRunner:
         event_bus: Callable[[], FamilyEventBus | None] | None = None,
     ) -> None:
         self._manager = manager
+        # Optional so a deployment without the notification tables (or a
+        # test rig) still delivers; the inbox row is the durable half of
+        # the delivery, the event is only the fast half.
+        self._notifications = notifications
         self._poll_interval = poll_interval_seconds
         self._lease_seconds = lease_seconds
         self._max_attempts = max_attempts
@@ -145,8 +151,32 @@ class ReminderRunner:
             _hm_inc("reminder_delivery_failed_total")
             return False
         await asyncio.to_thread(self._manager.mark_sent, reminder.id)
+        # The durable half of delivery. Done after the row is marked
+        # sent so a crash here loses an inbox entry rather than
+        # re-delivering a reminder the user already saw.
+        await asyncio.to_thread(self._persist_notification, dispatch)
         _hm_inc("reminder_delivered_total")
         return True
+
+    def _persist_notification(self, dispatch: ReminderDispatch) -> None:
+        """Write the inbox entry that outlives the socket.
+
+        Addressed to the reminder's own recipient rather than the whole
+        family: a reminder for one member must not land in everyone
+        else's inbox. A duplicate is a no-op — the dedupe key already
+        covers "same occurrence, same person".
+        """
+        if self._notifications is None or dispatch.recipient_user_id is None:
+            return
+        reminder = dispatch.reminder
+        self._notifications.notify_calendar_reminder(
+            dispatch.family_id,
+            reminder_id=reminder.id,
+            target_id=reminder.target_id,
+            title=dispatch.target_title,
+            starts_at=reminder.remind_at,
+            recipients=[dispatch.recipient_user_id],
+        )
 
     async def _publish(self, dispatch: ReminderDispatch) -> None:
         """Emit the reminder as a family event.

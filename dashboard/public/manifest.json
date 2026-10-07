@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Octop",
-  "short_name": "Octop",
-  "description": "Smarter self-hosted AI assistant — multi-user, multi-agent",
+  "name": "HomeMind",
+  "short_name": "HomeMind",
+  "description": "Self-hosted family assistant — memory, photos, calendar and tasks",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -37,5 +37,31 @@
       "purpose": "any"
     }
   ],
-  "categories": ["productivity", "utilities"]
+  "categories": ["productivity", "utilities", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "Photos",
+      "short_name": "Photos",
+      "url": "/photos",
+      "description": "Browse the family's photo library"
+    },
+    {
+      "name": "Calendar",
+      "short_name": "Calendar",
+      "url": "/calendar",
+      "description": "What the family has planned"
+    },
+    {
+      "name": "Tasks",
+      "short_name": "Tasks",
+      "url": "/task-board",
+      "description": "Tasks waiting on the family"
+    },
+    {
+      "name": "Approvals",
+      "short_name": "Approvals",
+      "url": "/approvals",
+      "description": "Actions waiting for a decision"
+    }
+  ]
 }

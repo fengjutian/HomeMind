@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from homemind.infra.db.migrate import _discover
 from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
@@ -108,13 +109,19 @@ def test_calendar_tables_exist_after_migration(tmp_path: Path) -> None:
     } <= names
 
 
-def test_schema_version_reaches_18(tmp_path: Path) -> None:
+def test_schema_version_covers_every_homemind_migration(tmp_path: Path) -> None:
+    """The recorded watermark equals the highest migration on disk.
+
+    Derived rather than hard-coded: pinning a literal would mean every
+    later stage has to edit this test, and the test would stop proving
+    what it exists to prove.
+    """
     pool = SqlitePool(tmp_path / "octop.db")
     run_migrations(pool)
     run_homemind_migrations(pool)
     with pool.connect() as conn:
         row = conn.execute("SELECT version FROM _homemind_schema_version").fetchone()
-    assert int(row[0]) == 18
+    assert int(row[0]) == max(version for version, _ in _discover("sqlite"))
 
 
 # ------------------------------------------------------------------- rrules

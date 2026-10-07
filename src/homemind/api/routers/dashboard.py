@@ -138,7 +138,7 @@ async def dashboard_summary(
     devices = services.family_device_repo.list_for_family(family_id)
     jobs = services.asset_job_repo.list_jobs(family_id, limit=5)
 
-    tasks = services.family_task_repo.list(family_id)
+    tasks = services.family_task_repo.list_for_family(family_id)
     day_start = now - (now % DAY_SECONDS)
 
     return DashboardSummary(

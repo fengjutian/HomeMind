@@ -6721,5 +6721,96 @@
     "cancelEvent": "Cancel event",
     "cancelConfirm": "Cancel this event?",
     "cancelled": "Cancelled"
+  },
+  "notifications": {
+    "taskDue": {
+      "title": "Task due soon",
+      "body": "{{title}} is due at {{due}}"
+    },
+    "taskDone": {
+      "title": "Task finished",
+      "body": "{{title}} was marked done"
+    },
+    "approvalWaiting": {
+      "title": "Approval needed",
+      "body": "{{action}} is waiting for your approval"
+    },
+    "approvalDecided": {
+      "title": "Approval decided",
+      "body": "{{action}} was {{outcome}}"
+    },
+    "deviceOffline": {
+      "title": "Device offline",
+      "body": "{{name}} stopped reporting in"
+    },
+    "assetJobDone": {
+      "title": "Scan finished",
+      "body": "The {{jobType}} job finished"
+    },
+    "assetJobFailed": {
+      "title": "Scan needs attention",
+      "body": "{{failedItems}} items failed in the {{jobType}} job"
+    },
+    "knowledgeIndexFailed": {
+      "title": "Document not indexed",
+      "body": "A document could not be read: {{reason}}"
+    },
+    "calendarReminder": {
+      "title": "Coming up",
+      "body": "{{title}} is coming up"
+    }
+  },
+  "notificationsBell": {
+    "title": "Notifications",
+    "all": "All",
+    "unread": "Unread",
+    "readAll": "Mark all read",
+    "empty": "Nothing to report",
+    "preferences": "Notification preferences",
+    "mutedTypes": "Muted types",
+    "quietHours": "Quiet hours",
+    "quietHoursHint": "Minutes from midnight. An end before the start wraps past midnight.",
+    "timezone": "Timezone"
+  },
+  "familyTaskBoard": {
+    "title": "Family task board",
+    "newTask": "New task",
+    "create": "Create",
+    "created": "Created",
+    "empty": "Empty",
+    "todo": "To do",
+    "scheduled": "Scheduled",
+    "inProgress": "Running",
+    "waitingApproval": "Waiting for approval",
+    "blocked": "Blocked",
+    "failed": "Failed",
+    "done": "Done",
+    "cancel": "Cancel",
+    "cancelConfirm": "Cancel this task?",
+    "cancelled": "Cancelled",
+    "retry": "Retry",
+    "retried": "Queued again",
+    "title_": "Title",
+    "description": "Description",
+    "taskType": "Type",
+    "typeDevice": "Device / system",
+    "typeAgent": "Run by an agent",
+    "agent": "Agent",
+    "agentHint": "Agent id",
+    "scheduleAt": "Runs at",
+    "recurrence": "Repeat",
+    "recurrenceHint": "RFC 5545 RRULE; each run spawns exactly one successor.",
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "weekdays": "Every weekday",
+    "monthly": "Monthly",
+    "priority": "Priority",
+    "maxAttempts": "Max attempts",
+    "attempts": "Attempts",
+    "attemptsTitle": "Execution history",
+    "noAttempts": "Never run yet",
+    "startedAt": "Started",
+    "completedAt": "Finished",
+    "transaction": "Transaction"
   }
 }

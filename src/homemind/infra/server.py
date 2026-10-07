@@ -20,6 +20,7 @@ from homemind.infra.family.events import FamilyEventBus
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
 from homemind.infra.family.memory_maintenance import MaintenanceRunner
+from homemind.infra.family.notifications import NotificationManager
 from homemind.infra.family.permissions import FamilyPermissionEvaluator
 from homemind.infra.family.photo_intelligence import PhotoIntelligenceManager
 from homemind.infra.family.privacy import ExternalProcessingGuard
@@ -27,6 +28,7 @@ from homemind.infra.family.reminder_runner import ReminderRunner
 from homemind.infra.family.reminders import FamilyReminderManager
 from homemind.infra.family.scan_job import FamilyAssetScanJob
 from homemind.infra.family.search_indexer import FamilySearchIndexer
+from homemind.infra.family.task_scheduler import FamilyTaskScheduler, TaskSchedulerRunner
 from homemind.infra.family.tasks import FamilyTaskManager
 from homemind.infra.family.thumbnails import ThumbnailService
 from homemind.infra.family.transactions import FamilyTransactionManager
@@ -41,6 +43,7 @@ class HomeMindServer(OctopServer):
         self._memory_maintenance: MaintenanceRunner | None = None
         self._asset_job_runner: AssetJobRunner | None = None
         self._reminder_runner: ReminderRunner | None = None
+        self._task_scheduler_runner: TaskSchedulerRunner | None = None
         self._family_event_bus: FamilyEventBus | None = None
 
     def build_extra_agent_tools(self) -> list[Any]:
@@ -144,6 +147,10 @@ class HomeMindServer(OctopServer):
     def reminder_runner(self) -> ReminderRunner | None:
         return self._reminder_runner
 
+    @property
+    def task_scheduler_runner(self) -> TaskSchedulerRunner | None:
+        return self._task_scheduler_runner
+
     async def start(self) -> None:
         await super().start()
         self._start_asset_scan_job()
@@ -151,6 +158,7 @@ class HomeMindServer(OctopServer):
         await self._start_memory_maintenance()
         await self._start_asset_job_runner()
         await self._start_reminder_runner()
+        await self._start_task_scheduler()
 
     def _start_family_event_bus(self) -> None:
         """Bind the family event bus to Octop's WebSocket hub.
@@ -195,6 +203,7 @@ class HomeMindServer(OctopServer):
         run_migrations(self.services.db)
         hm = HomeMindServices.from_pool(self.services.db)
         family_manager = FamilyManager(hm.family_repo)
+        notifications = self._notifications(hm, family_manager)
         context_manager = FamilyContextManager(
             family_manager,
             hm.family_context_repo,
@@ -210,6 +219,7 @@ class HomeMindServer(OctopServer):
             device_repo=hm.family_device_repo,
             family_manager=family_manager,
             context_manager=context_manager,
+            notification_manager=notifications,
             transaction_manager=FamilyTransactionManager(
                 family_manager,
                 context_manager,
@@ -219,6 +229,29 @@ class HomeMindServer(OctopServer):
             ),
         )
         await self._memory_maintenance.start()
+
+    def _notifications(
+        self, services: HomeMindServices, families: FamilyManager
+    ) -> NotificationManager:
+        return NotificationManager(
+            families,
+            services.family_notification_repo,
+            server_timezone=self._default_timezone(),
+        )
+
+    def _default_timezone(self) -> str:
+        """The server's display timezone, read fresh from config.
+
+        Read per call rather than cached at boot: ``config.json`` can be
+        edited while the process runs, and a stale value would put
+        reminders and notifications in the wrong hour.
+        """
+        from octop.config import load_config  # noqa: PLC0415 — keeps config out of module import
+
+        try:
+            return load_config(self.paths.config).default_timezone
+        except Exception:  # noqa: BLE001 — a missing config must not break notifications
+            return "UTC"
 
     async def _start_asset_job_runner(self) -> None:
         if self.services is None:
@@ -289,29 +322,52 @@ class HomeMindServer(OctopServer):
                 FamilyManager(hm.family_repo),
                 hm.family_reminder_repo,
             ),
+            notifications=self._notifications(hm, FamilyManager(hm.family_repo)),
             event_bus=lambda: self._family_event_bus,
         )
         await self._reminder_runner.start()
 
+    async def _start_task_scheduler(self) -> None:
+        """Start the family-task scheduler.
+
+        Wired without an executor by default: a deployment that has no
+        agent bridge cannot run agent tasks, and the runner reports that
+        honestly as a task failure rather than silently claiming work it
+        will never finish.
+        """
+        if self.services is None:
+            return
+        run_migrations(self.services.db)
+        hm = HomeMindServices.from_pool(self.services.db)
+        self._task_scheduler_runner = TaskSchedulerRunner(
+            scheduler=FamilyTaskScheduler(FamilyManager(hm.family_repo), hm.family_task_repo)
+        )
+        await self._task_scheduler_runner.start()
+
     async def stop(self) -> None:
         try:
-            if self._reminder_runner is not None:
-                await self._reminder_runner.stop()
-                self._reminder_runner = None
+            if self._task_scheduler_runner is not None:
+                await self._task_scheduler_runner.stop()
+                self._task_scheduler_runner = None
         finally:
             try:
-                if self._asset_job_runner is not None:
-                    await self._asset_job_runner.stop()
-                    self._asset_job_runner = None
+                if self._reminder_runner is not None:
+                    await self._reminder_runner.stop()
+                    self._reminder_runner = None
             finally:
                 try:
-                    if self._memory_maintenance is not None:
-                        await self._memory_maintenance.stop()
-                        self._memory_maintenance = None
+                    if self._asset_job_runner is not None:
+                        await self._asset_job_runner.stop()
+                        self._asset_job_runner = None
                 finally:
                     try:
-                        if self._asset_scan_job is not None:
-                            await self._asset_scan_job.shutdown()
-                            self._asset_scan_job = None
+                        if self._memory_maintenance is not None:
+                            await self._memory_maintenance.stop()
+                            self._memory_maintenance = None
                     finally:
-                        await super().stop()
+                        try:
+                            if self._asset_scan_job is not None:
+                                await self._asset_scan_job.shutdown()
+                                self._asset_scan_job = None
+                        finally:
+                            await super().stop()

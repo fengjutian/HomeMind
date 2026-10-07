@@ -13,6 +13,7 @@ from homemind.infra.db.repos.family_calendars import FamilyCalendarRepo
 from homemind.infra.db.repos.family_context import FamilyContextRepo
 from homemind.infra.db.repos.family_devices import FamilyDeviceRepo
 from homemind.infra.db.repos.family_invites import FamilyInviteRepo
+from homemind.infra.db.repos.family_notifications import FamilyNotificationRepo
 from homemind.infra.db.repos.family_reminders import FamilyReminderRepo
 from homemind.infra.db.repos.family_tasks import FamilyTaskRepo
 from homemind.infra.db.repos.family_transactions import FamilyTransactionRepo
@@ -23,6 +24,7 @@ from homemind.infra.db.repos.memory_candidates import (
 )
 from homemind.infra.db.repos.photo_intelligence import PhotoIntelligenceRepo
 from homemind.infra.db.repos.search_index import SearchIndexRepo
+from homemind.infra.db.repos.smart_home import SmartHomeRepo
 from octop.infra.db.pool import DatabasePool
 
 
@@ -36,6 +38,7 @@ class HomeMindServices:
     family_context_repo: FamilyContextRepo
     family_device_repo: FamilyDeviceRepo
     family_invite_repo: FamilyInviteRepo
+    family_notification_repo: FamilyNotificationRepo
     family_reminder_repo: FamilyReminderRepo
     family_task_repo: FamilyTaskRepo
     family_transaction_repo: FamilyTransactionRepo
@@ -44,6 +47,7 @@ class HomeMindServices:
     photo_intelligence_repo: PhotoIntelligenceRepo
     asset_job_repo: AssetJobRepo
     search_index_repo: SearchIndexRepo
+    smart_home_repo: SmartHomeRepo
     face_candidate_repo: FaceCandidateRepo
     knowledge_repo: KnowledgeRepo
 
@@ -58,6 +62,7 @@ class HomeMindServices:
             family_context_repo=FamilyContextRepo(db),
             family_device_repo=FamilyDeviceRepo(db),
             family_invite_repo=FamilyInviteRepo(db),
+            family_notification_repo=FamilyNotificationRepo(db),
             family_reminder_repo=FamilyReminderRepo(db),
             family_task_repo=FamilyTaskRepo(db),
             family_transaction_repo=FamilyTransactionRepo(db),
@@ -66,6 +71,7 @@ class HomeMindServices:
             photo_intelligence_repo=PhotoIntelligenceRepo(db),
             asset_job_repo=AssetJobRepo(db),
             search_index_repo=SearchIndexRepo(db),
+            smart_home_repo=SmartHomeRepo(db),
             face_candidate_repo=FaceCandidateRepo(db),
             knowledge_repo=KnowledgeRepo(db),
         )

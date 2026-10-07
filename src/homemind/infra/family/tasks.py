@@ -33,7 +33,7 @@ class FamilyTaskManager:
         family: FamilyManager,
         repo: FamilyTaskRepo,
         *,
-        reminders: "FamilyReminderManager | None" = None,
+        reminders: FamilyReminderManager | None = None,
     ) -> None:
         self.family = family
         self.repo = repo
@@ -70,7 +70,7 @@ class FamilyTaskManager:
         self, family_id: str, user: User, *, status: TaskStatus | None = None
     ) -> list[FamilyTaskRow]:
         self.family.require_access(family_id, user)
-        return self.repo.list(family_id, status=status.value if status else None)
+        return self.repo.list_for_family(family_id, status=status.value if status else None)
 
     def update(
         self,

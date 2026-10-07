@@ -28,6 +28,7 @@ const FamilyMemoryPage = lazy(() => import("../pages/FamilyMemory"));
 const FamilyDevicesPage = lazy(() => import("../pages/FamilyDevices"));
 const FamilyApprovalsPage = lazy(() => import("../pages/FamilyApprovals"));
 const FamilyCalendarPage = lazy(() => import("../pages/FamilyCalendar"));
+const FamilyTaskBoardPage = lazy(() => import("../pages/FamilyTaskBoard"));
 
 // Lazy-loaded pages — Control
 const RemoteDesktopPage = lazy(() => import("../pages/Control/RemoteDesktop"));
@@ -74,6 +75,7 @@ export const pathToKey: Record<string, string> = {
   "/devices": "family",
   "/approvals": "family",
   "/calendar": "family",
+  "/task-board": "family",
   // Common
   "/experts": "experts",
   "/tasks": "tasks",
@@ -187,6 +189,7 @@ export const routeConfigs: RouteConfig[] = [
   { path: "/devices", element: <FamilyDevicesPage /> },
   { path: "/approvals", element: <FamilyApprovalsPage /> },
   { path: "/calendar", element: <FamilyCalendarPage /> },
+  { path: "/task-board", element: <FamilyTaskBoardPage /> },
   { path: "/tasks", element: <CronJobsPage /> },
   { path: "/connectors", element: <ConnectorsPage /> },
   { path: "/skill-packages", element: <SkillPackagesPage /> },

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS homemind_family_notifications (
   target_type     TEXT,
   target_id       TEXT,
   severity        TEXT NOT NULL DEFAULT 'INFO',
+  dedupe_key      TEXT NOT NULL,
   read_at         INTEGER,
   created_at      INTEGER NOT NULL,
   expires_at      INTEGER
@@ -43,7 +44,7 @@ CREATE TABLE IF NOT EXISTS homemind_family_notifications (
 -- triggers idempotent; a retried job or a double-clicked approve must
 -- not stack two unread bells.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_homemind_family_notifications_dedupe
-  ON homemind_family_notifications(family_id, user_id, type, dedupe_key_placeholder);
+  ON homemind_family_notifications(dedupe_key);
 
 CREATE INDEX IF NOT EXISTS idx_homemind_family_notifications_inbox
   ON homemind_family_notifications(user_id, read_at, created_at);

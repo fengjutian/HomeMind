@@ -35,6 +35,7 @@ from homemind.infra.family.device_runtime import (
 )
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
+from homemind.infra.family.notifications import NotificationManager
 from homemind.infra.family.transactions import FamilyTransactionManager
 from homemind.infra.metrics import inc as _hm_inc
 from octop.infra.db.pool import DatabasePool
@@ -58,6 +59,7 @@ class MaintenanceRunner:
         context_manager: FamilyContextManager | None = None,
         lifecycle: MemoryLifecycleManager | None = None,
         device_manager: DeviceRuntimeManager | None = None,
+        notification_manager: NotificationManager | None = None,
         transaction_manager: FamilyTransactionManager | None = None,
         interval_seconds: float = 24 * 60 * 60,
     ) -> None:
@@ -86,6 +88,9 @@ class MaintenanceRunner:
             )
         )
         self._transaction_manager = transaction_manager
+        # Optional so a deployment without the notification tables still
+        # sweeps memories and devices.
+        self._notifications = notification_manager
         self._interval = interval_seconds
         self._task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
@@ -151,9 +156,24 @@ class MaintenanceRunner:
             _hm_inc("memory_dedup_groups_total", totals["duplicate_groups"])
         if self._device_manager is not None:
             try:
+                stale = self._device_manager.list_stale_online_devices()
                 totals["devices_offline"] = self._device_manager.mark_stale_devices_offline()
+                # Tell the family which device went dark, not just that
+                # something did. A notification with no name is a nag;
+                # a named one is actionable.
+                for device in stale:
+                    if self._notifications is None:
+                        break
+                    self._notifications.notify_device_offline(
+                        device.family_id, device_id=device.id, name=device.name
+                    )
             except Exception:
                 logger.exception("MaintenanceRunner: device liveness sweep crashed")
+        if self._notifications is not None:
+            try:
+                totals["notifications_purged"] = self._notifications.purge_expired_globally()
+            except Exception:
+                logger.exception("MaintenanceRunner: notification expiry sweep crashed")
         if self._transaction_manager is not None:
             # Stale approvals must not linger forever: an expired
             # approval is cancelled so the dashboard stops showing a

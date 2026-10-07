@@ -328,7 +328,7 @@ class HomeMindMcpServer:
                 ],
             }
         if name == "family.list_tasks":
-            tasks = self._services.family_task_repo.list(family_id)
+            tasks = self._services.family_task_repo.list_for_family(family_id)
             return {
                 "tasks": [
                     {"id": task.id, "title": task.title, "status": task.status}

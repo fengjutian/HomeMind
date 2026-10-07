@@ -55,6 +55,10 @@ class ExternalOperation(StrEnum):
     VISION = "VISION"
     EMBEDDING = "EMBEDDING"
     GEOCODING = "GEOCODING"
+    #: Sending a family's document to an external recognition engine.
+    #: Separate from VISION because the payload is text from a file the
+    #: family chose to keep private, not an image they took.
+    OCR = "OCR"
 
 
 class DataCategory(StrEnum):
@@ -95,6 +99,7 @@ class PrivacySettings:
     allow_external_vision: bool = False
     allow_external_embedding: bool = False
     allow_external_geocoding: bool = False
+    allow_external_ocr: bool = False
     allow_sensitive_external: bool = False
     allowed_provider_ids: frozenset[str] = frozenset()
 
@@ -149,10 +154,9 @@ class ExternalProcessingGuard:
             allow_external_vision=bool(row["allow_external_vision"]),
             allow_external_embedding=bool(row["allow_external_embedding"]),
             allow_external_geocoding=bool(row["allow_external_geocoding"]),
+            allow_external_ocr=bool(row["allow_external_ocr"]),
             allow_sensitive_external=bool(row["allow_sensitive_external"]),
-            allowed_provider_ids=frozenset(
-                json.loads(str(row["allowed_provider_ids"]))
-            ),
+            allowed_provider_ids=frozenset(json.loads(str(row["allowed_provider_ids"]))),
         )
 
     def update_settings(
@@ -164,6 +168,7 @@ class ExternalProcessingGuard:
         allow_external_vision: bool | None = None,
         allow_external_embedding: bool | None = None,
         allow_external_geocoding: bool | None = None,
+        allow_external_ocr: bool | None = None,
         allow_sensitive_external: bool | None = None,
         allowed_provider_ids: list[str] | None = None,
     ) -> PrivacySettings:
@@ -185,19 +190,28 @@ class ExternalProcessingGuard:
             "family_id": family_id,
             "processing_mode": mode.value,
             "allow_external_vision": _flag(
-                allow_external_vision, current.allow_external_vision,
+                allow_external_vision,
+                current.allow_external_vision,
             ),
             "allow_external_embedding": _flag(
-                allow_external_embedding, current.allow_external_embedding,
+                allow_external_embedding,
+                current.allow_external_embedding,
             ),
             "allow_external_geocoding": _flag(
-                allow_external_geocoding, current.allow_external_geocoding,
+                allow_external_geocoding,
+                current.allow_external_geocoding,
+            ),
+            "allow_external_ocr": _flag(
+                allow_external_ocr,
+                current.allow_external_ocr,
             ),
             "allow_sensitive_external": _flag(
-                allow_sensitive_external, current.allow_sensitive_external,
+                allow_sensitive_external,
+                current.allow_sensitive_external,
             ),
             "allowed_provider_ids": json.dumps(
-                sorted(providers), ensure_ascii=False,
+                sorted(providers),
+                ensure_ascii=False,
             ),
             "updated_at": int(time.time()),
             "updated_by": user.id,
@@ -205,8 +219,7 @@ class ExternalProcessingGuard:
         fields = ", ".join(f"{key} = ?" for key in values if key != "family_id")
         with self._services.db.transaction() as conn:
             existing = conn.execute(
-                "SELECT family_id FROM homemind_family_privacy_settings "
-                "WHERE family_id = ?",
+                "SELECT family_id FROM homemind_family_privacy_settings WHERE family_id = ?",
                 (family_id,),
             ).fetchone()
             if existing is None:
@@ -219,8 +232,7 @@ class ExternalProcessingGuard:
                 )
             else:
                 conn.execute(
-                    f"UPDATE homemind_family_privacy_settings SET {fields} "
-                    "WHERE family_id = ?",
+                    f"UPDATE homemind_family_privacy_settings SET {fields} WHERE family_id = ?",
                     [*[v for k, v in values.items() if k != "family_id"], family_id],
                 )
         return self.get_settings(family_id)
@@ -305,7 +317,11 @@ class ExternalProcessingGuard:
     # ------------------------------------------------------------ requests
 
     def list_requests(
-        self, family_id: str, user: User, *, status: str | None = None,
+        self,
+        family_id: str,
+        user: User,
+        *,
+        status: str | None = None,
     ) -> list[dict[str, Any]]:
         self._family.require_manager(family_id, user)
         clauses = ["family_id = ?"]
@@ -322,7 +338,12 @@ class ExternalProcessingGuard:
         return [dict(row) for row in rows]
 
     def decide_request(
-        self, family_id: str, request_id: str, user: User, *, approve: bool,
+        self,
+        family_id: str,
+        request_id: str,
+        user: User,
+        *,
+        approve: bool,
     ) -> dict[str, Any]:
         """Manager approves or rejects a pending outbound request."""
 
@@ -335,7 +356,8 @@ class ExternalProcessingGuard:
             ).fetchone()
         if row is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "external request not found",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "external request not found",
             )
         status = "APPROVED" if approve else "REJECTED"
         with self._services.db.transaction() as conn:
@@ -351,9 +373,7 @@ class ExternalProcessingGuard:
                     "external request is already decided",
                 )
         _hm_inc(
-            "external_request_approved_total"
-            if approve
-            else "external_request_rejected_total",
+            "external_request_approved_total" if approve else "external_request_rejected_total",
         )
         return {"request_id": request_id, "status": status}
 
@@ -450,6 +470,8 @@ def _operation_allowed(settings: PrivacySettings, operation: ExternalOperation) 
         return settings.allow_external_vision
     if operation is ExternalOperation.EMBEDDING:
         return settings.allow_external_embedding
+    if operation is ExternalOperation.OCR:
+        return settings.allow_external_ocr
     return settings.allow_external_geocoding
 
 

@@ -372,6 +372,29 @@ class FamilyDeviceRepo:
             )
         return int(cursor.rowcount or 0)
 
+    def list_stale_online_devices(
+        self, *, heartbeat_timeout_seconds: int, now: int | None = None,
+    ) -> list[FamilyDeviceRow]:
+        """Devices whose heartbeat lapsed and that still read as online.
+
+        The read half of :meth:`mark_stale_devices_offline`, split out
+        so the caller can tell the family *which* device went dark
+        before the write lands. Querying first and updating second
+        risks naming a device that another sweep already flipped, which
+        is the lesser evil compared to flipping a row the caller never
+        mentioned.
+        """
+        timestamp = now_ts() if now is None else now
+        cutoff = timestamp - heartbeat_timeout_seconds
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_devices "
+                "WHERE status IN ('ONLINE', 'BUSY') "
+                "  AND (last_seen IS NULL OR last_seen <= ?)",
+                (cutoff,),
+            ).fetchall()
+        return map_rows(rows, FamilyDeviceRow)
+
     def revoke_credential(self, credential_id: str) -> FamilyDeviceCredentialRow | None:
         ts = now_ts()
         with self._db.transaction() as conn:
