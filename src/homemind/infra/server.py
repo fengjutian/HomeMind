@@ -22,6 +22,7 @@ from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
 from homemind.infra.family.memory_maintenance import MaintenanceRunner
 from homemind.infra.family.permissions import FamilyPermissionEvaluator
 from homemind.infra.family.scan_job import FamilyAssetScanJob
+from homemind.infra.family.search_indexer import FamilySearchIndexer
 from homemind.infra.family.tasks import FamilyTaskManager
 from homemind.infra.family.transactions import FamilyTransactionManager
 from homemind.tools.family import build_family_tools
@@ -65,6 +66,7 @@ class HomeMindServer(OctopServer):
             family_manager,
             hm.family_context_repo,
             asset_repo=hm.family_asset_repo,
+            search_indexer=self._search_indexer(hm),
         )
         lifecycle = MemoryLifecycleManager(
             family_manager,
@@ -86,6 +88,24 @@ class HomeMindServer(OctopServer):
                 event_bus=lambda: self._family_event_bus,
             ),
         ]
+
+    @staticmethod
+    def _search_indexer(services: HomeMindServices) -> FamilySearchIndexer:
+        """Build the unified search index writer.
+
+        Every `FamilyContextManager` gets one so event and memory
+        writes keep the index fresh; without it Stage 7's search would
+        be permanently empty.
+        """
+
+        return FamilySearchIndexer(
+            services.search_index_repo,
+            family_repo=services.family_repo,
+            context_repo=services.family_context_repo,
+            asset_repo=services.family_asset_repo,
+            album_repo=services.family_album_repo,
+            photo_repo=services.photo_intelligence_repo,
+        )
 
     @property
     def memory_maintenance(self) -> MaintenanceRunner | None:
@@ -135,7 +155,9 @@ class HomeMindServer(OctopServer):
         run_migrations(self.services.db)
         services = HomeMindServices.from_pool(self.services.db)
         manager = FamilyAssetManager(
-            services.family_repo, services.family_asset_repo,
+            services.family_repo,
+            services.family_asset_repo,
+            search_indexer=self._search_indexer(services),
         )
         self._asset_scan_job = FamilyAssetScanJob(
             asset_manager=manager,
@@ -154,6 +176,7 @@ class HomeMindServer(OctopServer):
             family_manager,
             hm.family_context_repo,
             asset_repo=hm.family_asset_repo,
+            search_indexer=self._search_indexer(hm),
         )
         self._memory_maintenance = MaintenanceRunner(
             db=self.services.db,
@@ -182,7 +205,11 @@ class HomeMindServer(OctopServer):
         family_manager = FamilyManager(hm.family_repo)
         self._asset_job_runner = AssetJobRunner(
             manager=AssetJobManager(family_manager, hm.asset_job_repo),
-            asset_manager=FamilyAssetManager(hm.family_repo, hm.family_asset_repo),
+            asset_manager=FamilyAssetManager(
+                hm.family_repo,
+                hm.family_asset_repo,
+                search_indexer=self._search_indexer(hm),
+            ),
             family_manager=family_manager,
             asset_repo=hm.family_asset_repo,
             event_bus=lambda: self._family_event_bus,

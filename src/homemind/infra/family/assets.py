@@ -142,10 +142,14 @@ class FamilyAssetManager:
         asset_repo: FamilyAssetRepo,
         *,
         permission_evaluator: FamilyPermissionEvaluator | None = None,
+        search_indexer: Any | None = None,
     ) -> None:
         self.family = FamilyManager(family_repo)
         self.repo = asset_repo
         self.permissions = permission_evaluator or FamilyPermissionEvaluator(family_repo)
+        # Optional unified search index; absent in tests and in a plain
+        # Octop deployment.
+        self.search_indexer = search_indexer
 
     def scan_directory(
         self,
@@ -273,6 +277,7 @@ class FamilyAssetManager:
                 if existing is None:
                     seen.append(asset.id)
                 indexed.append(asset.id)
+                self._reindex_asset(family_id, asset)
             except (OSError, ValueError) as exc:
                 errors.append(f"{path.name}: {exc}")
         timestamp = now_ts()
@@ -314,7 +319,7 @@ class FamilyAssetManager:
         family = self.family.repo.get_family(family_id)
         if family is None:
             raise OctopError(ErrorCode.NOT_FOUND, "family not found")
-        return self._index_file(
+        asset = self._index_file(
             family_id,
             created_by_user_id,
             source_id=source_id,
@@ -325,6 +330,26 @@ class FamilyAssetManager:
             visibility=source.visibility if source is not None else "FAMILY",
             timezone=ZoneInfo(family.timezone),
         )
+        self._reindex_asset(family_id, asset)
+        return asset
+
+    def _reindex_asset(self, family_id: str, asset: FamilyAssetRow) -> None:
+        """Push a freshly indexed asset into the unified search index.
+
+        Best-effort: a search index failure must not fail the scan that
+        already wrote the asset row.
+        """
+        if self.search_indexer is None:
+            return
+        try:
+            self.search_indexer.index_asset(family_id, asset)
+        except Exception as exc:  # noqa: BLE001 — never fail the scan
+            import logging  # noqa: PLC0415
+
+            logging.getLogger(__name__).warning(
+                "search index update failed for asset %s/%s: %s",
+                family_id, asset.id, exc,
+            )
 
     def refresh_metadata_for_job(self, asset_id: str, path: str) -> None:
         """Refresh EXIF / GPS for an already-indexed asset."""

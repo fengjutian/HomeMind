@@ -43,9 +43,15 @@ from homemind.infra.db.repos.search_index import (
 
 logger = logging.getLogger(__name__)
 
-STATUS_INDEXED = "INDEXED"
+STATUS_INDEXED = "ACTIVE"
 STATUS_ARCHIVED = "ARCHIVED"
 STATUS_DELETED = "DELETED"
+# ``STATUS_INDEXED`` is the *query* vocabulary ("this document is in
+# the default result set"), not the domain one. An indexed event stays
+# ``ACTIVE`` because that is what the family tables call it; keeping
+# the two namespaces aligned is what stops a freshly-written document
+# from being invisible to every search.
+
 
 
 def _member_visibility(member: FamilyMemberRow) -> str:

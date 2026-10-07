@@ -28,6 +28,7 @@ from homemind.infra.family.photo_providers import (
     require_provider,
 )
 from homemind.infra.family.search import FamilySearchManager, SearchKind
+from homemind.infra.family.search_indexer import FamilySearchIndexer
 from homemind.infra.family.tasks import FamilyTaskManager, TaskStatus
 from homemind.infra.family.transactions import FamilyTransactionManager
 from octop.infra.db.pool import DatabasePool
@@ -45,13 +46,27 @@ def _build_managers(
     """
     families = FamilyManager(services.family_repo)
     permissions = FamilyPermissionEvaluator(services.family_repo)
+    # One indexer shared by every manager so a write through any of
+    # them lands in the same unified index.
+    indexer = FamilySearchIndexer(
+        services.search_index_repo,
+        family_repo=services.family_repo,
+        context_repo=services.family_context_repo,
+        asset_repo=services.family_asset_repo,
+        album_repo=services.family_album_repo,
+        photo_repo=services.photo_intelligence_repo,
+    )
     context = FamilyContextManager(
-        families, services.family_context_repo, permission_evaluator=permissions,
+        families,
+        services.family_context_repo,
+        permission_evaluator=permissions,
+        search_indexer=indexer,
     )
     assets = FamilyAssetManager(
         services.family_repo,
         services.family_asset_repo,
         permission_evaluator=permissions,
+        search_indexer=indexer,
     )
     albums = FamilyAlbumManager(families, assets, services.family_album_repo)
     photos = PhotoIntelligenceManager(

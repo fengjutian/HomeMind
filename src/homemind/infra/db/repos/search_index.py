@@ -406,23 +406,24 @@ class SearchIndexRepo:
                 end_at=end_at,
                 limit=limit,
             )
-        params: list[Any] = [family_id]
         kind_placeholders = ", ".join("?" for _ in kinds)
-        params.extend(kinds)
-        params.append(needle)
         time_clause = ""
         if start_at is not None:
-            params.append(start_at)
             time_clause = " AND (d.captured_at IS NULL OR d.captured_at >= ?)"
         if end_at is not None:
-            params.append(end_at)
             time_clause += " AND (d.captured_at IS NULL OR d.captured_at <= ?)"
 
         visibility_clause, visibility_params = self._visibility_predicate(
             visible_visibility, owner_member_id, allow_private,
         )
-        params.extend(visibility_params)
-        params.append(limit)
+        # Time bounds sit between the kind list and the visibility
+        # predicate in the SQL text, so their params are appended in
+        # that same order.
+        time_params: list[Any] = []
+        if start_at is not None:
+            time_params.append(start_at)
+        if end_at is not None:
+            time_params.append(end_at)
 
         if self.dialect == "postgresql":
             sql = (
@@ -435,21 +436,42 @@ class SearchIndexRepo:
                 + f" AND {visibility_clause} "
                 "ORDER BY rank DESC, d.updated_at DESC, d.id DESC LIMIT ?"
             )
+            params = [
+                needle,            # similarity(..., ?)
+                family_id,
+                *kinds,
+                needle,            # ... % ?
+                *time_params,
+                *visibility_params,
+                limit,
+            ]
             with self._db.connect() as conn:
                 rows = conn.execute(sql, params).fetchall()
             return self._rows_with_rank(rows)
 
+        # No alias on the FTS table: SQLite only resolves ``MATCH``
+        # against the *real* table name, so ``homemind_search_fts MATCH ?``
+        # silently returns nothing the moment the table is renamed to
+        # ``fts`` in the FROM clause. A subquery keeps the real name and
+        # carries the rank out.
+        #
+        # The visibility filter lives in the outer query so it runs
+        # *after* ranking — the index never returns a row the caller
+        # may not read, and the limit is applied post-filter.
         sql = (
-            "SELECT d.*, fts.rank AS rank "
+            "SELECT d.*, m.rank AS rank "
             "FROM homemind_search_documents d "
-            "JOIN homemind_search_fts fts ON fts.document_id = d.document_id "
+            "JOIN ("
+            "  SELECT document_id, rank FROM homemind_search_fts "
+            "  WHERE homemind_search_fts MATCH ?"
+            ") m ON m.document_id = d.document_id "
             f"WHERE d.family_id = ? AND d.kind IN ({kind_placeholders}) "
             "  AND d.status = 'ACTIVE' "
-            "  AND homemind_search_fts MATCH ? "
             + time_clause
             + f" AND {visibility_clause} "
-            "ORDER BY fts.rank LIMIT ?"
+            "ORDER BY m.rank LIMIT ?"
         )
+        params = [needle, family_id, *kinds, *time_params, *visibility_params, limit]
         with self._db.connect() as conn:
             rows = conn.execute(sql, params).fetchall()
         return self._rows_with_rank(rows)

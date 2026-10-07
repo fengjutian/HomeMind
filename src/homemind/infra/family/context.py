@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
+from typing import Any
 from datetime import datetime
 from enum import StrEnum
 from zoneinfo import ZoneInfo
@@ -67,10 +68,15 @@ class FamilyContextManager:
         *,
         permission_evaluator: FamilyPermissionEvaluator | None = None,
         asset_repo: FamilyAssetRepo | None = None,
+        search_indexer: Any | None = None,
     ) -> None:
         self.family = family
         self.repo = repo
         self.permissions = permission_evaluator or FamilyPermissionEvaluator(family.repo)
+        # Optional unified search index. Absent in tests and in a plain
+        # Octop deployment; the write paths below then skip indexing
+        # rather than failing the write.
+        self.search_indexer = search_indexer
         # Optional asset repo: when supplied, asset candidates are resolved
         # via the Stage 2 ``AssetQueryResolver``. Otherwise asset_ids stays
         # empty and ``asset_ids`` is simply not populated.
@@ -93,7 +99,9 @@ class FamilyContextManager:
         values["metadata_json"] = json.dumps(
             values.pop("metadata", {}), ensure_ascii=False, sort_keys=True
         )
-        return self.repo.create_event(family_id, **values)
+        event = self.repo.create_event(family_id, **values)
+        self._reindex_event(family_id, event)
+        return event
 
     def list_events(
         self, family_id: str, user: User, **filters: int | None
@@ -121,12 +129,16 @@ class FamilyContextManager:
             changes["metadata_json"] = json.dumps(
                 changes.pop("metadata") or {}, ensure_ascii=False, sort_keys=True
             )
-        return self.repo.update_event(event_id, **changes)  # type: ignore[return-value]
+        updated = self.repo.update_event(event_id, **changes)  # type: ignore[return-value]
+        if updated is not None:
+            self._reindex_event(family_id, updated)
+        return updated
 
     def delete_event(self, family_id: str, event_id: str, user: User) -> None:
         self.family.require_manager(family_id, user)
         self._event(family_id, event_id)
         self.repo.delete_event(event_id)
+        self._deindex_event(family_id, event_id)
 
     def create_memory(self, family_id: str, user: User, **values: object) -> FamilyMemoryRow:
         self.family.require_access(family_id, user)
@@ -137,7 +149,9 @@ class FamilyContextManager:
                 raise OctopError(ErrorCode.NOT_FOUND, "family member not found")
         values["content"] = str(values["content"]).strip()
         values["created_by"] = user.id
-        return self.repo.create_memory(family_id, **values)
+        memory = self.repo.create_memory(family_id, **values)
+        self._reindex_memory(family_id, memory)
+        return memory
 
     def search_memories(
         self, family_id: str, user: User, query: str | None = None
@@ -181,12 +195,16 @@ class FamilyContextManager:
         self._memory(family_id, memory_id)
         if "content" in changes:
             changes["content"] = str(changes["content"]).strip()
-        return self.repo.update_memory(memory_id, **changes)  # type: ignore[return-value]
+        updated = self.repo.update_memory(memory_id, **changes)  # type: ignore[return-value]
+        if updated is not None:
+            self._reindex_memory(family_id, updated)
+        return updated
 
     def delete_memory(self, family_id: str, memory_id: str, user: User) -> None:
         self.family.require_manager(family_id, user)
         self._memory(family_id, memory_id)
         self.repo.delete_memory(memory_id)
+        self._deindex_memory(family_id, memory_id)
 
     def resolve(self, family_id: str, user: User, query: str) -> ResolvedFamilyContext:
         family = self.family.require_access(family_id, user)
@@ -384,6 +402,54 @@ class FamilyContextManager:
             asset=memory,
         )
         return decision.effect is PermissionEffect.ALLOW
+
+    # ------------------------------------------------- search index upkeep
+
+    def _reindex_event(self, family_id: str, event: FamilyEventRow) -> None:
+        """Push an event into the unified search index.
+
+        Indexing is best-effort: a search index failure must not roll
+        back a write the user already sees as successful.
+        """
+        if self.search_indexer is None:
+            return
+        try:
+            self.search_indexer.index_event(family_id, event)
+        except Exception:  # noqa: BLE001 — never fail the write
+            _log_index_failure("event", family_id, event.id)
+
+    def _deindex_event(self, family_id: str, event_id: str) -> None:
+        if self.search_indexer is None:
+            return
+        try:
+            self.search_indexer.remove_event(family_id, event_id)
+        except Exception:  # noqa: BLE001
+            _log_index_failure("event", family_id, event_id)
+
+    def _reindex_memory(self, family_id: str, memory: FamilyMemoryRow) -> None:
+        if self.search_indexer is None:
+            return
+        try:
+            self.search_indexer.index_memory(family_id, memory)
+        except Exception:  # noqa: BLE001
+            _log_index_failure("memory", family_id, memory.id)
+
+    def _deindex_memory(self, family_id: str, memory_id: str) -> None:
+        if self.search_indexer is None:
+            return
+        try:
+            self.search_indexer.remove_memory(family_id, memory_id)
+        except Exception:  # noqa: BLE001
+            _log_index_failure("memory", family_id, memory_id)
+
+
+def _log_index_failure(kind: str, family_id: str, entity_id: str) -> None:
+    import logging  # noqa: PLC0415
+
+    logging.getLogger(__name__).warning(
+        "search index update failed for %s %s/%s; the write itself succeeded",
+        kind, family_id, entity_id,
+    )
 
 
 def _extract_relation_terms(query: str) -> list[str]:
