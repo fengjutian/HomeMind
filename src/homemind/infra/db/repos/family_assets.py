@@ -124,7 +124,7 @@ class FamilyAssetRepo:
         self,
         *,
         family_id: str,
-        source_id: str,
+        source_id: str | None,
         space_id: str | None,
         asset_type: str,
         name: str,

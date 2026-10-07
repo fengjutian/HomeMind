@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from collections.abc import Callable
 from enum import StrEnum
-from typing import Callable, TypeVar
+from typing import TypeVar
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 try:
@@ -24,8 +25,8 @@ from homemind.infra.db.repos.families import (
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.permissions import (
     FamilyPermissionEvaluator,
-    PermissionEffect,
     PermissionDecision,
+    PermissionEffect,
 )
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
@@ -248,6 +249,11 @@ class FamilyManager:
         member = self._require_member(family_id, member_id)
         if member.role == MemberRole.OWNER:
             raise OctopError(ErrorCode.FORBIDDEN, "family owner cannot be deleted")
+        if self._is_last_manager(family_id, member_id):
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "the last family manager cannot be removed",
+            )
         if any(
             space.space_type == SpaceType.PRIVATE and space.owner_member_id == member_id
             for space in self.repo.list_spaces(family_id)
@@ -257,6 +263,132 @@ class FamilyManager:
                 "private spaces must be reassigned before deleting their owner",
             )
         self.repo.delete_member(member_id)
+
+    # --------------------------------------------------- ownership transfer
+
+    def transfer_ownership(
+        self, family_id: str, user: User, *, to_member_id: str
+    ) -> FamilyMemberRow:
+        """Hand the family over to another member.
+
+        The current owner and the target swap roles in one write so the
+        family is never briefly left with two owners (or none). Only the
+        owner may transfer — an admin cannot seize the family.
+        """
+        family = self.require_access(family_id, user)
+        membership = self.repo.get_membership(family_id, user.id)
+        if membership is None or str(membership["role"]) != MemberRole.OWNER.value:
+            raise OctopError(ErrorCode.FORBIDDEN, "only the family owner can transfer ownership")
+        target = self._require_member(family_id, to_member_id)
+        if target.id == str(membership["member_id"]):
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "member already owns this family"
+            )
+        if target.role not in {MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER}:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "ownership cannot be transferred to a guest or child member",
+            )
+        if target.user_id is None:
+            # ``homemind_families.owner_user_id`` is a NOT NULL foreign
+            # key, so ownership has to land on a member that is actually
+            # bound to an account. An unbound member is a placeholder, not
+            # a person who can sign in and administer the family.
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "bind a platform account to the member before transferring ownership",
+            )
+        _write(
+            lambda: self.repo.update_member(
+                str(membership["member_id"]), role=MemberRole.ADMIN.value,
+            )
+        )
+        # ``update_member`` cascades the role onto the membership row,
+        # so both members now carry the right role and only the family's
+        # owner pointer still needs moving.
+        self.repo.update_member(to_member_id, role=MemberRole.OWNER.value)
+        if not self.repo.update_family_owner(family.id, user.id, target.user_id):
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "family ownership changed concurrently; retry the transfer",
+            )
+        return self._require_member(family_id, to_member_id)
+
+    def leave_family(self, family_id: str, user: User) -> None:
+        """A member voluntarily leaves.
+
+        Two invariants block an exit that would strand the family:
+        the owner must transfer first, and the last manager cannot walk
+        away and leave nobody able to approve anything.
+        """
+        self.require_access(family_id, user)
+        membership = self.repo.get_membership(family_id, user.id)
+        if membership is None:
+            return
+        member_id = str(membership["member_id"])
+        role = str(membership["role"])
+        if role == MemberRole.OWNER.value:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "transfer ownership before leaving the family",
+            )
+        if role == MemberRole.ADMIN.value and self._is_last_manager(family_id, member_id):
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "the last family manager cannot leave",
+            )
+        self.repo.delete_member(member_id)
+
+    # ------------------------------------------------------- user binding
+
+    def bind_user(
+        self, family_id: str, member_id: str, user: User, *, target_user_id: int
+    ) -> FamilyMemberRow:
+        """Link a member to a platform account.
+
+        A member may be bound to at most one user, and a user may not
+        hold two member rows in the same family — otherwise one login
+        would see two identities and permission checks would become
+        ambiguous.
+        """
+        self.require_manager(family_id, user)
+        member = self._require_member(family_id, member_id)
+        if not self.repo.user_exists(target_user_id):
+            raise OctopError(ErrorCode.NOT_FOUND, "linked user not found")
+        existing_member = self.repo.find_member_by_user(family_id, target_user_id)
+        if existing_member is not None and existing_member.id != member.id:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "that user is already bound to another member in this family",
+            )
+        if member.user_id is not None and member.user_id != target_user_id:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "member is already bound to a different user",
+            )
+        row = _write(
+            lambda: self.repo.update_member(member.id, user_id=target_user_id)
+        )
+        return self._require_member(family_id, row.id if row else member.id)
+
+    def unbind_user(
+        self, family_id: str, member_id: str, user: User
+    ) -> FamilyMemberRow:
+        """Detach a member from its platform account."""
+        self.require_manager(family_id, user)
+        self._require_member(family_id, member_id)
+        _write(lambda: self.repo.update_member(member_id, user_id=None))
+        return self._require_member(family_id, member_id)
+
+    def _is_last_manager(self, family_id: str, member_id: str) -> bool:
+        """True when removing ``member_id`` would leave no owner/admin."""
+        managers = [
+            member
+            for member in self.repo.list_members(family_id)
+            if member.role in {MemberRole.OWNER, MemberRole.ADMIN}
+            and member.id != member_id
+        ]
+        return not managers
 
     def create_relationship(
         self,

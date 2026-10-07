@@ -83,6 +83,7 @@ class FamilyContextMiddleware(AgentMiddleware[Any, Any]):
         context_manager: FamilyContextManager,
         permission_evaluator: FamilyPermissionEvaluator | None = None,
         memory_lifecycle: MemoryLifecycleManager | None = None,
+        event_bus: Callable[[], Any] | None = None,
     ) -> None:
         super().__init__()
         self._user_repo = user_repo
@@ -91,6 +92,11 @@ class FamilyContextMiddleware(AgentMiddleware[Any, Any]):
         self._context = context_manager
         self._permissions = permission_evaluator or FamilyPermissionEvaluator(family_manager.repo)
         self._memory_lifecycle = memory_lifecycle
+        # A *callable*, not the bus itself: this middleware is built
+        # during ``OctopServer._boot_runtime``, before the gateway hub
+        # exists. Resolving lazily lets a later ``start()`` wire the bus
+        # in without rebuilding the middleware chain.
+        self._event_bus_source = event_bus
         # Per-process dedupe for the post-turn extractor so a single
         # user message does not become three candidates when the agent
         # loops through multiple model calls inside one turn.
@@ -159,7 +165,7 @@ class FamilyContextMiddleware(AgentMiddleware[Any, Any]):
             if message_key not in self._seen_message_keys:
                 self._seen_message_keys.add(message_key)
                 try:
-                    _run_post_turn(
+                    result = _run_post_turn(
                         user_repo=self._user_repo,
                         family_manager=self._family,
                         context_repo=self._context.repo,
@@ -168,6 +174,7 @@ class FamilyContextMiddleware(AgentMiddleware[Any, Any]):
                         turn_user=turn,
                         messages=messages,
                     )
+                    await self._announce_candidates(family_id, result)
                 except Exception:
                     # ``run_for_turn`` already swallows and logs, but
                     # belt-and-braces: an extractor crash must never
@@ -211,6 +218,35 @@ class FamilyContextMiddleware(AgentMiddleware[Any, Any]):
         _ = block  # silence unused-warning; kept for future sync driver
         return handler(request)
 
+    async def _announce_candidates(
+        self, family_id: str, result: Any,
+    ) -> None:
+        """Tell the family's dashboards a candidate is waiting review.
+
+        Skipped silently when the bus is absent — a conversation must
+        never fail because nobody is subscribed.
+        """
+
+        if self._event_bus_source is None or result is None:
+            return
+        bus = self._event_bus_source()
+        if bus is None:
+            return
+        created = getattr(result, "candidates_created", 0)
+        if not created:
+            return
+        from homemind.infra.family.events import (  # noqa: PLC0415
+            EVENT_MEMORY_CANDIDATE_CREATED,
+            emit_family_event,
+        )
+
+        await emit_family_event(
+            bus,
+            EVENT_MEMORY_CANDIDATE_CREATED,
+            family_id,
+            {"candidates_created": created},
+        )
+
 
 def _append_block(request: Any, block: str, base_message: SystemMessage) -> Any:
     existing_content = base_message.content or ""
@@ -224,7 +260,7 @@ def _append_block(request: Any, block: str, base_message: SystemMessage) -> Any:
         return request.override(system_message=new_message)
     # Fallback for stub requests in tests.
     with contextlib.suppress(Exception):
-        setattr(request, "system_message", new_message)
+        request.system_message = new_message
     return request
 
 

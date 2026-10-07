@@ -25,6 +25,12 @@ from homemind.infra.family.device_runtime import (
     DeviceRuntimeManager,
     PairingCode,
 )
+from homemind.infra.family.events import (
+    EVENT_APPROVAL_CREATED,
+    EVENT_APPROVAL_DECIDED,
+    EVENT_JOB_PROGRESS,
+    emit_family_event,
+)
 from homemind.infra.family.manager import FamilyManager
 from octop.api.deps import current_user, get_server
 from octop.infra.server import OctopServer
@@ -34,6 +40,22 @@ router = APIRouter()
 
 Server = Annotated[OctopServer, Depends(get_server)]
 CurrentUser = Annotated[User, Depends(current_user)]
+
+
+async def emit_command_event(
+    server: OctopServer,
+    family_id: str,
+    event_type: str,
+    payload: dict[str, Any],
+) -> None:
+    """Push a device-command event to the family's dashboards.
+
+    The bus lives on ``HomeMindServer`` and is absent in a plain Octop
+    deployment, so a device write must not depend on it.
+    """
+
+    bus = getattr(server, "family_event_bus", None)
+    await emit_family_event(bus, event_type, family_id, payload)
 
 
 class _RowModel(BaseModel):
@@ -52,6 +74,8 @@ class FamilyDeviceResponse(_RowModel):
     last_seen: int | None
     created_at: int
     updated_at: int
+    root_path: str | None = None
+    runtime_version: str | None = None
 
 
 class FamilyDeviceCreateBody(BaseModel):
@@ -299,6 +323,17 @@ async def enqueue_command(
         transaction_id=body.transaction_id,
         user=user,
     )
+    await emit_command_event(
+        server,
+        family_id,
+        EVENT_APPROVAL_CREATED if row.status == "WAITING_APPROVAL" else EVENT_JOB_PROGRESS,
+        {
+            "command_id": row.id,
+            "capability": row.capability,
+            "status": row.status,
+            "is_unsafe": row.is_unsafe,
+        },
+    )
     return _command_response(row)
 
 
@@ -314,9 +349,14 @@ async def approve_command(
     server: Server,
     user: CurrentUser,
 ) -> FamilyDeviceCommandResponse:
-    return _command_response(
-        _manager(server).approve_command(family_id, command_id, user),
+    row = _manager(server).approve_command(family_id, command_id, user)
+    await emit_command_event(
+        server,
+        family_id,
+        EVENT_APPROVAL_DECIDED,
+        {"command_id": row.id, "status": row.status, "decision": "APPROVED"},
     )
+    return _command_response(row)
 
 
 @router.post(
@@ -330,9 +370,14 @@ async def cancel_command(
     server: Server,
     user: CurrentUser,
 ) -> FamilyDeviceCommandResponse:
-    return _command_response(
-        _manager(server).cancel_command(family_id, command_id, user),
+    row = _manager(server).cancel_command(family_id, command_id, user)
+    await emit_command_event(
+        server,
+        family_id,
+        EVENT_APPROVAL_DECIDED,
+        {"command_id": row.id, "status": row.status, "decision": "CANCELLED"},
     )
+    return _command_response(row)
 
 
 @router.get(

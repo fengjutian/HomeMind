@@ -116,6 +116,10 @@ export interface FamilyDevice {
   last_seen: number | null;
   created_at: number;
   updated_at: number;
+  // Stage 5: the device's authorized filesystem root and the runtime
+  // build it last reported on a heartbeat.
+  root_path?: string | null;
+  runtime_version?: string | null;
 }
 
 export interface FamilyDevicePairingResponse {
@@ -251,6 +255,16 @@ export interface FamilyTransaction {
   error: string | null;
   created_at: number;
   updated_at: number;
+  // Stage-4 additions: the approval page renders preview, verification
+  // and the lease fields from the same row.
+  preview_json?: string | null;
+  verification_json?: string | null;
+  attempt_count?: number;
+  approved_at?: number | null;
+  executed_at?: number | null;
+  verified_at?: number | null;
+  cancelled_at?: number | null;
+  lease_expires_at?: number | null;
 }
 
 export interface FamilyAudit {
@@ -560,6 +574,12 @@ export const homeMindFamilyApi = {
     request<FamilyTransaction>(
       `${root}/${familyId}/approvals/${approvalId}/${decision}`,
       json({ reason }),
+    ),
+  listTransactions: (familyId: string, status?: string) =>
+    request<FamilyTransaction[]>(
+      status
+        ? `${root}/${familyId}/transactions?status=${encodeURIComponent(status)}`
+        : `${root}/${familyId}/transactions`,
     ),
   getTransaction: (familyId: string, transactionId: string) =>
     request<FamilyTransaction>(

@@ -344,7 +344,21 @@
     "TEAM_MEMBER_BUSY": "该专家有进行中的团队任务，请等结束后再调整成员或删除。",
     "TEAM_NOT_SHAREABLE": "当前版本不支持分享团队。",
     "SKILL_PACKAGE_COPY_DENIED": "该技能包的创建者已禁止复制其中的技能。",
-    "SKILL_PACKAGE_LOCKED": "此技能复制自锁定策略的技能包，无法在工作区编辑。"
+    "SKILL_PACKAGE_LOCKED": "此技能复制自锁定策略的技能包，无法在工作区编辑。",
+    "FAMILY_INVALID": "家庭请求无效",
+    "FAMILY_CONFLICT": "家庭状态冲突",
+    "HOMEMIND_FAMILY_NOT_FOUND": "未找到该家庭",
+    "HOMEMIND_FAMILY_ACCESS_DENIED": "无权访问该家庭",
+    "HOMEMIND_ACTIVE_FAMILY_REQUIRED": "请先选择一个家庭",
+    "HOMEMIND_PRIVATE_SPACE_DENIED": "无权访问该私密空间",
+    "HOMEMIND_APPROVAL_REQUIRED": "该操作需要审批",
+    "HOMEMIND_TRANSACTION_CONFLICT": "事务状态已变化,请刷新后重试",
+    "HOMEMIND_DEVICE_TOKEN_INVALID": "设备凭证无效",
+    "HOMEMIND_DEVICE_OFFLINE": "设备当前离线",
+    "HOMEMIND_JOB_NOT_FOUND": "未找到该后台任务",
+    "HOMEMIND_EXTERNAL_PROCESSING_DENIED": "家庭隐私设置不允许发送到外部服务",
+    "HOMEMIND_MEMORY_REVIEW_REQUIRED": "该记忆需要人工确认",
+    "HOMEMIND_IDENTITY_REQUIRED": "无法确认调用者身份"
   },
   "nav": {
     "chat": "对话",

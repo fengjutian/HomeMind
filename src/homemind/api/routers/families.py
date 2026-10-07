@@ -86,6 +86,14 @@ class FamilyMemberCreateBody(BaseModel):
     birthday: str | None = Field(default=None, max_length=10, description="ISO date (YYYY-MM-DD).")
 
 
+class FamilyTransferOwnershipBody(BaseModel):
+    to_member_id: str = Field(min_length=1, max_length=64)
+
+
+class FamilyBindUserBody(BaseModel):
+    user_id: int = Field(description="Platform user id to link to this member.")
+
+
 class FamilyMemberUpdateBody(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=100)
     role: MemberRole | None = None
@@ -359,6 +367,72 @@ async def create_relationship(
     family_id: str, body: FamilyRelationshipCreateBody, server: Server, user: CurrentUser
 ) -> object:
     return _manager(server).create_relationship(family_id, user, **body.model_dump())
+
+
+@router.post(
+    "/{family_id}/transfer-ownership",
+    response_model=FamilyMemberResponse,
+    summary="Transfer family ownership to another member",
+    description=(
+        "Owner-only. The previous owner is demoted to ADMIN in the "
+        "same operation so the family is never briefly ownerless. The "
+        "last manager and the owner cannot be removed this way."
+    ),
+)
+async def transfer_ownership(
+    family_id: str, body: FamilyTransferOwnershipBody, server: Server, user: CurrentUser,
+) -> object:
+    return _manager(server).transfer_ownership(
+        family_id, user, to_member_id=body.to_member_id,
+    )
+
+
+@router.post(
+    "/{family_id}/leave",
+    status_code=204,
+    summary="Leave the family",
+    description=(
+        "The owner must transfer ownership first, and the last manager "
+        "cannot leave — otherwise nobody could approve anything."
+    ),
+)
+async def leave_family(
+    family_id: str, server: Server, user: CurrentUser,
+) -> Response:
+    _manager(server).leave_family(family_id, user)
+    return Response(status_code=204)
+
+
+@router.post(
+    "/{family_id}/members/{member_id}/bind-user",
+    response_model=FamilyMemberResponse,
+    summary="Bind a member to a platform account",
+    description=(
+        "Manager-only. One member binds to at most one user, and one "
+        "user holds at most one member per family."
+    ),
+)
+async def bind_member_user(
+    family_id: str,
+    member_id: str,
+    body: FamilyBindUserBody,
+    server: Server,
+    user: CurrentUser,
+) -> object:
+    return _manager(server).bind_user(
+        family_id, member_id, user, target_user_id=body.user_id,
+    )
+
+
+@router.delete(
+    "/{family_id}/members/{member_id}/user-binding",
+    response_model=FamilyMemberResponse,
+    summary="Unbind a member from its platform account",
+)
+async def unbind_member_user(
+    family_id: str, member_id: str, server: Server, user: CurrentUser,
+) -> object:
+    return _manager(server).unbind_user(family_id, member_id, user)
 
 
 @router.get(

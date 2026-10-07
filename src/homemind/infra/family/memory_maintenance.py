@@ -35,6 +35,7 @@ from homemind.infra.family.device_runtime import (
 )
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
+from homemind.infra.family.transactions import FamilyTransactionManager
 from homemind.infra.metrics import inc as _hm_inc
 from octop.infra.db.pool import DatabasePool
 
@@ -57,6 +58,7 @@ class MaintenanceRunner:
         context_manager: FamilyContextManager | None = None,
         lifecycle: MemoryLifecycleManager | None = None,
         device_manager: DeviceRuntimeManager | None = None,
+        transaction_manager: FamilyTransactionManager | None = None,
         interval_seconds: float = 24 * 60 * 60,
     ) -> None:
         self._db = db
@@ -83,6 +85,7 @@ class MaintenanceRunner:
                 else None
             )
         )
+        self._transaction_manager = transaction_manager
         self._interval = interval_seconds
         self._task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
@@ -125,6 +128,7 @@ class MaintenanceRunner:
             "duplicate_groups": 0,
             "families": 0,
             "devices_offline": 0,
+            "approvals_expired": 0,
         }
         with self._db.connect() as conn:
             rows = conn.execute(
@@ -150,6 +154,16 @@ class MaintenanceRunner:
                 totals["devices_offline"] = self._device_manager.mark_stale_devices_offline()
             except Exception:
                 logger.exception("MaintenanceRunner: device liveness sweep crashed")
+        if self._transaction_manager is not None:
+            # Stale approvals must not linger forever: an expired
+            # approval is cancelled so the dashboard stops showing a
+            # pending badge nobody can act on.
+            try:
+                totals["approvals_expired"] = (
+                    self._transaction_manager.expire_pending_approvals()
+                )
+            except Exception:
+                logger.exception("MaintenanceRunner: approval expiry sweep crashed")
         return totals
 
     def _sweep_family(self, family_id: str, totals: dict[str, int]) -> None:

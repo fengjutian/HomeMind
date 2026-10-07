@@ -344,7 +344,21 @@
     "TEAM_MEMBER_BUSY": "This expert has an in-flight team job. Wait until it finishes.",
     "TEAM_NOT_SHAREABLE": "Teams cannot be shared in this version.",
     "SKILL_PACKAGE_COPY_DENIED": "The creator of this skill package has disabled copying its skills.",
-    "SKILL_PACKAGE_LOCKED": "This skill was copied from a locked skill package and cannot be edited in the workspace."
+    "SKILL_PACKAGE_LOCKED": "This skill was copied from a locked skill package and cannot be edited in the workspace.",
+    "FAMILY_INVALID": "invalid family request",
+    "FAMILY_CONFLICT": "family state conflict",
+    "HOMEMIND_FAMILY_NOT_FOUND": "family not found",
+    "HOMEMIND_FAMILY_ACCESS_DENIED": "family access denied",
+    "HOMEMIND_ACTIVE_FAMILY_REQUIRED": "select an active family first",
+    "HOMEMIND_PRIVATE_SPACE_DENIED": "private space access denied",
+    "HOMEMIND_APPROVAL_REQUIRED": "this action needs approval",
+    "HOMEMIND_TRANSACTION_CONFLICT": "transaction state changed; refresh and retry",
+    "HOMEMIND_DEVICE_TOKEN_INVALID": "device credential invalid",
+    "HOMEMIND_DEVICE_OFFLINE": "device is offline",
+    "HOMEMIND_JOB_NOT_FOUND": "asset job not found",
+    "HOMEMIND_EXTERNAL_PROCESSING_DENIED": "family privacy settings forbid external processing",
+    "HOMEMIND_MEMORY_REVIEW_REQUIRED": "this memory needs human review",
+    "HOMEMIND_IDENTITY_REQUIRED": "caller identity required"
   },
   "nav": {
     "chat": "Conversation",

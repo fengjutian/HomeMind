@@ -389,3 +389,20 @@ def test_path_within_root_normalizes_traversal() -> None:
 def test_unsafe_capability_set_covers_destructive_actions() -> None:
     for capability in ("filesystem.delete", "filesystem.move", "filesystem.rename"):
         assert capability in UNSAFE_CAPABILITIES
+
+
+def test_heartbeat_records_the_reported_runtime_version(tmp_path: Path) -> None:
+    """The panel can only show a runtime build if something stores it;
+    a heartbeat carrying `runtime_version` is that something."""
+
+    pool, runtime, family, user, family_id = _bootstrap(tmp_path)
+    device, token = _pair(runtime, family_id, user)
+    assert runtime.repo.get(device.id).runtime_version is None  # type: ignore[union-attr]
+
+    updated = runtime.heartbeat(token, runtime_version="homemind-runtime/0.4.2")
+    assert updated.runtime_version == "homemind-runtime/0.4.2"
+
+    # A later heartbeat without the field must not erase it.
+    again = runtime.heartbeat(token)
+    assert again.runtime_version == "homemind-runtime/0.4.2"
+    pool.close()

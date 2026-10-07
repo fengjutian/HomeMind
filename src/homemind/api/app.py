@@ -8,7 +8,9 @@ from fastapi.responses import JSONResponse
 from homemind.api.routers import (
     active_family,
     albums,
+    asset_jobs,
     context,
+    dashboard,
     devices,
     families,
     filesystem,
@@ -17,6 +19,7 @@ from homemind.api.routers import (
     photos,
     runtime,
     search,
+    search_index,
     tasks,
     transactions,
 )
@@ -77,6 +80,11 @@ def build_app(server: OctopServer) -> FastAPI:
         tags=["homemind-search"],
     )
     app.include_router(
+        search_index.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-search-index"],
+    )
+    app.include_router(
         tasks.router,
         prefix="/api/homemind/families",
         tags=["homemind-tasks"],
@@ -100,6 +108,17 @@ def build_app(server: OctopServer) -> FastAPI:
         memory_candidates.router,
         prefix="/api/homemind/families",
         tags=["homemind-memory-candidates"],
+    )
+    app.include_router(
+        asset_jobs.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-asset-jobs"],
+    )
+
+    app.include_router(
+        dashboard.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-dashboard"],
     )
     # Octop installs its dashboard catch-all while building the base app. Keep
     # that fallback behind HomeMind's routes so it cannot swallow API GETs.

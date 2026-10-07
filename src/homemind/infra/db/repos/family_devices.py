@@ -27,6 +27,7 @@ class FamilyDeviceRow:
     created_at: int
     updated_at: int
     root_path: str | None = None
+    runtime_version: str | None = None
 
     @classmethod
     def from_row(cls, row: DbRow) -> FamilyDeviceRow:
@@ -53,6 +54,7 @@ class FamilyDeviceRow:
             created_at=int(data["created_at"]),
             updated_at=int(data["updated_at"]),
             root_path=data.get("root_path"),
+            runtime_version=data.get("runtime_version"),
         )
 
 
@@ -269,14 +271,16 @@ class FamilyDeviceRepo:
         *,
         status: str = "ONLINE",
         address: str | None = None,
+        runtime_version: str | None = None,
     ) -> FamilyDeviceRow | None:
         ts = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
                 "UPDATE homemind_family_devices SET status = ?, last_seen = ?, "
-                "address = COALESCE(?, address), updated_at = ? "
+                "address = COALESCE(?, address), "
+                "runtime_version = COALESCE(?, runtime_version), updated_at = ? "
                 "WHERE device_id = ?",
-                (status, ts, address, ts, device_id),
+                (status, ts, address, runtime_version, ts, device_id),
             )
         return self.get(device_id)
 

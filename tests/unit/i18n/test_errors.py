@@ -12,6 +12,12 @@ from octop.i18n import error_message
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.utils.locale import resolve_request_locale
 
+from homemind.infra.errors import (
+    DEFAULT_MESSAGES,
+    HomeMindError,
+    HomeMindErrorCode,
+)
+
 
 def test_every_error_code_has_i18n_entry():
     for code in ErrorCode:
@@ -54,8 +60,28 @@ def test_dashboard_api_errors_match_backend():
     dash_en = json.loads((repo / "dashboard/src/locales/en.json").read_text(encoding="utf-8"))
     backend_en = json.loads((repo / "src/octop/i18n/en.json").read_text(encoding="utf-8"))
     dash_codes = set(dash_en["apiErrors"].keys())
-    backend_codes = set(backend_en["errors"].keys())
-    assert dash_codes == backend_codes == {c.value for c in ErrorCode}
+    # The dashboard mirrors Octop's catalogue *plus* the HomeMind
+    # product codes, which live in their own enum so they never
+    # collide with Octop's stable codes.
+    octop_codes = {c.value for c in ErrorCode}
+    homemind_codes = {c.value for c in HomeMindErrorCode}
+    assert set(backend_en["errors"].keys()) == octop_codes
+    assert dash_codes == octop_codes | homemind_codes
+
+
+def test_every_homemind_error_code_has_bilingual_copy():
+    for code in HomeMindErrorCode:
+        zh, en = DEFAULT_MESSAGES[code]
+        assert zh and en
+        assert zh != en, f"{code.value} has the same copy in both locales"
+
+
+def test_homemind_error_envelope_carries_the_code():
+    err = HomeMindError(HomeMindErrorCode.ACTIVE_FAMILY_REQUIRED)
+    assert err.status == 409
+    envelope = err.to_envelope(locale="en")
+    assert envelope["error"]["code"] == "HOMEMIND_ACTIVE_FAMILY_REQUIRED"
+    assert envelope["error"]["message"]
 
 
 # i18next uses ``{{name}}``; a lone ``{name}`` is left uninterpolated in the UI.

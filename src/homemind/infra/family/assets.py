@@ -289,12 +289,84 @@ class FamilyAssetManager:
             errors=errors,
         )
 
+    def index_path_for_job(
+        self,
+        *,
+        family_id: str,
+        path: str,
+        created_by_user_id: int,
+        source_id: str | None = None,
+    ) -> FamilyAssetRow:
+        """Index a single file on behalf of a persistent asset job.
+
+        Same hashing / EXIF / dedup path as the interactive scan, so a
+        job-driven index produces identical rows to
+        :meth:`scan_source_internal`. ``relative_path`` falls back to the
+        bare filename when the file sits outside the source root (a job
+        may carry items the source no longer contains).
+        """
+        target = Path(path)
+        if not target.is_file():
+            raise ValueError("asset scan path is not a file")
+        source = self.repo.get_source(source_id) if source_id else None
+        root = self._source_root(source) if source is not None else target.parent
+        stat = target.stat()
+        family = self.family.repo.get_family(family_id)
+        if family is None:
+            raise OctopError(ErrorCode.NOT_FOUND, "family not found")
+        return self._index_file(
+            family_id,
+            created_by_user_id,
+            source_id=source_id,
+            root=root,
+            path=target,
+            stat=stat,
+            space_id=source.space_id if source is not None else None,
+            visibility=source.visibility if source is not None else "FAMILY",
+            timezone=ZoneInfo(family.timezone),
+        )
+
+    def refresh_metadata_for_job(self, asset_id: str, path: str) -> None:
+        """Refresh EXIF / GPS for an already-indexed asset."""
+        asset = self.repo.get(asset_id)
+        if asset is None:
+            raise ValueError("asset not found")
+        family = self.family.repo.get_family(asset.family_id)
+        if family is None:
+            raise OctopError(ErrorCode.NOT_FOUND, "family not found")
+        target = Path(path)
+        if not target.is_file():
+            raise ValueError("asset path is not a file")
+        mime_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        if _asset_type(mime_type) != "PHOTO":
+            return
+        photo = _photo_metadata(target, ZoneInfo(family.timezone))
+        self.repo.upsert_photo_metadata(
+            asset_id,
+            width=photo.width,
+            height=photo.height,
+            camera_make=photo.camera_make,
+            camera_model=photo.camera_model,
+            latitude=photo.latitude,
+            longitude=photo.longitude,
+            taken_at=photo.taken_at,
+        )
+
+    @staticmethod
+    def _source_root(source: FamilyAssetSourceRow) -> Path:
+        parsed = urlparse(source.directory_uri)
+        if parsed.scheme != "file":
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "asset source is not a local directory",
+            )
+        return Path(url2pathname(unquote(parsed.path)))
+
     def _index_file(
         self,
         family_id: str,
         created_by_user_id: int,
         *,
-        source_id: str,
+        source_id: str | None,
         root: Path,
         path: Path,
         stat: os.stat_result,

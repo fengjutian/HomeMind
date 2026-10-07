@@ -141,10 +141,18 @@ class _AssetLike(Protocol):
     """Minimal asset / memory shape required for visibility and
     private-space pre-checks. Either attribute may be missing for callers
     that pass memory-like objects (no space) or asset-like objects
-    (no visibility at the protocol level)."""
+    (no visibility at the protocol level).
 
-    space_id: str | None
-    visibility: str | None
+    Declared as read-only properties so frozen dataclass rows (which
+    expose plain attributes) satisfy the protocol — declaring them as
+    mutable attributes would make every frozen row incompatible.
+    """
+
+    @property
+    def space_id(self) -> str | None: ...
+
+    @property
+    def visibility(self) -> str | None: ...
 
 
 class FamilyPermissionEvaluator:

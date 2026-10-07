@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from homemind.infra.db.repos.asset_jobs import AssetJobRepo
 from homemind.infra.db.repos.families import FamilyRepo
 from homemind.infra.db.repos.family_albums import FamilyAlbumRepo
 from homemind.infra.db.repos.family_assets import FamilyAssetRepo
@@ -17,6 +18,7 @@ from homemind.infra.db.repos.memory_candidates import (
     MemoryEvidenceRepo,
 )
 from homemind.infra.db.repos.photo_intelligence import PhotoIntelligenceRepo
+from homemind.infra.db.repos.search_index import SearchIndexRepo
 from octop.infra.db.pool import DatabasePool
 
 
@@ -34,6 +36,8 @@ class HomeMindServices:
     memory_candidate_repo: MemoryCandidateRepo
     memory_evidence_repo: MemoryEvidenceRepo
     photo_intelligence_repo: PhotoIntelligenceRepo
+    asset_job_repo: AssetJobRepo
+    search_index_repo: SearchIndexRepo
 
     @classmethod
     def from_pool(cls, db: DatabasePool) -> HomeMindServices:
@@ -50,4 +54,6 @@ class HomeMindServices:
             memory_candidate_repo=MemoryCandidateRepo(db),
             memory_evidence_repo=MemoryEvidenceRepo(db),
             photo_intelligence_repo=PhotoIntelligenceRepo(db),
+            asset_job_repo=AssetJobRepo(db),
+            search_index_repo=SearchIndexRepo(db),
         )

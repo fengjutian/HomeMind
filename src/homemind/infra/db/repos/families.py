@@ -309,6 +309,37 @@ class FamilyRepo:
                     )
         return self.get_member(member_id)
 
+    def find_member_by_user(self, family_id: str, user_id: int) -> FamilyMemberRow | None:
+        """The member row bound to ``user_id`` in this family, if any.
+
+        Used to refuse binding one account to two member rows, which
+        would make every permission check ambiguous.
+        """
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM homemind_family_members "
+                "WHERE family_id = ? AND user_id = ? AND status = 'ACTIVE'",
+                (family_id, user_id),
+            ).fetchone()
+        return FamilyMemberRow.from_row(row) if row else None
+
+    def update_family_owner(
+        self, family_id: str, previous_owner_user_id: int, new_owner_user_id: int,
+    ) -> bool:
+        """Repoint ``owner_user_id`` after an ownership transfer.
+
+        The previous-owner clause makes this a compare-and-swap: a
+        concurrent transfer that already moved the owner will not be
+        silently overwritten.
+        """
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                "UPDATE homemind_families SET owner_user_id = ?, updated_at = ? "
+                "WHERE family_id = ? AND owner_user_id = ?",
+                (new_owner_user_id, now_ts(), family_id, previous_owner_user_id),
+            )
+        return int(cursor.rowcount or 0) == 1
+
     def delete_member(self, member_id: str) -> bool:
         with self._db.transaction() as conn:
             cursor = conn.execute(

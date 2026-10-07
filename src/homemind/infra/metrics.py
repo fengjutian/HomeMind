@@ -59,6 +59,28 @@ class HomeMindMetrics:
     memory_expiration_total: int = 0
     memory_dedup_groups_total: int = 0
 
+    # persistent asset jobs (Stage 6)
+    asset_job_created_total: int = 0
+    asset_job_completed_total: int = 0
+    asset_job_failed_total: int = 0
+    asset_job_cancelled_total: int = 0
+    asset_job_retried_total: int = 0
+    asset_job_recovered_total: int = 0
+
+    # external provider boundary (Stage 12)
+    external_processing_denied_total: int = 0
+    external_request_created_total: int = 0
+    external_request_approved_total: int = 0
+    external_request_rejected_total: int = 0
+
+    # family export / import (Stage 13)
+    family_export_created_total: int = 0
+    family_import_staged_total: int = 0
+    family_import_applied_total: int = 0
+
+    # family real-time events (Stage 14)
+    family_event_emitted_total: int = 0
+
     # asset scan job
     asset_scan_sweep_total: int = 0
     asset_scan_sources_total: int = 0

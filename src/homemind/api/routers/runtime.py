@@ -48,6 +48,8 @@ class RuntimeDeviceResponse(_RowModel):
     last_seen: int | None
     created_at: int
     updated_at: int
+    root_path: str | None = None
+    runtime_version: str | None = None
 
 
 class RuntimePairBody(BaseModel):
@@ -64,6 +66,11 @@ class RuntimePairResponse(BaseModel):
 class RuntimeHeartbeatBody(BaseModel):
     address: str | None = Field(default=None, max_length=200)
     status: str = Field(default="ONLINE", pattern="^(ONLINE|OFFLINE|BUSY|ERROR)$")
+    runtime_version: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Runtime build string, recorded so the dashboard can show it.",
+    )
 
 
 class RuntimeHeartbeatResponse(BaseModel):
@@ -185,7 +192,10 @@ async def heartbeat(
 ) -> RuntimeHeartbeatResponse:
     token = _resolve_token(authorization)
     device = _manager(server).heartbeat(
-        token, address=body.address, status=body.status,
+        token,
+        address=body.address,
+        status=body.status,
+        runtime_version=body.runtime_version,
     )
     return RuntimeHeartbeatResponse(device=_device_response(device))
 

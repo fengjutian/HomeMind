@@ -306,7 +306,7 @@ def build_family_tools(
         try:
             user = _current_user(user_repo)
             families.require_access(family_id, user)
-            return _ok([asdict(row) for row in devices.list(family_id)])
+            return _ok([asdict(row) for row in devices.list_for_family(family_id)])
         except Exception as exc:
             return _error(exc)
 

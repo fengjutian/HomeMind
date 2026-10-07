@@ -323,9 +323,15 @@ class DeviceRuntimeManager:
         *,
         address: str | None = None,
         status: str = "ONLINE",
+        runtime_version: str | None = None,
     ) -> FamilyDeviceRow:
         _, device = self._authenticate(token)
-        updated = self.repo.heartbeat(device.id, status=status, address=address)
+        updated = self.repo.heartbeat(
+            device.id,
+            status=status,
+            address=address,
+            runtime_version=runtime_version,
+        )
         if updated is None:
             raise HomeMindError(
                 HomeMindErrorCode.FAMILY_INVALID, "device heartbeat failed",
@@ -615,9 +621,15 @@ class DeviceRuntimeManager:
         """Runtime-side: mark a claimed command as RUNNING.
 
         Records the lease so a slow execution is not reclaimed mid-flight,
-        and refreshes the lease window.
+        and refreshes the lease window. A ``runtime_version`` supplied
+        here is also stamped onto the device row, so the panel shows
+        which build is actually running a command.
         """
         _, device = self._authenticate(token)
+        if runtime_version:
+            self.repo.heartbeat(
+                device.id, status=device.status, runtime_version=runtime_version,
+            )
         command = self.repo.get_command(command_id)
         if command is None or command.device_id != device.id:
             raise HomeMindError(

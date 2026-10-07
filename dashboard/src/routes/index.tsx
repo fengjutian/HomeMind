@@ -15,6 +15,19 @@ const ACPPage = lazy(() => import("../pages/Agent/ACP"));
 const TokenUsagePage = lazy(() => import("../pages/Control/TokenUsage"));
 const FamilyPage = lazy(() => import("../pages/Family"));
 
+// Standalone HomeMind pages (Stage 8). Each one reads the active family
+// from useActiveFamily, so the header switcher re-renders all of them.
+// `/family-tasks` and `/family-memory` deliberately avoid `/tasks` and
+// `/memory`, which belong to Octop's cron jobs and agent memory.
+const HomeMindHomePage = lazy(() => import("../pages/HomeMindHome"));
+const FamilyPhotosPage = lazy(() => import("../pages/FamilyPhotos"));
+const FamilyFilesPage = lazy(() => import("../pages/FamilyFiles"));
+const FamilyTimelinePage = lazy(() => import("../pages/FamilyTimeline"));
+const FamilyTasksPage = lazy(() => import("../pages/FamilyTasks"));
+const FamilyMemoryPage = lazy(() => import("../pages/FamilyMemory"));
+const FamilyDevicesPage = lazy(() => import("../pages/FamilyDevices"));
+const FamilyApprovalsPage = lazy(() => import("../pages/FamilyApprovals"));
+
 // Lazy-loaded pages — Control
 const RemoteDesktopPage = lazy(() => import("../pages/Control/RemoteDesktop"));
 
@@ -50,6 +63,15 @@ export interface RouteConfig {
 export const pathToKey: Record<string, string> = {
   "/chat": "chat",
   "/family": "family",
+  // HomeMind standalone pages
+  "/home": "family",
+  "/photos": "family",
+  "/files": "family",
+  "/timeline": "family",
+  "/family-tasks": "family",
+  "/family-memory": "family",
+  "/devices": "family",
+  "/approvals": "family",
   // Common
   "/experts": "experts",
   "/tasks": "tasks",
@@ -154,6 +176,14 @@ export const routeConfigs: RouteConfig[] = [
   // Common
   { path: "/experts", element: <ExpertsPage /> },
   { path: "/family", element: <FamilyPage /> },
+  { path: "/home", element: <HomeMindHomePage /> },
+  { path: "/photos", element: <FamilyPhotosPage /> },
+  { path: "/files", element: <FamilyFilesPage /> },
+  { path: "/timeline", element: <FamilyTimelinePage /> },
+  { path: "/family-tasks", element: <FamilyTasksPage /> },
+  { path: "/family-memory", element: <FamilyMemoryPage /> },
+  { path: "/devices", element: <FamilyDevicesPage /> },
+  { path: "/approvals", element: <FamilyApprovalsPage /> },
   { path: "/tasks", element: <CronJobsPage /> },
   { path: "/connectors", element: <ConnectorsPage /> },
   { path: "/skill-packages", element: <SkillPackagesPage /> },

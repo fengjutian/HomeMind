@@ -236,6 +236,12 @@ export default function DevicesPanel({ familyId }: DevicesPanelProps) {
                         <Tag key={capability}>{capability}</Tag>
                       ))}
                     </Space>
+                    {device.runtime_version && (
+                      <Typography.Text type="secondary">
+                        {t("family.runtimeVersion", "运行时版本")}：
+                        <Tag>{device.runtime_version}</Tag>
+                      </Typography.Text>
+                    )}
                   </Space>
                 }
               />
@@ -372,6 +378,11 @@ export default function DevicesPanel({ familyId }: DevicesPanelProps) {
                     <Tag color={statusColor(command.status)}>
                       {command.status}
                     </Tag>
+                    {command.status === "WAITING_APPROVAL" && (
+                      <Tag color="warning">
+                        {t("family.awaitingApproval", "待审批")}
+                      </Tag>
+                    )}
                   </Space>
                 }
                 description={
