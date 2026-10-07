@@ -505,6 +505,43 @@ tests/         unit/ + integration/
 
 **前置条件：** Python 3.12+、Node 18+、[uv](https://docs.astral.sh/uv/)
 
+### Windows PowerShell 源码启动
+
+在仓库根目录安装依赖并完成首次初始化：
+
+```powershell
+uv sync --frozen
+cd dashboard
+npm ci
+cd ..
+uv run --frozen octop init
+```
+
+分别打开两个 PowerShell 终端启动后端和前端：
+
+```powershell
+# 终端一：后端（http://127.0.0.1:8088）
+uv run --frozen homemind run
+```
+
+```powershell
+# 终端二：前端（http://127.0.0.1:5173）
+cd dashboard
+npm run dev
+```
+
+如果 `uv` 访问 PyPI 时发生超时，可在当前 PowerShell 会话中临时使用清华镜像：
+
+```powershell
+$env:UV_DEFAULT_INDEX = "https://pypi.tuna.tsinghua.edu.cn/simple"
+uv sync
+uv run --no-sync homemind run
+```
+
+仓库的 `uv.lock` 已锁定依赖版本；网络正常时优先使用 `--frozen`，避免启动过程中重新解析依赖。`--no-sync` 用于依赖已经安装完成后跳过联网同步。
+
+### Make 命令
+
 ```bash
 # 后端
 make install          # pip install -e ".[dev]"
