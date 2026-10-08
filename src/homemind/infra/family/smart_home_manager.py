@@ -38,8 +38,17 @@ from homemind.infra.family.smart_home import (
     SmartHomeAdapter,
     risk_for,
 )
-from homemind.infra.family.smart_home_descriptors import describe_entity
+from homemind.infra.family.smart_home_descriptors import (
+    CapabilityKind,
+    DeviceDescriptor,
+    agent_view,
+    describe_entity,
+)
 from octop.infra.users.identity import User
+
+#: Capability values this build understands; anything else stored by an older
+#: release is skipped rather than crashing the catalogue.
+_KNOWN = {c.value for c in CapabilityKind}
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +272,108 @@ class FamilySmartHomeManager:
             )
         except CommandNotAllowed as exc:
             raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, str(exc)) from exc
+
+    def device_catalog(self, family_id: str, provider_id: str) -> list[dict[str, Any]]:
+        """The agent-facing device catalogue for one provider.
+
+        What an agent may *see*: identity, normalized capabilities, the
+        commands each device accepts, and the risk of each. Built on
+        :func:`agent_view`, so no adapter raw payload is ever included.
+
+        Writable devices list their commands; a blocked device appears with
+        ``writable=False`` and an empty command list rather than disappearing,
+        so an agent can tell "not controllable" from "does not exist".
+        """
+        self._provider(family_id, provider_id)
+        provider = self.repo.get_provider(provider_id)
+        catalog = self.command_catalog(provider) if provider is not None else []
+        commands_by_domain: dict[str, list[dict[str, Any]]] = {}
+        for command in catalog:
+            commands_by_domain.setdefault(command.domain, []).append(
+                {
+                    "name": command.name,
+                    "risk": risk_for(command.domain),
+                    "parameters": command.payload_schema,
+                }
+            )
+
+        out: list[dict[str, Any]] = []
+        for key, entities in self.repo.group_entities_by_device(provider_id, family_id).items():
+            head = entities[0]
+            risk = risk_for(head.domain)
+            writable = risk != RISK_BLOCKED
+            device = DeviceDescriptor(
+                device_id=key,
+                name=head.name,
+                provider_id=provider_id,
+                domain=head.domain,
+                capabilities=tuple(
+                    CapabilityKind(c) for c in head.capabilities_typed if c in _KNOWN
+                ),
+                entity_ids=tuple(e.external_entity_id for e in entities),
+            )
+            entry = agent_view(device)
+            entry["writable"] = writable
+            entry["risk"] = risk
+            entry["commands"] = commands_by_domain.get(head.domain, []) if writable else []
+            out.append(entry)
+        return out
+
+    def command_catalog(self, provider: SmartProviderRow) -> list[SmartCommand]:
+        """The commands this provider's adapter understands, or [] when down.
+
+        Returns an empty catalogue rather than raising so a caller can refuse
+        a command with a useful message ("nothing available") instead of a
+        connection error.
+        """
+        adapter = self._adapter(provider)
+        if adapter is None:
+            return []
+        return list(getattr(adapter, "commands", ()))
+
+    def execute_command(
+        self,
+        provider: SmartProviderRow,
+        entity: SmartEntityRow,
+        command_name: str,
+        payload: dict[str, Any],
+        *,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Run a catalogued command against a connected provider."""
+        adapter = self._adapter(provider)
+        if adapter is None:
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "this provider is not connected")
+        import asyncio
+
+        try:
+            return asyncio.run(
+                adapter.execute_command(
+                    entity.external_entity_id,
+                    command_name,
+                    dict(payload or {}),
+                    idempotency_key=idempotency_key,
+                )
+            )
+        except CommandNotAllowed as exc:
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, str(exc)) from exc
+
+    def verify_command(
+        self,
+        provider: SmartProviderRow,
+        entity: SmartEntityRow,
+        command_name: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Re-read the entity and confirm the command's effect landed."""
+        adapter = self._adapter(provider)
+        if adapter is None:
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "this provider is not connected")
+        import asyncio
+
+        return asyncio.run(
+            adapter.verify_command(entity.external_entity_id, command_name, dict(payload or {}))
+        )
 
     def requires_approval(self, entity_id: str, *, family_policy: str = "AUTO") -> bool:
         """Whether a write needs a human before it runs.

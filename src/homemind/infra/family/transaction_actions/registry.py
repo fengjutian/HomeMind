@@ -9,6 +9,7 @@ from homemind.infra.family.device_runtime import DeviceRuntimeManager
 from homemind.infra.family.filesystem import FamilyFilesystemManager
 from homemind.infra.family.knowledge import KnowledgeManager
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.smart_home_manager import FamilySmartHomeManager
 from homemind.infra.family.tasks import FamilyTaskManager
 from homemind.infra.family.transaction_actions.events import EventCreateHandler
 from homemind.infra.family.transaction_actions.filesystem import (
@@ -39,6 +40,9 @@ from homemind.infra.family.transaction_actions.lowrisk import (
 from homemind.infra.family.transaction_actions.memories import (
     MemoryCreateHandler,
 )
+from homemind.infra.family.transaction_actions.smart_device import (
+    SmartDeviceCommandHandler,
+)
 from homemind.infra.family.transaction_actions.tasks import TaskCreateHandler
 
 
@@ -68,6 +72,7 @@ def build_default_action_registry(
     calendars: FamilyCalendarManager | None = None,
     knowledge: KnowledgeManager | None = None,
     devices: DeviceRuntimeManager | None = None,
+    smart_home: FamilySmartHomeManager | None = None,
 ) -> FamilyActionRegistry:
     """Wire every built-in handler. Tests can override any argument to
     inject fakes for specific actions."""
@@ -102,6 +107,10 @@ def build_default_action_registry(
         registry.register("knowledge.reindex", KnowledgeReindexHandler(knowledge))
     if devices is not None:
         registry.register("device.command", DeviceCommandHandler(devices))
+    if smart_home is not None:
+        # Server-side smart-home write. Same Transaction pipeline, different
+        # execution target from the paired-device ``device.command`` above.
+        registry.register("smart_device.command", SmartDeviceCommandHandler(smart_home))
     return registry
 
 

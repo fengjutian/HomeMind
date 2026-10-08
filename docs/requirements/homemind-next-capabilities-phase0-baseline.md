@@ -242,3 +242,23 @@ $env:PYTHONPATH="src"; .\.venv\Scripts\python.exe -m pytest <paths> -q -p no:cac
 ### 7.2 建议的下一阶段
 
 **阶段 1：定义上传会话协议与持久化模型。** 理由：它是四条主线里唯一不存在「可达性争议」的（现有 multipart 链路虽内存不安全，但可用），且 Bridge 远程附件、设备文件同步都要复用同一上传会话协议，先做收益最大。开工前建议先补两个基线修复（各自独立、向后兼容）：`workspace/upload` 缺失的 `max_upload_bytes` 校验，以及 chat / workspace 两条上传路径的 `owner_only` 强度对齐。
+
+## 8. 后续执行记录（阶段 1 起）
+
+### 8.1 阶段 1–4：大文件断点续传（已完成）
+
+- **阶段 1**：协议与持久化。`infra/uploads/protocol.py`（枚举/限额/字节区间几何）、迁移 `021_upload_sessions`（octop 水位 20 → 21）、`repos/upload_sessions.py`、staging 路径 + id 校验。
+  - **偏离**：分片列名用 `byte_offset` 而非计划里的 `offset`，避开保留字；子表用复合主键 `(upload_id, part_number)` 直接实现计划要求的唯一约束。
+- **阶段 2**：领域服务 + HTTP。`infra/uploads/service.py`、`api/routers/upload_sessions.py`（5 端点）。
+  - **偏离**：计划写「最终文件仍走现有 workspace 服务」，但 `octop-harness` 的写入接口全是 bytes 型（`aupload_bytes` / `upload_files([(key, bytes)])`，云存储基类同样），2 GB 无法在不经内存的情况下落进 workspace。改为超过 `max_upload_bytes` 的文件**原子 rename** 到 Octop 自管 blob store，由 `GET /uploads/blobs/{id}` 流式返回。`LandedUpload` 契约留作将来换回 workspace 的接缝。
+- **阶段 3**：前端 uploader。`dashboard/src/api/resumableUploader.ts` + chat attachment 接入（阈值 8 MB，以下走原 XHR）。IndexedDB 只存会话元数据，不存文件内容。
+- **阶段 4**：后台清理器（启动 + 每 15 分钟）、9 个 `upload_*` 指标、Bridge 转发（`tunnel_policy` + `bridge_proxy` 头部路由）。
+
+### 8.2 阶段 5：统一设备能力模型（进行中）
+
+- **接通不可达链路**：`api/app.py` 一直 import 了 `smart_home` 却从未 `include_router`；`secret_ref` 全仓无解析实现，`_adapter()` 恒返回 `None`。新增 `infra/family/smart_home_factory.py` 作为**全栈唯一接触 secret store 的地方**，并在 `app.py` 挂载 router（9 条端点，`tests/integration/test_smart_home_api_mounted.py` 锁定）。
+  - 路由检查必须读 **OpenAPI schema**：`app.routes` 在本仓库是惰性 `_IncludedRouter` 包装，遍历拿不到 `path`。
+- **修掉一个 fail-open**：`risk_for()` 原先对未分类 domain 走 `return RISK_LOW`，即**默认可写**——任何新集成引入的 domain 都会自动获得低风险可写。改为显式可写白名单 + 兜底 `RISK_BLOCKED`。全仓无测试依赖旧行为。
+- **统一能力模型**：`infra/family/smart_home_descriptors.py`。能力按**生态自身的 domain/attribute 映射，映射表里没有任何品牌名**（有测试断言 `xiaomi/huawei/philips/matter` 一个都不出现）。`DeviceState.raw` 按 adapter 命名空间隔离，`agent_view()` 是唯一允许给 Agent 的投影。
+- **设备身份**：迁移 `026_smart_home_health`（`025` 已被资产传输占用）新增 provider 健康字段与 `device_key`；`device_key` 取集成自己的 device id，**改名字不会fork出新设备**，同一物理设备的多个 entity 聚合到一个 key。
+- **不复用 `device.command`（计划偏离，代码为准）**：计划写「命令继续走现有 `device.command` Transaction」，但该 handler 是给**配对设备**（手机/电脑）投递命令并停在 `AWAITING_DEVICE` 等回执的；智能家居实体是**服务端经 adapter 执行**、可立即验证。硬塞会把 HA 的灯挂到没人轮询的设备队列上。故新增独立 action `smart_device.command`，走**同一条** Transaction 流水线（Permission → Approval → Execute → Verify → Audit），并保留「服务端执行 + 立即 verify」。

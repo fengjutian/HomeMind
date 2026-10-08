@@ -12,29 +12,37 @@ from typing import Any
 from homemind.api.app import build_app
 
 EXPECTED_ROUTES: tuple[tuple[str, str], ...] = (
-    ("POST", "/api/homemind/families/{family_id}/smart-home/providers"),
-    ("GET", "/api/homemind/families/{family_id}/smart-home/providers"),
-    ("GET", "/api/homemind/families/{family_id}/smart-home/providers/{provider_id}"),
-    ("PATCH", "/api/homemind/families/{family_id}/smart-home/providers/{provider_id}"),
-    ("DELETE", "/api/homemind/families/{family_id}/smart-home/providers/{provider_id}"),
-    ("POST", "/api/homemind/families/{family_id}/smart-home/providers/{provider_id}/probe"),
-    ("POST", "/api/homemind/families/{family_id}/smart-home/providers/{provider_id}/sync"),
-    ("GET", "/api/homemind/families/{family_id}/smart-home/entities"),
+    ("post", "/api/homemind/families/{family_id}/smart-home/providers"),
+    ("get", "/api/homemind/families/{family_id}/smart-home/providers"),
+    ("delete", "/api/homemind/families/{family_id}/smart-home/providers/{provider_id}"),
+    ("put", "/api/homemind/families/{family_id}/smart-home/providers/{provider_id}/topics"),
+    ("post", "/api/homemind/families/{family_id}/smart-home/providers/{provider_id}/probe"),
+    ("post", "/api/homemind/families/{family_id}/smart-home/providers/{provider_id}/sync"),
+    ("get", "/api/homemind/families/{family_id}/smart-home/entities"),
+    ("get", "/api/homemind/families/{family_id}/smart-home/entities/{entity_id}/commands"),
+    ("post", "/api/homemind/families/{family_id}/smart-home/entities/{entity_id}/preview"),
 )
 
 
-def _routes(app: Any) -> set[tuple[str, str]]:
+def _documented_routes(app: Any) -> set[tuple[str, str]]:
+    """Routes from the OpenAPI document.
+
+    ``app.routes`` holds lazy ``_IncludedRouter`` wrappers in this codebase, so
+    the generated schema is the reliable source for what is actually exposed.
+    """
+    paths = app.openapi().get("paths", {})
     return {
-        (method, route.path)
-        for route in app.routes
-        for method in (getattr(route, "methods", None) or set())
+        (method, path)
+        for path, operations in paths.items()
+        for method in operations
+        if method in {"get", "post", "put", "patch", "delete"}
     }
 
 
 async def test_smart_home_router_is_mounted(env: Any) -> None:
     """Route registration only happens once the server has bound services."""
     _client, srv, _auth = env
-    present = _routes(build_app(srv))
+    present = _documented_routes(build_app(srv))
     missing = [r for r in EXPECTED_ROUTES if r not in present]
     assert not missing, f"smart-home routes not mounted: {missing}"
 
