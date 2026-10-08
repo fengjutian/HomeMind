@@ -57,8 +57,30 @@ _QUOTA_STATUSES = (
     UploadStatus.FAILED.value,
 )
 
-#: Hands the assembled file to the real destination and returns its resource id.
-UploadLander = Callable[[UploadSessionRow, Path], Awaitable[str]]
+
+@dataclass(frozen=True)
+class LandedUpload:
+    """Where an assembled file ended up.
+
+    ``kind`` distinguishes the two delivery strategies:
+
+    * ``workspace`` — landed through ``write_inbound``; the bytes API requires
+      the whole file in memory, so this is only used below the configured cap.
+    * ``blob`` — moved (never copied) into Octop's own blob store and served by
+      a streaming route. This is what makes multi-GB uploads possible without
+      buffering the file, because ``octop-harness`` exposes no streaming
+      workspace write.
+    """
+
+    kind: str
+    resource_id: str
+    path: str
+    media_type: str
+    filename: str
+
+
+#: Hands the assembled file to the real destination and describes where it landed.
+UploadLander = Callable[[UploadSessionRow, Path], Awaitable[LandedUpload]]
 
 
 @dataclass(frozen=True)
@@ -346,7 +368,7 @@ class UploadSessionService:
                     ErrorCode.UPLOAD_CHECKSUM_MISMATCH,
                     "assembled content failed SHA-256 verification",
                 )
-            final_resource_id = await lander(row, merged)
+            landed = await lander(row, merged)
         except OctopError as exc:
             # Keep every part so the client can resume or retry.
             self._repo.release_to_open(row.upload_id, last_error=str(exc))
@@ -356,11 +378,22 @@ class UploadSessionService:
             self._repo.release_to_open(row.upload_id, last_error=type(exc).__name__)
             raise OctopError(ErrorCode.INTERNAL_ERROR, "upload completion failed") from exc
 
-        self._repo.mark_completed(upload_id, final_resource_id=final_resource_id)
+        self._repo.mark_completed(upload_id, final_resource_id=landed.resource_id)
         self._staging_cleanup(upload_id)
         completed = self._repo.get(upload_id)
         assert completed is not None  # noqa: S101
         return self._view(completed, [])
+
+    def completed_row(self, *, upload_id: str, owner_user_id: int) -> UploadSessionRow | None:
+        """Owner-scoped row lookup for a finished upload, or ``None``.
+
+        Used by the blob download route, which must not hand out a file for a
+        session that is still open, expired, or owned by somebody else.
+        """
+        row = self._repo.get_for_owner(upload_id, owner_user_id)
+        if row is None or row.status != UploadStatus.COMPLETED.value:
+            return None
+        return row
 
     def cancel(self, *, upload_id: str, owner_user_id: int) -> None:
         row = self._require_owned(upload_id, owner_user_id)

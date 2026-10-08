@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from octop.api.common.attachments import dashboard_inbound_preview_url, save_attachment
@@ -24,8 +25,9 @@ from octop.infra.gateway.media.inbound_store import (
     INBOUND_EXTENSION_MEDIA_TYPES,
     sanitize_inbound_filename,
 )
+from octop.infra.uploads.blobstore import UploadBlobStore
 from octop.infra.uploads.protocol import UploadPurpose
-from octop.infra.uploads.service import UploadSessionService
+from octop.infra.uploads.service import LandedUpload, UploadSessionService
 
 router = APIRouter()
 
@@ -189,17 +191,27 @@ async def complete_upload_session(
     workspace = await _target_workspace(
         UploadPurpose(view.purpose), view.agent_id, user=user, server=server
     )
+    landed: list[LandedUpload] = []
 
-    async def lander(row: UploadSessionRow, assembled: Path) -> str:
-        """Deliver the assembled file and return its workspace-relative path."""
+    async def lander(row: UploadSessionRow, assembled: Path) -> LandedUpload:
+        """Deliver the assembled file to whichever target can hold its size."""
         max_bytes = int(server.services.config.max_upload_bytes)
+        # octop-harness writes workspace files from bytes, so anything larger
+        # than the configured cap would have to be fully buffered in memory.
+        # Those go to Octop's own blob store and stream back from a dedicated route.
         if row.total_bytes > max_bytes:
-            max_mb = max(1, max_bytes // (1024 * 1024))
-            raise OctopError(
-                ErrorCode.ATTACHMENT_TOO_LARGE,
-                f"file too large (max {max_mb}MB)",
-                details={"max_mb": max_mb},
+            blobs = UploadBlobStore(server.services.paths)
+            blobs.promote(row.upload_id, assembled)
+            result = LandedUpload(
+                kind="blob",
+                resource_id=row.upload_id,
+                path=row.upload_id,
+                media_type=row.mime_type or "application/octet-stream",
+                filename=row.filename,
             )
+            landed.append(result)
+            return result
+
         stored = await save_attachment(
             workspace,
             owner_id=user.id,
@@ -208,28 +220,71 @@ async def complete_upload_session(
             data=assembled.read_bytes(),
             max_bytes=max_bytes,
         )
-        return stored.data_path
+        result = LandedUpload(
+            kind="workspace",
+            resource_id=stored.data_path,
+            path=stored.data_path,
+            media_type=stored.media_type,
+            filename=stored.filename,
+        )
+        landed.append(result)
+        return result
 
     completed = await _service(server).complete(
         upload_id=upload_id, owner_user_id=user.id, lander=lander
     )
-    agent_id = completed.agent_id or ""
-    preview = dashboard_inbound_preview_url(
-        agent_id,
-        str(completed.final_resource_id),
-        media_type=completed.mime_type or "",
-    )
-    # Compatibility payload identical to the legacy multipart endpoint.
+    delivery = landed[0]
+    if delivery.kind == "blob":
+        access_url = f"/api/uploads/blobs/{upload_id}"
+    else:
+        access_url = dashboard_inbound_preview_url(
+            completed.agent_id or "",
+            delivery.path,
+            media_type=delivery.media_type,
+        )
+    # Payload stays a superset of the legacy multipart endpoint's fields.
     return {
         "upload_id": completed.upload_id,
         "status": completed.status,
-        "filename": completed.filename,
-        "media_type": completed.mime_type,
-        "path": completed.final_resource_id,
-        "workspace_path": completed.final_resource_id,
-        "url": preview,
-        "access_url": preview,
+        "filename": delivery.filename,
+        "media_type": delivery.media_type,
+        "storage": delivery.kind,
+        "size": completed.total_bytes,
+        "path": delivery.path,
+        "workspace_path": delivery.path,
+        "url": access_url,
+        "access_url": access_url,
     }
+
+
+@router.get(
+    "/uploads/blobs/{upload_id}",
+    summary="Stream a completed oversized upload",
+    description=(
+        "Serves uploads too large to land in an agent workspace. Streams from disk "
+        "in bounded buffers and is scoped to the session owner."
+    ),
+    response_class=StreamingResponse,
+)
+async def download_upload_blob(
+    upload_id: str,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> Any:
+    row = _service(server).completed_row(upload_id=upload_id, owner_user_id=user.id)
+    blobs = UploadBlobStore(server.services.paths)
+    if row is None or not blobs.exists(upload_id):
+        raise OctopError(ErrorCode.UPLOAD_SESSION_NOT_FOUND, "upload not found")
+
+    return StreamingResponse(
+        blobs.stream_chunks(upload_id),
+        media_type=row.mime_type or "application/octet-stream",
+        headers={
+            "Content-Length": str(blobs.size(upload_id)),
+            "Content-Disposition": f'inline; filename="{row.filename}"',
+            "X-Octop-Upload-Storage": "blob",
+        },
+    )
 
 
 @router.delete(

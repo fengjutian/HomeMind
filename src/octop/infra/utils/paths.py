@@ -114,6 +114,15 @@ class PathLayout:
         out.mkdir(parents=True, exist_ok=True)
         return out
 
+    @property
+    def uploads_blobs_dir(self) -> Path:
+        """Assembled uploads too large for the bytes-only workspace API."""
+        return self.uploads_dir / "blobs"
+
+    def upload_blob_dir(self, upload_id: str) -> Path:
+        """Blob dir for one upload, guarded exactly like the staging dir."""
+        return self.uploads_blobs_dir / _safe_upload_id(upload_id)
+
     def agent_workspace(self, agent_id: str) -> Path:
         """Global agent workspace: ~/.octop/agents/<agent_id>/"""
         return self.agents_dir / agent_id
