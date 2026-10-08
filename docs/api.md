@@ -497,6 +497,27 @@ upload is `409 UPLOAD_INCOMPLETE` and keeps every part so the client can finish.
 Currently `CHAT_ATTACHMENT` and `WORKSPACE_FILE` are wired; `KNOWLEDGE_DOCUMENT`
 and `FAMILY_ASSET` are refused explicitly until they have a destination.
 
+### Where a completed file lands
+
+`octop-harness` only exposes byte-oriented workspace writes (`aupload_bytes`,
+`upload_files([(key, bytes)])`), so a file larger than `max_upload_bytes` could
+not be placed in an agent workspace without buffering the whole thing in memory.
+Completion therefore branches on `total_bytes > max_upload_bytes`:
+
+| Storage | Where | How it is served | Response `storage` |
+|---------|-------|------------------|--------------------|
+| `workspace` | `{workspace}/inbound/` | existing agent media/download routes | `"workspace"` |
+| `blob` | `~/.octop/uploads/blobs/{upload_id}/payload.bin` | `GET /api/uploads/blobs/{upload_id}` | `"blob"` |
+
+The blob path is **moved** from staging with an atomic rename (never copied), so
+promoting a multi-GB file costs no extra I/O and no extra memory. Its response
+payload is otherwise a superset of the legacy multipart fields, so callers can
+always use the returned `access_url`.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| `GET` | `/uploads/blobs/{upload_id}` | owner, completed only | streams from disk in bounded buffers; `404` for unfinished or foreign sessions |
+
 ## Updates, ollama, i18n, plugins, slash, preferences
 
 | Method | Path | Auth | Notes |

@@ -49,6 +49,12 @@ Large files use the resumable session API: open a session with
 `missing_ranges`, so a client that reloads mid-upload re-sends only what is
 missing. Sessions are owner-scoped: another user's session reads as `404`.
 
+Files at or below `max_upload_bytes` land in the agent workspace `inbound/` like
+the legacy multipart route. Larger ones cannot — `octop-harness` writes workspace
+files from bytes — so they are moved into Octop's own blob store and streamed
+back from `GET /api/uploads/blobs/{upload_id}`. The completion response's
+`storage` field reports which path was taken.
+
 ## Agent scope
 
 Many agent-scoped routes use the agent ID in the URL path (`/api/agents/{agent_id}/…`).

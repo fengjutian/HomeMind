@@ -14,7 +14,7 @@ from octop.infra.db.repos.upload_sessions import UploadSessionRepo
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.uploads.protocol import UploadLimits, UploadPurpose
-from octop.infra.uploads.service import UploadSessionService
+from octop.infra.uploads.service import LandedUpload, UploadSessionService
 from octop.infra.utils.paths import PathLayout
 
 CHUNK = 1024
@@ -79,6 +79,16 @@ def _open(
     )
 
 
+def _landed(resource_id: str, row: object) -> LandedUpload:
+    return LandedUpload(
+        kind="workspace",
+        resource_id=resource_id,
+        path=resource_id,
+        media_type="video/mp4",
+        filename="movie.mp4",
+    )
+
+
 async def _put(service: UploadSessionService, uid: str, owner: int, n: int, blob: bytes) -> None:
     await service.write_part(
         upload_id=uid,
@@ -104,7 +114,7 @@ async def test_write_parts_then_complete_merges_and_verifies(
     async def lander(row: object, assembled: Path) -> str:
         landed["bytes"] = assembled.read_bytes()
         landed["sha"] = hashlib.sha256(assembled.read_bytes()).hexdigest()
-        return "inbound/1_movie.mp4"
+        return _landed("inbound/1_movie.mp4", row)
 
     done = await service.complete(upload_id=view.upload_id, owner_user_id=owner_id, lander=lander)
     assert landed["bytes"] == data
@@ -435,7 +445,7 @@ async def test_merge_does_not_load_the_whole_file(
 
     async def lander(row: object, assembled: Path) -> str:
         assert assembled.stat().st_size == len(data)
-        return "inbound/big.bin"
+        return _landed("inbound/big.bin", row)
 
     done = await service.complete(upload_id=view.upload_id, owner_user_id=owner_id, lander=lander)
     assert done.status == "COMPLETED"
