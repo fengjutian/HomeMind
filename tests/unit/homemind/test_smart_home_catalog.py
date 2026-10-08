@@ -9,15 +9,15 @@ from typing import Any
 
 import pytest
 
-from octop.infra.db.migrate import run_migrations as run_octop_migrations
-from octop.infra.db.pool import SqlitePool
-from octop.infra.users.identity import Role, User
-
 from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.smart_home import SmartCommand
 from homemind.infra.family.smart_home_manager import FamilySmartHomeManager
+from octop.infra.db.migrate import run_migrations as run_octop_migrations
+from octop.infra.db.pool import SqlitePool
+from octop.infra.db.repos.users import UserRepo as OctopUserRepo
+from octop.infra.users.identity import Role, User
 
 
 @pytest.fixture
@@ -31,57 +31,38 @@ def db(tmp_path: Path) -> SqlitePool:
 @pytest.fixture
 def env(db: SqlitePool) -> dict[str, Any]:
     services = HomeMindServices.from_pool(db)
-    families = FamilyManager(services.family_repo)
     user_row = OctopUserRepo(db).create(username="owner", password_hash="h", role="user")
     owner = User(user_row, "owner", Role.USER, "Owner")
-    family = families.create_family(
+    family = FamilyManager(services.family_repo).create_family(
         owner, name="Smart Family", timezone="Asia/Shanghai", locale="zh"
     )
-    return {
-        "families": families,
-        "owner": owner,
-        "family": family,
-        "manager": FamilySmartHomeManager(
-            FamilyManager(services.family_repo), services.smart_home_repo
-        ),
-    }
-
-
-@pytest.fixture
-def manager(env: dict[str, Any]) -> FamilySmartHomeManager:
-    manager = env["manager"]
-    manager.create_provider(
-        env["family"].id,
-        env["owner"],
+    manager = FamilySmartHomeManager(FamilyManager(services.family_repo), services.smart_home_repo)
+    provider = manager.create_provider(
+        family.id,
+        owner,
         kind="HOME_ASSISTANT",
         name="Home",
         base_url="http://ha.local:8123",
     )
-    return manager
-
-
-def _family_id(manager: FamilySmartHomeManager) -> str:
-    return manager.family.family_id
-
-
-def _catalog(manager: FamilySmartHomeManager) -> list[SmartCommand]:
-    return [
-        SmartCommand(name="turn_on", domain="light", service="light.turn_on"),
-        SmartCommand(name="turn_off", domain="light", service="light.turn_off"),
-    ]
+    return {
+        "owner": owner,
+        "family_id": family.id,
+        "manager": manager,
+        "provider_id": provider.id,
+    }
 
 
 def _seed(
-    manager: FamilySmartHomeManager,
+    env: dict[str, Any],
     *,
     domain: str,
     external: str,
     device_key: str | None,
     typed: list[str],
 ) -> None:
-    manager.repo.upsert_entity(
-        _fid(manager),
-        provider_id="prov1",
+    env["manager"].repo.upsert_entity(
+        env["family_id"],
+        provider_id=env["provider_id"],
         external_entity_id=external,
         domain=domain,
         name=f"Device {external}",
@@ -91,11 +72,21 @@ def _seed(
     )
 
 
-def test_read_only_device_is_listed_without_commands(manager: FamilySmartHomeManager) -> None:
-    _seed(manager, domain="lock", external="lock.front", device_key="d1", typed=["lock"])
-    manager._adapter_factory = lambda _p: _StubAdapter(_catalog(manager))  # type: ignore[attr-defined]
+def _use(manager: FamilySmartHomeManager, commands: list[SmartCommand]) -> None:
+    manager._adapter_factory = lambda _p: _StubAdapter(commands)  # type: ignore[attr-defined]
 
-    entries = manager.device_catalog(_fid(manager), "prov1")
+
+_LIGHT_COMMANDS = [
+    SmartCommand(name="turn_on", domain="light", service="light.turn_on"),
+    SmartCommand(name="turn_off", domain="light", service="light.turn_off"),
+]
+
+
+def test_read_only_device_is_listed_without_commands(env: dict[str, Any]) -> None:
+    _seed(env, domain="lock", external="lock.front", device_key="d1", typed=["lock"])
+    _use(env["manager"], _LIGHT_COMMANDS)
+
+    entries = env["manager"].device_catalog(env["family_id"], env["provider_id"])
     assert len(entries) == 1
     entry = entries[0]
     assert entry["writable"] is False
@@ -104,59 +95,63 @@ def test_read_only_device_is_listed_without_commands(manager: FamilySmartHomeMan
     assert entry["capabilities"] == ["lock"]
 
 
-def test_writable_device_exposes_its_catalog(manager: FamilySmartHomeManager) -> None:
-    _seed(manager, domain="light", external="light.lamp", device_key="d1", typed=["light"])
-    manager._adapter_factory = lambda _p: _StubAdapter(_catalog(manager))  # type: ignore[attr-defined]
+def test_writable_device_exposes_its_catalog(env: dict[str, Any]) -> None:
+    _seed(env, domain="light", external="light.lamp", device_key="d1", typed=["light"])
+    _use(env["manager"], _LIGHT_COMMANDS)
 
-    entry = manager.device_catalog(_fid(manager), "prov1")[0]
+    entry = env["manager"].device_catalog(env["family_id"], env["provider_id"])[0]
     assert entry["writable"] is True
+    assert entry["reachable"] is True
     assert entry["risk"] == "LOW"
     assert {c["name"] for c in entry["commands"]} == {"turn_on", "turn_off"}
 
 
-def test_entities_of_one_device_collapse_into_one_entry(
-    manager: FamilySmartHomeManager,
-) -> None:
-    _seed(manager, domain="light", external="light.lamp", device_key="d1", typed=["light"])
-    _seed(
-        manager,
-        domain="sensor",
-        external="sensor.lamp_power",
-        device_key="d1",
-        typed=["sensor"],
-    )
-    manager._adapter_factory = lambda _p: _StubAdapter([])  # type: ignore[attr-defined]
+def test_entities_of_one_device_collapse_into_one_entry(env: dict[str, Any]) -> None:
+    _seed(env, domain="light", external="light.lamp", device_key="d1", typed=["light"])
+    _seed(env, domain="sensor", external="sensor.lamp_power", device_key="d1", typed=["sensor"])
+    _use(env["manager"], [])
 
-    entries = manager.device_catalog(_fid(manager), "prov1")
+    entries = env["manager"].device_catalog(env["family_id"], env["provider_id"])
     assert len(entries) == 1
     assert set(entries[0]["entity_ids"]) == {"light.lamp", "sensor.lamp_power"}
 
 
-def test_catalog_never_contains_adapter_raw_payload(
-    manager: FamilySmartHomeManager,
-) -> None:
-    _seed(manager, domain="light", external="light.lamp", device_key="d1", typed=["light"])
-    manager._adapter_factory = lambda _p: _StubAdapter(_catalog(manager))  # type: ignore[attr-defined]
+def test_catalog_never_contains_adapter_raw_payload(env: dict[str, Any]) -> None:
+    _seed(env, domain="light", external="light.lamp", device_key="d1", typed=["light"])
+    _use(env["manager"], _LIGHT_COMMANDS)
 
-    blob = json.dumps(manager.device_catalog(_fid(manager), "prov1"))
-    assert "friendly_name" not in blob
-    assert "raw" not in blob
-    assert "unique_id" not in blob
+    blob = json.dumps(env["manager"].device_catalog(env["family_id"], env["provider_id"]))
+    for leaked in ("friendly_name", "unique_id", '"raw"', "attributes"):
+        assert leaked not in blob, leaked
 
 
-def test_unknown_stored_capability_is_skipped(manager: FamilySmartHomeManager) -> None:
+def test_unknown_stored_capability_is_skipped(env: dict[str, Any]) -> None:
     """A capability from a future/older release must not crash the catalogue."""
     _seed(
-        manager,
+        env,
         domain="light",
         external="light.lamp",
         device_key="d1",
         typed=["light", "holographic"],
     )
-    manager._adapter_factory = lambda _p: _StubAdapter([])  # type: ignore[attr-defined]
+    _use(env["manager"], [])
 
-    entry = manager.device_catalog(_fid(manager), "prov1")[0]
+    entry = env["manager"].device_catalog(env["family_id"], env["provider_id"])[0]
     assert entry["capabilities"] == ["light"]
+
+
+def test_disabled_provider_is_reachable_false_not_non_writable(
+    env: dict[str, Any],
+) -> None:
+    """A stopped provider must not make a light look permanently unwritable."""
+    _seed(env, domain="light", external="light.lamp", device_key="d1", typed=["light"])
+    _use(env["manager"], _LIGHT_COMMANDS)
+    env["manager"].repo.update_provider(env["provider_id"], enabled=0)
+
+    entry = env["manager"].device_catalog(env["family_id"], env["provider_id"])[0]
+    assert entry["reachable"] is False
+    assert entry["writable"] is True, "domain risk is unchanged by a stopped bridge"
+    assert entry["commands"] == [], "nothing may be offered while unreachable"
 
 
 class _StubAdapter:

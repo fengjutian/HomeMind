@@ -287,6 +287,7 @@ class FamilySmartHomeManager:
         self._provider(family_id, provider_id)
         provider = self.repo.get_provider(provider_id)
         catalog = self.command_catalog(provider) if provider is not None else []
+        reachable = self._adapter(provider) is not None if provider is not None else False
         commands_by_domain: dict[str, list[dict[str, Any]]] = {}
         for command in catalog:
             commands_by_domain.setdefault(command.domain, []).append(
@@ -313,9 +314,18 @@ class FamilySmartHomeManager:
                 entity_ids=tuple(e.external_entity_id for e in entities),
             )
             entry = agent_view(device)
+            # Two different questions, kept apart on purpose:
+            #   writable  — may the assistant ever control this kind of device?
+            #               (a property of the domain)
+            #   reachable — can we talk to it right now? (a property of the
+            #               provider connection; a stopped bridge must not make
+            #               a light look permanently non-writable)
             entry["writable"] = writable
+            entry["reachable"] = reachable
             entry["risk"] = risk
-            entry["commands"] = commands_by_domain.get(head.domain, []) if writable else []
+            entry["commands"] = (
+                commands_by_domain.get(head.domain, []) if writable and reachable else []
+            )
             out.append(entry)
         return out
 
