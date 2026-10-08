@@ -67,6 +67,16 @@ _STATUS: dict[HomeMindErrorCode, int] = {
     HomeMindErrorCode.DEVICE_TOKEN_INVALID: 401,
     HomeMindErrorCode.DEVICE_OFFLINE: 409,
     HomeMindErrorCode.JOB_NOT_FOUND: 404,
+    HomeMindErrorCode.ASSET_TRANSFER_NOT_FOUND: 404,
+    HomeMindErrorCode.ASSET_TRANSFER_FORBIDDEN: 403,
+    HomeMindErrorCode.ASSET_TRANSFER_EXPIRED: 410,
+    HomeMindErrorCode.ASSET_TRANSFER_TERMINAL: 409,
+    HomeMindErrorCode.ASSET_TRANSFER_TOKEN_INVALID: 401,
+    HomeMindErrorCode.ASSET_TRANSFER_SOURCE_UNAVAILABLE: 503,
+    HomeMindErrorCode.ASSET_TRANSFER_SOURCE_CHANGED: 412,
+    HomeMindErrorCode.ASSET_TRANSFER_RANGE_INVALID: 416,
+    HomeMindErrorCode.ASSET_TRANSFER_LIMIT_EXCEEDED: 429,
+    HomeMindErrorCode.ASSET_TRANSFER_HASH_MISMATCH: 409,
     HomeMindErrorCode.EXTERNAL_PROCESSING_DENIED: 403,
     HomeMindErrorCode.MEMORY_REVIEW_REQUIRED: 409,
     HomeMindErrorCode.IDENTITY_REQUIRED: 401,
@@ -97,6 +107,46 @@ DEFAULT_MESSAGES: dict[HomeMindErrorCode, tuple[str, str]] = {
     HomeMindErrorCode.DEVICE_TOKEN_INVALID: ("设备凭证无效", "device credential invalid"),
     HomeMindErrorCode.DEVICE_OFFLINE: ("设备当前离线", "device is offline"),
     HomeMindErrorCode.JOB_NOT_FOUND: ("未找到该后台任务", "asset job not found"),
+    HomeMindErrorCode.ASSET_TRANSFER_NOT_FOUND: (
+        "未找到该下载任务",
+        "asset transfer not found",
+    ),
+    HomeMindErrorCode.ASSET_TRANSFER_FORBIDDEN: (
+        "无权下载该资源",
+        "asset transfer forbidden",
+    ),
+    HomeMindErrorCode.ASSET_TRANSFER_EXPIRED: (
+        "下载任务已过期,请重新创建",
+        "asset transfer expired; create a new one",
+    ),
+    HomeMindErrorCode.ASSET_TRANSFER_TERMINAL: (
+        "下载任务已结束",
+        "asset transfer already reached a terminal state",
+    ),
+    HomeMindErrorCode.ASSET_TRANSFER_TOKEN_INVALID: (
+        "下载凭证无效或已过期",
+        "transfer credential invalid or expired",
+    ),
+    HomeMindErrorCode.ASSET_TRANSFER_SOURCE_UNAVAILABLE: (
+        "资源当前不可读取",
+        "asset source is unavailable",
+    ),
+    HomeMindErrorCode.ASSET_TRANSFER_SOURCE_CHANGED: (
+        "资源内容已变化,请重新下载",
+        "asset source changed; restart the download",
+    ),
+    HomeMindErrorCode.ASSET_TRANSFER_RANGE_INVALID: (
+        "请求的字节区间无效",
+        "requested byte range is not satisfiable",
+    ),
+    HomeMindErrorCode.ASSET_TRANSFER_LIMIT_EXCEEDED: (
+        "下载任务数量已达上限",
+        "too many active asset transfers",
+    ),
+    HomeMindErrorCode.ASSET_TRANSFER_HASH_MISMATCH: (
+        "文件校验不通过,下载内容已损坏",
+        "file hash mismatch; the downloaded content is corrupt",
+    ),
     HomeMindErrorCode.EXTERNAL_PROCESSING_DENIED: (
         "家庭隐私设置不允许发送到外部服务",
         "family privacy settings forbid external processing",

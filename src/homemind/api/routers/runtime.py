@@ -14,6 +14,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Header, Response
 from pydantic import BaseModel, ConfigDict, Field
 
+from homemind.api.headers import bearer_token
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.repos.family_devices import (
     FamilyDeviceCommandRow,
@@ -113,7 +114,8 @@ def _manager(server: OctopServer) -> DeviceRuntimeManager:
     run_migrations(server.services.db)
     services = HomeMindServices.from_pool(server.services.db)
     return DeviceRuntimeManager(
-        FamilyManager(services.family_repo), services.family_device_repo,
+        FamilyManager(services.family_repo),
+        services.family_device_repo,
     )
 
 
@@ -146,16 +148,13 @@ def _command_payload(row: FamilyDeviceCommandRow) -> RuntimeCommandResponse:
 
 
 def _resolve_token(authorization: str | None) -> str:
-    if not authorization:
-        raise HomeMindError(
-            HomeMindErrorCode.FAMILY_INVALID, "missing authorization header",
-        )
-    scheme, _, value = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not value:
-        raise HomeMindError(
-            HomeMindErrorCode.FAMILY_INVALID, "authorization must be Bearer <token>",
-        )
-    return value
+    """Parse the device bearer credential.
+
+    Thin alias over the shared parser so the runtime surface and the
+    asset-transfer control plane cannot drift on what a valid device
+    credential looks like.
+    """
+    return bearer_token(authorization)
 
 
 @router.post(
@@ -171,7 +170,8 @@ def _resolve_token(authorization: str | None) -> str:
 )
 async def pair(body: RuntimePairBody, server: Server) -> RuntimePairResponse:
     device, token, expires_at = _manager(server).complete_pairing(
-        body.code, address=body.address,
+        body.code,
+        address=body.address,
     )
     return RuntimePairResponse(
         device=_device_response(device),
@@ -244,7 +244,9 @@ async def ack_command(
     token = _resolve_token(authorization)
     manager = _manager(server)
     updated = manager.acknowledge_command(
-        token, command_id, runtime_version=body.runtime_version,
+        token,
+        command_id,
+        runtime_version=body.runtime_version,
     )
     return RuntimeCommandAckResponse(
         id=updated.id,

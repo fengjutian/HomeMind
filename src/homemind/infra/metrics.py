@@ -121,6 +121,22 @@ class HomeMindMetrics:
     transaction_device_needs_review_total: int = 0
     transaction_device_await_expired_total: int = 0
 
+    # device asset transfers (async large-file distribution).
+    # Low-cardinality counters only: no transfer_id, device_id, filename
+    # or URL ever becomes a label here.
+    asset_transfer_created_total: int = 0
+    asset_transfer_completed_total: int = 0
+    asset_transfer_failed_total: int = 0
+    asset_transfer_cancelled_total: int = 0
+    asset_transfer_expired_total: int = 0
+    asset_transfer_bytes_served_total: int = 0
+    asset_transfer_range_requests_total: int = 0
+    asset_transfer_full_requests_total: int = 0
+    asset_transfer_token_issued_total: int = 0
+    asset_transfer_token_refresh_total: int = 0
+    asset_transfer_hash_mismatch_total: int = 0
+    asset_transfer_range_rejected_total: int = 0
+
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def inc(self, name: str, n: int = 1) -> None:

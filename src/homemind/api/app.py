@@ -9,6 +9,7 @@ from homemind.api.routers import (
     active_family,
     albums,
     asset_jobs,
+    asset_transfers,
     calendar,
     context,
     dashboard,
@@ -44,7 +45,10 @@ def build_app(server: OctopServer) -> FastAPI:
 
     @app.exception_handler(HomeMindError)
     async def _homemind_error(_request: Request, exc: HomeMindError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status, content=exc.to_envelope())
+        # 429 must tell the caller when to come back; without the header a
+        # client can only guess and retry into the same limit.
+        headers = {"Retry-After": "1"} if exc.status == 429 else None
+        return JSONResponse(status_code=exc.status, content=exc.to_envelope(), headers=headers)
 
     app.include_router(
         families.router,
@@ -60,6 +64,11 @@ def build_app(server: OctopServer) -> FastAPI:
         runtime.router,
         prefix="/api/homemind",
         tags=["homemind-runtime"],
+    )
+    app.include_router(
+        asset_transfers.router,
+        prefix="/api/homemind",
+        tags=["homemind-asset-transfers"],
     )
     app.include_router(
         observability.router,

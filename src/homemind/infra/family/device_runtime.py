@@ -213,7 +213,8 @@ class DeviceRuntimeManager:
         self.family.require_manager(family_id, user)
         if not device_name:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "device name is required",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "device name is required",
             )
         if not capabilities:
             raise HomeMindError(
@@ -221,8 +222,7 @@ class DeviceRuntimeManager:
                 "device must declare at least one capability",
             )
         if not root_path and any(
-            capability.startswith(PATH_BEARING_CAPABILITY_PREFIXES)
-            for capability in capabilities
+            capability.startswith(PATH_BEARING_CAPABILITY_PREFIXES) for capability in capabilities
         ):
             raise HomeMindError(
                 HomeMindErrorCode.FAMILY_INVALID,
@@ -273,9 +273,7 @@ class DeviceRuntimeManager:
             root_path=entry.root_path or root_path,
         )
         token = mint_token()
-        credential = self.repo.issue_credential(
-            device.id, device.family_id, hash_token(token)
-        )
+        credential = self.repo.issue_credential(device.id, device.family_id, hash_token(token))
         refreshed = self.repo.heartbeat(device.id, status="ONLINE", address=address)
         return refreshed or device, token, credential.expires_at or 0
 
@@ -312,19 +310,34 @@ class DeviceRuntimeManager:
         credential = self.repo.find_active_credential_by_hash(hash_token(token))
         if credential is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "device credential rejected",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "device credential rejected",
             )
         now = int(time.time())
         if credential.expires_at is not None and credential.expires_at < now:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "device credential expired",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "device credential expired",
             )
         device = self.repo.get(credential.device_id)
         if device is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "credential points at missing device",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "credential points at missing device",
             )
         return credential, device
+
+    def authenticate_device(self, token: str) -> FamilyDeviceRow:
+        """Public single entry point for device authentication.
+
+        Other domains (the asset-transfer control plane, for instance)
+        need the same guarantee this class provides -- a caller is only
+        ever identified by its credential, never by an id in the body --
+        so they call this instead of re-implementing the lookup. Keeping
+        one funnel means a revocation rule added here applies everywhere.
+        """
+        _, device = self._authenticate(token)
+        return device
 
     def heartbeat(
         self,
@@ -343,7 +356,8 @@ class DeviceRuntimeManager:
         )
         if updated is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "device heartbeat failed",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "device heartbeat failed",
             )
         _hm_inc("device_heartbeat_total")
         return updated
@@ -355,7 +369,8 @@ class DeviceRuntimeManager:
         not depend on a dashboard page being open.
         """
         count = self.repo.mark_stale_devices_offline(
-            heartbeat_timeout_seconds=self.heartbeat_timeout_seconds, now=now,
+            heartbeat_timeout_seconds=self.heartbeat_timeout_seconds,
+            now=now,
         )
         if count:
             _hm_inc("device_marked_offline_total", count)
@@ -368,18 +383,29 @@ class DeviceRuntimeManager:
         instead of) flipping them.
         """
         return self.repo.list_stale_online_devices(
-            heartbeat_timeout_seconds=self.heartbeat_timeout_seconds, now=now,
+            heartbeat_timeout_seconds=self.heartbeat_timeout_seconds,
+            now=now,
         )
 
     def list_recent_commands(
-        self, family_id: str, device_id: str, user: User, *, limit: int = 50,
+        self,
+        family_id: str,
+        device_id: str,
+        user: User,
+        *,
+        limit: int = 50,
     ) -> list[FamilyDeviceCommandRow]:
         self.family.require_access(family_id, user)
         device = self._assert_device(family_id, device_id)
         return self.repo.list_commands(device.id, limit=limit)
 
     def list_commands(
-        self, family_id: str, device_id: str, user: User, *, limit: int = 50,
+        self,
+        family_id: str,
+        device_id: str,
+        user: User,
+        *,
+        limit: int = 50,
     ) -> list[FamilyDeviceCommandRow]:
         """Alias for ``list_recent_commands`` retained for naming parity
         with the plan spec; the dashboard uses ``list_recent_commands``.
@@ -393,7 +419,10 @@ class DeviceRuntimeManager:
         return self.repo.list_for_family(family_id)
 
     def get_device(
-        self, family_id: str, device_id: str, user: User,
+        self,
+        family_id: str,
+        device_id: str,
+        user: User,
     ) -> FamilyDeviceRow:
         self.family.require_access(family_id, user)
         return self._assert_device(family_id, device_id)
@@ -412,12 +441,13 @@ class DeviceRuntimeManager:
         self.family.require_manager(family_id, user)
         self._assert_device(family_id, device_id)
         if capabilities is not None and any(
-            capability.startswith(PATH_BEARING_CAPABILITY_PREFIXES)
-            for capability in capabilities
+            capability.startswith(PATH_BEARING_CAPABILITY_PREFIXES) for capability in capabilities
         ):
             effective_root = root_path
             if effective_root is None:
-                effective_root = (self.repo.get(device_id) or None) and self.repo.get(device_id).root_path  # type: ignore[union-attr]
+                effective_root = (self.repo.get(device_id) or None) and self.repo.get(
+                    device_id
+                ).root_path  # type: ignore[union-attr]
             if not effective_root:
                 raise HomeMindError(
                     HomeMindErrorCode.FAMILY_INVALID,
@@ -432,7 +462,8 @@ class DeviceRuntimeManager:
         )
         if updated is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "device update failed",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "device update failed",
             )
         return updated
 
@@ -495,7 +526,10 @@ class DeviceRuntimeManager:
         return row
 
     def approve_command(
-        self, family_id: str, command_id: str, user: User,
+        self,
+        family_id: str,
+        command_id: str,
+        user: User,
     ) -> FamilyDeviceCommandRow:
         """Move a ``WAITING_APPROVAL`` command to ``PENDING``.
 
@@ -506,7 +540,8 @@ class DeviceRuntimeManager:
         command = self.repo.get_command(command_id)
         if command is None or command.family_id != family_id:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "family command not found",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "family command not found",
             )
         approved = self.repo.transition_command(
             command.id,
@@ -524,14 +559,20 @@ class DeviceRuntimeManager:
         return approved
 
     def cancel_command(
-        self, family_id: str, command_id: str, user: User, *, reason: str | None = None,
+        self,
+        family_id: str,
+        command_id: str,
+        user: User,
+        *,
+        reason: str | None = None,
     ) -> FamilyDeviceCommandRow:
         """Manager cancels a command that has not finished yet."""
         self.family.require_manager(family_id, user)
         command = self.repo.get_command(command_id)
         if command is None or command.family_id != family_id:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "family command not found",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "family command not found",
             )
         cancelled = self.repo.transition_command(
             command.id,
@@ -542,7 +583,8 @@ class DeviceRuntimeManager:
         )
         if cancelled is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "command is already terminal",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "command is already terminal",
             )
         return cancelled
 
@@ -572,11 +614,14 @@ class DeviceRuntimeManager:
         for command in self.repo.list_commands(device_id, status="PENDING"):
             if command.expires_at < now:
                 self.repo.transition_command(
-                    command.id, from_status="PENDING", to_status="EXPIRED",
+                    command.id,
+                    from_status="PENDING",
+                    to_status="EXPIRED",
                 )
 
     def list_reclaimable_commands(
-        self, token: str,
+        self,
+        token: str,
     ) -> list[FamilyDeviceCommandRow]:
         """Commands whose lease lapsed and are still safe to reclaim."""
         _, device = self._authenticate(token)
@@ -644,7 +689,10 @@ class DeviceRuntimeManager:
         return updated
 
     def acknowledge_command(
-        self, token: str, command_id: str, *,
+        self,
+        token: str,
+        command_id: str,
+        *,
         runtime_version: str | None = None,
     ) -> FamilyDeviceCommandRow:
         """Runtime-side: mark a claimed command as RUNNING.
@@ -657,7 +705,9 @@ class DeviceRuntimeManager:
         _, device = self._authenticate(token)
         if runtime_version:
             self.repo.heartbeat(
-                device.id, status=device.status, runtime_version=runtime_version,
+                device.id,
+                status=device.status,
+                runtime_version=runtime_version,
             )
         command = self.repo.get_command(command_id)
         if command is None or command.device_id != device.id:
@@ -711,7 +761,8 @@ class DeviceRuntimeManager:
         device = self.repo.get(device_id)
         if device is None or device.family_id != family_id:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "family device not found",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "family device not found",
             )
         return device
 

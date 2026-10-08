@@ -142,16 +142,10 @@ class FamilyDeviceCommandRow:
             is_unsafe=bool(data.get("is_unsafe")),
             lease_owner=data.get("lease_owner"),
             lease_expires_at=(
-                int(data["lease_expires_at"])
-                if data.get("lease_expires_at") is not None
-                else None
+                int(data["lease_expires_at"]) if data.get("lease_expires_at") is not None else None
             ),
-            approved_at=(
-                int(data["approved_at"]) if data.get("approved_at") is not None else None
-            ),
-            approved_by=(
-                int(data["approved_by"]) if data.get("approved_by") is not None else None
-            ),
+            approved_at=(int(data["approved_at"]) if data.get("approved_at") is not None else None),
+            approved_by=(int(data["approved_by"]) if data.get("approved_by") is not None else None),
             retry_count=int(data.get("retry_count") or 0),
         )
 
@@ -235,9 +229,7 @@ class FamilyDeviceRepo:
         if platform is not None:
             values["platform"] = platform
         if capabilities is not None:
-            values["capabilities"] = json.dumps(
-                capabilities, ensure_ascii=False, sort_keys=True
-            )
+            values["capabilities"] = json.dumps(capabilities, ensure_ascii=False, sort_keys=True)
         if status is not None:
             values["status"] = status
         if address is not None:
@@ -251,8 +243,7 @@ class FamilyDeviceRepo:
         params.extend((now_ts(), device_id))
         with self._db.transaction() as conn:
             conn.execute(
-                f"UPDATE homemind_family_devices SET {', '.join(fields)} "
-                "WHERE device_id = ?",
+                f"UPDATE homemind_family_devices SET {', '.join(fields)} WHERE device_id = ?",
                 params,
             )
         return self.get(device_id)
@@ -323,7 +314,8 @@ class FamilyDeviceRepo:
         return FamilyDeviceCredentialRow.from_row(row) if row else None
 
     def find_active_credential_by_hash(
-        self, token_hash: str,
+        self,
+        token_hash: str,
     ) -> FamilyDeviceCredentialRow | None:
         """Look up a live credential for ``token_hash``.
 
@@ -351,7 +343,10 @@ class FamilyDeviceRepo:
         return matched
 
     def mark_stale_devices_offline(
-        self, *, heartbeat_timeout_seconds: int, now: int | None = None,
+        self,
+        *,
+        heartbeat_timeout_seconds: int,
+        now: int | None = None,
     ) -> int:
         """Flip devices to ``OFFLINE`` once ``last_seen`` falls behind the
         heartbeat timeout.
@@ -373,7 +368,10 @@ class FamilyDeviceRepo:
         return int(cursor.rowcount or 0)
 
     def list_stale_online_devices(
-        self, *, heartbeat_timeout_seconds: int, now: int | None = None,
+        self,
+        *,
+        heartbeat_timeout_seconds: int,
+        now: int | None = None,
     ) -> list[FamilyDeviceRow]:
         """Devices whose heartbeat lapsed and that still read as online.
 
@@ -414,6 +412,31 @@ class FamilyDeviceRepo:
                 (ts, device_id),
             )
         return int(cursor.rowcount or 0)
+
+    def has_active_credential(
+        self,
+        device_id: str,
+        *,
+        now: int | None = None,
+    ) -> bool:
+        """True when the device still holds at least one live credential.
+
+        Data-plane requests authenticate with a short-lived *transfer*
+        token, not the device token -- so they cannot re-check the device
+        credential by hash. This is the aggregate stand-in: revoking or
+        rotating every device credential leaves the device with zero live
+        credentials, and every already-issued transfer token stops
+        working immediately.
+        """
+        ts = now_ts() if now is None else now
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM homemind_device_credentials "
+                "WHERE device_id = ? AND revoked_at IS NULL "
+                "AND (expires_at IS NULL OR expires_at > ?) LIMIT 1",
+                (device_id, ts),
+            ).fetchone()
+        return row is not None
 
     # ------------------------------------------------------------ commands
 
@@ -598,7 +621,10 @@ class FamilyDeviceRepo:
         return None
 
     def list_reclaimable_commands(
-        self, device_id: str, *, now: int | None = None,
+        self,
+        device_id: str,
+        *,
+        now: int | None = None,
     ) -> list[FamilyDeviceCommandRow]:
         """Commands whose lease expired and may still be reclaimed."""
         timestamp = now_ts() if now is None else now

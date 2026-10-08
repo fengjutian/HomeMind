@@ -25,15 +25,12 @@ from octop.infra.db.pool import DatabasePool
 from octop.infra.db.repos._base import DbRow, map_rows, now_ts
 from octop.infra.utils.ulid import new_ulid
 
-
 #: States a transfer can still download bytes in.
 ACTIVE_STATUSES: tuple[str, ...] = ("PENDING", "ACTIVE")
 
 #: States from which no transition is legal. A device that reports
 #: complete twice must not drag the row back into an active state.
-TERMINAL_STATUSES: frozenset[str] = frozenset(
-    {"COMPLETED", "FAILED", "CANCELLED", "EXPIRED"}
-)
+TERMINAL_STATUSES: frozenset[str] = frozenset({"COMPLETED", "FAILED", "CANCELLED", "EXPIRED"})
 
 
 def _row_data(row: DbRow) -> dict[str, Any]:
@@ -93,22 +90,16 @@ class AssetTransferRow:
             size_bytes=int(data["size_bytes"]),
             sha256=str(data["sha256"]),
             source_mtime_ns=(
-                int(data["source_mtime_ns"])
-                if data["source_mtime_ns"] is not None
-                else None
+                int(data["source_mtime_ns"]) if data["source_mtime_ns"] is not None else None
             ),
             etag=str(data["etag"]),
             chunk_size=int(data["chunk_size"]),
             bytes_reported=int(data["bytes_reported"]),
             last_progress_at=(
-                int(data["last_progress_at"])
-                if data["last_progress_at"] is not None
-                else None
+                int(data["last_progress_at"]) if data["last_progress_at"] is not None else None
             ),
             expires_at=int(data["expires_at"]),
-            completed_at=(
-                int(data["completed_at"]) if data["completed_at"] is not None else None
-            ),
+            completed_at=(int(data["completed_at"]) if data["completed_at"] is not None else None),
             failure_code=data["failure_code"],
             failure_detail=data["failure_detail"],
             created_at=int(data["created_at"]),
@@ -135,9 +126,7 @@ class AssetTransferTokenRow:
             transfer_id=str(data["transfer_id"]),
             token_hash=str(data["token_hash"]),
             expires_at=int(data["expires_at"]),
-            revoked_at=(
-                int(data["revoked_at"]) if data["revoked_at"] is not None else None
-            ),
+            revoked_at=(int(data["revoked_at"]) if data["revoked_at"] is not None else None),
             created_at=int(data["created_at"]),
         )
 
@@ -220,12 +209,13 @@ class AssetTransferRepo:
         return AssetTransferRow.from_row(row) if row else None
 
     def get_by_request_key(
-        self, device_id: str, request_key: str,
+        self,
+        device_id: str,
+        request_key: str,
     ) -> AssetTransferRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM homemind_asset_transfers "
-                "WHERE device_id = ? AND request_key = ?",
+                "SELECT * FROM homemind_asset_transfers WHERE device_id = ? AND request_key = ?",
                 (device_id, request_key),
             ).fetchone()
         return AssetTransferRow.from_row(row) if row else None
@@ -276,7 +266,10 @@ class AssetTransferRepo:
         return self.get(transfer_id)
 
     def advance_progress(
-        self, transfer_id: str, bytes_reported: int, now: int,
+        self,
+        transfer_id: str,
+        bytes_reported: int,
+        now: int,
     ) -> AssetTransferRow | None:
         """Record aggregate progress, monotonically.
 
@@ -307,7 +300,11 @@ class AssetTransferRepo:
         return self.get(transfer_id)
 
     def fail(
-        self, transfer_id: str, code: str, detail: str | None, now: int,
+        self,
+        transfer_id: str,
+        code: str,
+        detail: str | None,
+        now: int,
     ) -> AssetTransferRow | None:
         with self._db.transaction() as conn:
             conn.execute(
@@ -319,7 +316,11 @@ class AssetTransferRepo:
         return self.get(transfer_id)
 
     def cancel(
-        self, transfer_id: str, now: int, *, statuses: tuple[str, ...] = ACTIVE_STATUSES,
+        self,
+        transfer_id: str,
+        now: int,
+        *,
+        statuses: tuple[str, ...] = ACTIVE_STATUSES,
     ) -> int:
         if not statuses:
             return 0
@@ -421,7 +422,10 @@ class AssetTransferRepo:
         return AssetTransferTokenRow.from_row(row)
 
     def resolve_active_token(
-        self, token_hash: str, *, now: int,
+        self,
+        token_hash: str,
+        *,
+        now: int,
     ) -> AssetTransferTokenRow | None:
         """Look up a live data-plane credential for ``token_hash``.
 

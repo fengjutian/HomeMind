@@ -2,6 +2,10 @@ import { useCallback, useRef, useState } from "react";
 import type { ChangeEvent, ClipboardEvent, DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { uploadFile } from "../../../api/modules/upload";
+import {
+  RESUMABLE_THRESHOLD_BYTES,
+  ResumableUpload,
+} from "../../../api/resumableUploader";
 import { agentAttachmentAccessUrl } from "../../../utils/toolMediaBlocks";
 import type { ChatAttachment } from "./useChat";
 import { message as antMessage } from "@/utils/antdMessage";
@@ -17,6 +21,22 @@ export function useChatAttachments(agentId: string | null | undefined) {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadViaSession = async (file: File) => {
+    const upload = new ResumableUpload(file, {
+      purpose: "CHAT_ATTACHMENT",
+      agentId,
+    });
+    const completed = await upload.start();
+    return {
+      path: completed.path,
+      workspace_path: completed.workspace_path,
+      filename: completed.filename,
+      media_type: completed.media_type,
+      url: completed.url,
+      access_url: completed.access_url,
+    };
+  };
 
   const processFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -44,7 +64,13 @@ export function useChatAttachments(agentId: string | null | undefined) {
       try {
         const results = await Promise.all(
           fileArr.map(async (file) => {
-            const res = await uploadFile(agentId, file);
+            // Small files keep the single-request XHR experience; anything
+            // above the threshold goes through the resumable session API so a
+            // dropped connection does not restart the whole upload.
+            const res =
+              file.size > RESUMABLE_THRESHOLD_BYTES
+                ? await uploadViaSession(file)
+                : await uploadFile(agentId, file);
             const workspacePath = res.path || res.workspace_path;
             const previewUrl =
               res.access_url ||
