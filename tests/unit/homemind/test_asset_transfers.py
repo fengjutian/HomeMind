@@ -677,6 +677,40 @@ def test_concurrent_range_requests_are_capped(env: _Env) -> None:
     env.manager.release_content(third)
 
 
+def test_process_wide_handle_budget_bounds_several_devices(env: _Env) -> None:
+    """The per-transfer cap does not bound the household.
+
+    Four devices, one range each: that is four open handles against a
+    budget of two. The per-transfer limits would each pass happily, so
+    only the process-wide budget can refuse the last one.
+    """
+    handles: list = []
+    for index in range(3):
+        _device, device_token = env.pair(f"tv-{index}")
+        handle = run(env.manager.create_transfer(device_token, asset_id=env.asset.id,
+                                                 request_key=f"k{index}"))
+        # The data plane is addressed by the transfer credential, not the
+        # device's long-lived one.
+        handles.append((handle.token, handle.transfer.id))
+
+    env.manager.max_open_handles = 2
+    try:
+        first = env.manager.authorize_content(handles[0][0], range_header="bytes=0-9")
+        second = env.manager.authorize_content(handles[1][0], range_header="bytes=0-9")
+        with pytest.raises(HomeMindError) as caught:
+            env.manager.authorize_content(handles[2][0], range_header="bytes=0-9")
+        assert caught.value.code is HomeMindErrorCode.ASSET_TRANSFER_LIMIT_EXCEEDED
+        assert caught.value.status == 429
+
+        # Giving a handle back frees budget for the next device.
+        env.manager.release_content(first)
+        third = env.manager.authorize_content(handles[2][0], range_header="bytes=0-9")
+        env.manager.release_content(second)
+        env.manager.release_content(third)
+    finally:
+        env.manager.max_open_handles = 64
+
+
 def test_released_range_does_not_leak_the_slot(env: _Env) -> None:
     _device, token = env.pair()
     handle = run(env.manager.create_transfer(token, asset_id=env.asset.id, request_key="k"))

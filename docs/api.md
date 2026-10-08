@@ -539,6 +539,31 @@ always use the returned `access_url`.
 |--------|------|------|-------|
 | `GET` | `/uploads/blobs/{upload_id}` | owner, completed only | streams from disk in bounded buffers; `404` for unfinished or foreign sessions |
 
+### Cleanup and metrics
+
+A background sweeper runs on boot and every 15 minutes. It expires sessions
+past their TTL and reclaims two kinds of leftovers: staging directories of rows
+already in a terminal status (a crash between `mark_completed` and the delete),
+and staging/blob directories with no row at all (a crash before the row was
+written). Both are unreachable by any client, so both are safe to delete.
+Blobs of **completed** sessions are kept — those are the user's files.
+
+`METRICS` exposes `upload_sessions_active`, `upload_sessions_total`,
+`upload_bytes_received_total`, `upload_parts_total`, `upload_failures_total`,
+`upload_checksum_failures_total`, `upload_resumes_total`,
+`upload_cleanup_bytes_total`, and `upload_cleanup_sessions_total`. The cleanup
+byte counter measures real disk bytes freed, not the DB counter.
+
+### Bridge forwarding
+
+Resumable uploads work against a remote Bridge agent. The session state machine
+stays on the instance that will hold the file: the dashboard sends
+`X-Octop-Agent-Id: bridge:{connection_id}:{agent_id}`, and the whole session
+(create → parts → complete) is forwarded through the tunnel. The tunnel policy
+allows `GET/POST/PUT/DELETE` on `/api/uploads/sessions[/{id}[/parts/{n}|/complete]]`
+and `GET` on `/api/uploads/blobs/{id}`; every other upload path, and any nested
+path smuggling, stays denied.
+
 ## Updates, ollama, i18n, plugins, slash, preferences
 
 | Method | Path | Auth | Notes |

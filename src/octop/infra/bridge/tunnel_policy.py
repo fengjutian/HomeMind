@@ -49,6 +49,12 @@ _ACP_GLOBAL = re.compile(r"^/api/acp(?:/[^/]+)?$")
 _CRON_SETTINGS = re.compile(r"^/api/cron/settings$")
 _CONNECTOR_INSTANCES_LIST = re.compile(r"^/api/connector-instances$")
 
+# Resumable upload sessions. The state machine lives on the instance that will
+# hold the file, so the whole session (create / status / part / complete /
+# cancel) is forwarded rather than proxied part-by-part from the hub.
+_UPLOAD_SESSIONS = re.compile(r"^/api/uploads/sessions(?:/[^/]+(?:/(?:parts/[^/]+|complete))?)?$")
+_UPLOAD_BLOBS = re.compile(r"^/api/uploads/blobs/[^/]+$")
+
 
 def is_tunnel_path_allowed(method: str, path: str) -> bool:
     """Return True when ``method`` + ``path`` may run via an inbound tunnel."""
@@ -91,6 +97,12 @@ def is_tunnel_path_allowed(method: str, path: str) -> bool:
         return verb == "GET"
 
     if _CONNECTOR_INSTANCES_LIST.fullmatch(raw):
+        return verb == "GET"
+
+    if _UPLOAD_SESSIONS.fullmatch(raw):
+        return verb in {"GET", "POST", "PUT", "DELETE"}
+
+    if _UPLOAD_BLOBS.fullmatch(raw):
         return verb == "GET"
 
     return False

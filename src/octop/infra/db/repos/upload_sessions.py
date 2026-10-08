@@ -247,6 +247,16 @@ class UploadSessionRepo:
             r = conn.execute(sql, params).fetchone()
         return int(r[0]) if r else 0
 
+    def list_by_statuses(self, statuses: list[str]) -> list[UploadSessionRow]:
+        """Every session in one of *statuses* — used by the orphan sweeper."""
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM upload_sessions "
+                f"WHERE status IN ({sql_in_placeholders(len(statuses))})",
+                list(statuses),
+            ).fetchall()
+        return map_rows(rows, UploadSessionRow)
+
     def list_expired(self, *, now: int, limit: int = 100) -> list[UploadSessionRow]:
         """Non-terminal sessions past their TTL, oldest first."""
         with self._db.connect() as conn:

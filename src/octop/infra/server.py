@@ -42,6 +42,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+#: How often the resumable-upload sweeper reclaims expired sessions and any
+#: staging / blob directories left behind by a crash.
+_UPLOAD_SWEEP_INTERVAL_SEC = 15 * 60
+
 # Default 100 MiB per active log file before size-triggered rollover (in addition to daily).
 DEFAULT_LOG_MAX_BYTES = 100 * 1024 * 1024
 DEFAULT_LOG_RETENTION_DAYS = 14
@@ -261,6 +265,7 @@ class OctopServer:
         self._ldap_service: LdapAuthService | None = None
         self._ldap_bind_throttle: LdapBindThrottle | None = None
         self._ldap_bind_throttle_services: SharedServices | None = None
+        self._upload_sweep_task: asyncio.Task[None] | None = None
 
     # Backward compat: expose user_manager directly
     @property
@@ -593,6 +598,25 @@ class OctopServer:
 
         asyncio.create_task(_resume_bridges(), name="bridge-auto-resume")
 
+        # Reclaim resumable-upload staging and blobs left behind by a crash or
+        # an expired session. Runs on boot and then on a slow interval.
+        async def _sweep_uploads() -> None:
+            from octop.infra.uploads.service import UploadSessionService  # noqa: PLC0415
+
+            while True:
+                try:
+                    services = self.services
+                    if services is None:
+                        return
+                    svc = UploadSessionService(services.repos.upload_session_repo, services.paths)
+                    await svc.cleanup_expired()
+                    await svc.sweep_orphans()
+                except Exception:  # noqa: BLE001 - a sweep failure must not kill the loop
+                    logger.warning("upload sweep failed", exc_info=True)
+                await asyncio.sleep(_UPLOAD_SWEEP_INTERVAL_SEC)
+
+        self._upload_sweep_task = asyncio.create_task(_sweep_uploads(), name="upload-sweeper")
+
     def _emit_wizard_password(self, *, user_count: int) -> None:
         config = self.config
         if config is None:
@@ -627,6 +651,10 @@ class OctopServer:
         if not self._started:
             return
         try:
+            sweep = self._upload_sweep_task
+            if sweep is not None:
+                sweep.cancel()
+                self._upload_sweep_task = None
             from octop.infra.connectors.gateway import agently_auth
 
             await agently_auth.close()

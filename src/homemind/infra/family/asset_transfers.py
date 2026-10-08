@@ -77,6 +77,13 @@ DEFAULT_READ_BLOCK_BYTES = 512 * 1024
 #: process file-handle budget.
 DEFAULT_MAX_CONCURRENT_RANGES_PER_TRANSFER = 8
 
+#: Concurrent download file handles allowed across the whole process.
+#: The per-transfer cap bounds one device; this bounds the household. A
+#: desktop server can hold a few hundred descriptors comfortably, and a
+#: refused request (429 + Retry-After) is far better than a process that
+#: cannot open any more files at all.
+DEFAULT_MAX_OPEN_FILE_HANDLES = 64
+
 #: Create rate per device, sliding window.
 DEFAULT_CREATE_RATE_LIMIT = 30
 DEFAULT_CREATE_RATE_WINDOW_SECONDS = 60
@@ -411,26 +418,56 @@ class TransferHandle:
 
 
 class _Admission:
-    """Bounded concurrency and rate guards, in process memory.
+    """Bounded concurrency and handle guards, in process memory.
 
     Correctness first: a cache would need invalidation on every revoke,
-    and this is the cheap half of the answer. ``asyncio.Semaphore`` is
-    created lazily because it binds to the running loop, and the manager
-    is rebuilt per request by the router.
+    and this is the cheap half of the answer. The manager is rebuilt per
+    request by the router, so all state lives here at module scope.
+
+    Two independent limits, because they defend against different things:
+
+    * per-transfer range slots -- one device going wild;
+    * a process-wide open-handle budget -- several devices doing it at
+      once, which is the case that actually exhausts file descriptors
+      and is invisible to a per-transfer cap.
+
+    Deliberately *not* implemented: a per-device bandwidth ceiling. The
+    specification marks it optional, and a real one has to charge actual
+    served bytes mid-stream and abort a response that is already 2 GiB in
+    -- which trades a throttled download for a corrupt-looking partial
+    one. The handle budget plus the per-transfer cap already bound the
+    damage a single household can do; revisit when a real uplink
+    contention problem exists.
     """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._range_slots: dict[str, int] = {}
         self._creates: dict[str, list[float]] = {}
+        self._open_handles = 0
 
-    def acquire_range_slot(self, transfer_id: str, *, limit: int) -> bool:
+    def acquire_range_slot(
+        self,
+        transfer_id: str,
+        *,
+        limit: int,
+        max_open_handles: int,
+    ) -> tuple[bool, str]:
+        """Take one range slot plus one open-handle reservation.
+
+        Returns ``(granted, reason)``. Both reservations are taken under
+        one lock, so a granted slot always has a handle budget behind it;
+        the caller must give both back through :meth:`release_range_slot`.
+        """
         with self._lock:
             current = self._range_slots.get(transfer_id, 0)
             if current >= limit:
-                return False
+                return False, "TOO_MANY_RANGES"
+            if self._open_handles >= max_open_handles:
+                return False, "SERVER_BUSY"
             self._range_slots[transfer_id] = current + 1
-            return True
+            self._open_handles += 1
+        return True, ""
 
     def release_range_slot(self, transfer_id: str) -> None:
         with self._lock:
@@ -439,6 +476,8 @@ class _Admission:
                 self._range_slots.pop(transfer_id, None)
             else:
                 self._range_slots[transfer_id] = current - 1
+            if self._open_handles > 0:
+                self._open_handles -= 1
 
     def allow_create(self, device_id: str, *, limit: int, window: int, now: float) -> bool:
         with self._lock:
@@ -472,6 +511,7 @@ class AssetTransferManager:
         max_active_per_device: int = DEFAULT_MAX_ACTIVE_PER_DEVICE,
         read_block_bytes: int = DEFAULT_READ_BLOCK_BYTES,
         max_concurrent_ranges: int = DEFAULT_MAX_CONCURRENT_RANGES_PER_TRANSFER,
+        max_open_handles: int = DEFAULT_MAX_OPEN_FILE_HANDLES,
         create_rate_limit: int = DEFAULT_CREATE_RATE_LIMIT,
         create_rate_window_seconds: int = DEFAULT_CREATE_RATE_WINDOW_SECONDS,
         now: int | None = None,
@@ -490,6 +530,7 @@ class AssetTransferManager:
         self.max_active_per_device = max_active_per_device
         self.read_block_bytes = read_block_bytes
         self.max_concurrent_ranges = max_concurrent_ranges
+        self.max_open_handles = max_open_handles
         self.create_rate_limit = create_rate_limit
         self.create_rate_window_seconds = create_rate_window_seconds
         self._now = now
@@ -968,6 +1009,7 @@ class AssetTransferManager:
         if not _ADMISSION.acquire_range_slot(
             resolved.transfer.id,
             limit=self.max_concurrent_ranges,
+            max_open_handles=self.max_open_handles,
         ):
             _hm_inc("asset_transfer_range_rejected_total")
             raise HomeMindError(

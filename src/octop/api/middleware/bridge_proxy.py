@@ -57,6 +57,12 @@ def _is_header_tunneled_path(path: str) -> bool:
         return True
     if raw == "/api/connector-instances":
         return True
+    # Resumable uploads: the session must be created on the instance that will
+    # store the file, so the caller selects the hop with X-Octop-Agent-Id.
+    if raw == "/api/uploads/sessions" or raw.startswith("/api/uploads/sessions/"):
+        return True
+    if raw.startswith("/api/uploads/blobs/"):
+        return True
     if raw in {
         "/api/providers/resolved",
         "/api/providers/active-model",

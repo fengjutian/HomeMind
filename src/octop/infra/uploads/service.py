@@ -32,6 +32,7 @@ from octop.infra.db.repos.upload_sessions import (
     UploadSessionRow,
 )
 from octop.infra.errors import ErrorCode, OctopError
+from octop.infra.metrics import METRICS
 from octop.infra.uploads.protocol import (
     DEFAULT_UPLOAD_LIMITS,
     MissingRanges,
@@ -124,6 +125,13 @@ class UploadSessionView:
             ],
             "missing_truncated": self.missing.truncated,
         }
+
+
+def _dir_size(path: Path) -> int:
+    """Total bytes under *path*; 0 when it does not exist."""
+    if not path.is_dir():
+        return 0
+    return sum(entry.stat().st_size for entry in path.rglob("*") if entry.is_file())
 
 
 class UploadSessionService:
@@ -257,6 +265,11 @@ class UploadSessionService:
             expires_at=expires_at if expires_at is not None else self._limits.expires_at(now=ts),
         )
         self._paths.ensure_upload_staging_dir(row.upload_id)
+        METRICS.inc("upload_sessions_total")
+        METRICS.set(
+            "upload_sessions_active",
+            self._repo.count_active_for_owner(owner_user_id, now=ts),
+        )
         return self._view(row, [])
 
     def status(
@@ -304,6 +317,7 @@ class UploadSessionService:
         digest, written = await self._spool_part(row.upload_id, part_number, stream, expected_size)
         if digest.lower() != declared_sha256.lower():
             self._discard_part(row.upload_id, part_number)
+            METRICS.inc("upload_checksum_failures_total")
             raise OctopError(
                 ErrorCode.UPLOAD_CHECKSUM_MISMATCH,
                 "X-Chunk-SHA256 does not match the received bytes",
@@ -329,6 +343,9 @@ class UploadSessionService:
             # content (same digest ⇒ same bytes), so there is nothing to delete.
             # Removing it here would destroy the durable copy.
             logger.debug("upload part already registered", extra={"upload_id": upload_id})
+        else:
+            METRICS.inc("upload_parts_total")
+            METRICS.inc("upload_bytes_received_total", written)
 
         return self.status(upload_id=row.upload_id, owner_user_id=owner_user_id, now=ts)
 
@@ -371,10 +388,14 @@ class UploadSessionService:
             landed = await lander(row, merged)
         except OctopError as exc:
             # Keep every part so the client can resume or retry.
+            METRICS.inc("upload_failures_total")
+            if exc.code is ErrorCode.UPLOAD_CHECKSUM_MISMATCH:
+                METRICS.inc("upload_checksum_failures_total")
             self._repo.release_to_open(row.upload_id, last_error=str(exc))
             raise
         except Exception as exc:  # noqa: BLE001 - surface as a retryable failure
             logger.exception("upload completion failed", extra={"upload_id": upload_id})
+            METRICS.inc("upload_failures_total")
             self._repo.release_to_open(row.upload_id, last_error=type(exc).__name__)
             raise OctopError(ErrorCode.INTERNAL_ERROR, "upload completion failed") from exc
 
@@ -410,10 +431,62 @@ class UploadSessionService:
         """Expire sessions past their TTL and reclaim their staging bytes."""
         ts = now if now is not None else now_ts()
         rows = self._repo.list_expired(now=ts, limit=limit)
+        freed = 0
         for row in rows:
             self._repo.set_status(row.upload_id, status=UploadStatus.EXPIRED.value)
+            # Measure the real bytes on disk, not the DB counter: a crash can
+            # leave staging that was never registered as a part.
+            freed += _dir_size(self._paths.upload_staging_dir(row.upload_id))
             self._staging_cleanup(row.upload_id)
+        METRICS.inc("upload_cleanup_sessions_total", len(rows))
+        METRICS.inc("upload_cleanup_bytes_total", freed)
         return len(rows)
+
+    async def sweep_orphans(self, *, now: int | None = None) -> dict[str, int]:
+        """Reclaim disk with no live session behind it.
+
+        Two kinds of leftovers: rows that already reached a terminal status but
+        were never cleaned (a crash between ``mark_completed`` and the rmtree),
+        and staging/blob directories on disk with no row at all (a crash before
+        the row was written). Both are unreachable by any client, so both are
+        safe to delete.
+        """
+        ts = now if now is not None else now_ts()
+        staging_root = self._paths.uploads_staging_dir
+        blob_root = self._paths.uploads_blobs_dir
+
+        terminal = self._repo.list_by_statuses(
+            [
+                UploadStatus.COMPLETED.value,
+                UploadStatus.ABORTED.value,
+                UploadStatus.EXPIRED.value,
+            ]
+        )
+        freed = 0
+        reclaimed = 0
+        for row in terminal:
+            if self._paths.upload_staging_dir(row.upload_id).exists():
+                freed += _dir_size(self._paths.upload_staging_dir(row.upload_id))
+                self._staging_cleanup(row.upload_id)
+                reclaimed += 1
+
+        for root in (staging_root, blob_root):
+            if not root.is_dir():
+                continue
+            for child in root.iterdir():
+                if not child.is_dir():
+                    continue
+                known = self._repo.get(child.name) is not None
+                if known:
+                    continue
+                freed += _dir_size(child)
+                shutil.rmtree(child, ignore_errors=True)
+                reclaimed += 1
+
+        METRICS.inc("upload_cleanup_sessions_total", reclaimed)
+        METRICS.inc("upload_cleanup_bytes_total", freed)
+        logger.info("upload sweep reclaimed %s dir(s), %s bytes", reclaimed, freed)
+        return {"dirs": reclaimed, "bytes": freed, "at": ts}
 
     # ------------------------------------------------------------------ internals
 
