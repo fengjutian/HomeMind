@@ -452,22 +452,23 @@ class _Admission:
         *,
         limit: int,
         max_open_handles: int,
-    ) -> tuple[bool, str]:
+    ) -> str:
         """Take one range slot plus one open-handle reservation.
 
-        Returns ``(granted, reason)``. Both reservations are taken under
-        one lock, so a granted slot always has a handle budget behind it;
-        the caller must give both back through :meth:`release_range_slot`.
+        Returns ``""`` when granted, otherwise a short reason code.
+        Deliberately a plain string rather than a ``(ok, reason)`` tuple:
+        a non-empty tuple is truthy whatever it contains, so a caller
+        writing ``if not acquire(...)`` would swallow every refusal.
         """
         with self._lock:
             current = self._range_slots.get(transfer_id, 0)
             if current >= limit:
-                return False, "TOO_MANY_RANGES"
+                return "TOO_MANY_RANGES"
             if self._open_handles >= max_open_handles:
-                return False, "SERVER_BUSY"
+                return "SERVER_BUSY"
             self._range_slots[transfer_id] = current + 1
             self._open_handles += 1
-        return True, ""
+        return ""
 
     def release_range_slot(self, transfer_id: str) -> None:
         with self._lock:
@@ -1006,7 +1007,7 @@ class AssetTransferManager:
                 HomeMindErrorCode.ASSET_TRANSFER_SOURCE_CHANGED,
                 "If-Match does not describe this resource version",
             )
-        if not _ADMISSION.acquire_range_slot(
+        if _ADMISSION.acquire_range_slot(
             resolved.transfer.id,
             limit=self.max_concurrent_ranges,
             max_open_handles=self.max_open_handles,
