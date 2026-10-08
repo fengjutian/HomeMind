@@ -66,6 +66,10 @@ def risk_for(domain: str) -> str:
 
     Derived from the domain alone, never from the request: a payload
     cannot argue its way into a lower risk than the thing it acts on.
+
+    **Fails closed.** A domain nobody has classified is blocked, not
+    defaulted to low risk: otherwise every domain a new integration
+    release introduces would silently become writable to the assistant.
     """
     if domain in BLOCKED_DOMAINS:
         return RISK_BLOCKED
@@ -73,7 +77,9 @@ def risk_for(domain: str) -> str:
         return RISK_HIGH
     if domain in READ_ONLY_DOMAINS:
         return RISK_BLOCKED
-    return RISK_LOW
+    if domain in LOW_RISK_DOMAINS:
+        return RISK_LOW
+    return RISK_BLOCKED
 
 
 @dataclass(frozen=True)

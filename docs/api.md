@@ -166,6 +166,23 @@ Task states are `PENDING` → `ACTIVE` → `COMPLETED` / `FAILED`, with `CANCELL
 manual cancel) and `EXPIRED` (idle past the TTL) as the other terminal states. Terminal states are final: a late
 report never reopens them.
 
+**Server-side limits.** `429` with `Retry-After` when a client exceeds one of them; none of them queue
+indefinitely. Per device: 3 live transfers, 30 create calls per minute. Per transfer: 8 concurrent range
+requests — a client that ignores the advertised `max_concurrency` (4) is refused rather than accommodated.
+Process-wide: 64 simultaneously open download handles, which is what bounds several devices downloading at once
+rather than one device going wild.
+
+**Scale acceptance.** The multi-GiB path is verified separately because it writes several GiB:
+
+```bash
+OCTOP_RUN_LARGE_TRANSFER_TEST=1 pytest tests/integration/test_asset_transfer_large.py -s
+```
+
+It boots a real uvicorn on a socket (the in-process ASGI test harness buffers responses, so heap numbers taken
+against it describe the client rather than the server), pulls 5 GiB as 320 ranges through a four-worker pool,
+refreshes the credential mid-flight, verifies every chunk's SHA-256, and asserts the heap does not grow with the
+file.
+
 ## Agents
 
 | Method | Path | Auth | Notes |

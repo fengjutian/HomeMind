@@ -27,6 +27,7 @@ from homemind.api.routers import (
     runtime,
     search,
     search_index,
+    smart_home,
     task_scheduler,
     tasks,
     transactions,
@@ -175,6 +176,15 @@ def build_app(server: OctopServer) -> FastAPI:
         dashboard.router,
         prefix="/api/homemind/families",
         tags=["homemind-dashboard"],
+    )
+
+    # Smart home: providers, entity mappings and the command catalogue. This
+    # router existed but was never mounted, which is why every adapter call
+    # short-circuited and the feature was unreachable over HTTP.
+    app.include_router(
+        smart_home.router,
+        prefix="/api/homemind/families",
+        tags=["homemind-smart-home"],
     )
     # Octop installs its dashboard catch-all while building the base app. Keep
     # that fallback behind HomeMind's routes so it cannot swallow API GETs.

@@ -27,12 +27,14 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import os
+import socket
 import tracemalloc
 from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 import pytest
+import uvicorn
 
 from homemind.api.app import build_app as build_homemind_app
 from octop.infra.server import OctopServer
@@ -96,23 +98,71 @@ def large_source(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return payload
 
 
+def _free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
+
+
 @pytest.fixture
 async def rig(tmp_octop_home: Path) -> object:
-    async with octop_client(tmp_octop_home, app_factory=build_homemind_app) as (client, srv):
-        await bootstrap_admin(client, tmp_octop_home)
-        auth = await auth_header(client)
-        created = await client.post(
-            "/api/homemind/families",
-            headers=auth,
-            json={"name": "Large Transfer", "timezone": "Asia/Shanghai", "locale": "zh"},
+    """A *real* HTTP server on a socket, not the in-process ASGI harness.
+
+    This is what makes the memory assertion mean anything. The ASGI
+    transport httpx mounts in-process collects a response before handing
+    it back, so heap numbers taken against it describe the test client
+    rather than the server. Over a socket the only thing between the
+    file and the assertion is the real server.
+    """
+    async with octop_client(tmp_octop_home, app_factory=build_homemind_app) as (_probe, srv):
+        port = _free_port()
+        server = uvicorn.Server(
+            uvicorn.Config(
+                build_homemind_app(srv),
+                host="127.0.0.1",
+                port=port,
+                log_level="error",
+            )
         )
-        assert created.status_code == 201, created.text
-        yield _Rig(
-            client=client,
-            auth=auth,
-            family_id=str(created.json()["id"]),
-            server=srv,
-        )
+        task = asyncio.get_running_loop().create_task(server.serve())
+        try:
+            while not server.started:
+                await asyncio.sleep(0.05)
+            async with httpx.AsyncClient(
+                base_url=f"http://127.0.0.1:{port}", timeout=600.0
+            ) as client:
+                await bootstrap_admin(client, tmp_octop_home)
+                auth = await auth_header(client)
+                created = await client.post(
+                    "/api/homemind/families",
+                    headers=auth,
+                    json={
+                        "name": "Large Transfer",
+                        "timezone": "Asia/Shanghai",
+                        "locale": "zh",
+                    },
+                )
+                assert created.status_code == 201, created.text
+                yield _Rig(
+                    client=client,
+                    auth=auth,
+                    family_id=str(created.json()["id"]),
+                    server=srv,
+                )
+        finally:
+            server.should_exit = True
+            await task
+
+
+def _open_handles() -> int:
+    """Server-side admission slots currently held, read from the test.
+
+    The server runs in this same process, so the live counter is the
+    honest way to see whether a slot came back after each response.
+    """
+    from homemind.infra.family.asset_transfers import _ADMISSION
+
+    return int(_ADMISSION._open_handles)
 
 
 async def _prepare(rig: _Rig, source: Path, *, device_name: str, request_key: str) -> dict:
@@ -197,6 +247,8 @@ async def test_five_gib_download_survives_refresh_and_stays_flat(
     assert probe.headers["etag"] == manifest["asset"]["etag"]
     assert probe.headers["accept-ranges"] == "bytes"
 
+    seen: list[int] = []
+
     async def pull(token: str, index: int) -> str:
         """Fetch one chunk at its offset and return its digest."""
         start = index * CHUNK_BYTES
@@ -207,9 +259,15 @@ async def test_five_gib_download_survives_refresh_and_stays_flat(
             url,
             headers={"Authorization": f"Transfer {token}", "Range": f"bytes={start}-{end}"},
         ) as response:
-            assert response.status_code == 206, response.status_code
+            if response.status_code != 206:
+                detail = (await response.aread())[:200]
+                raise AssertionError(
+                    f"chunk {index} refused: {response.status_code} {detail!r} "
+                    f"(open handles {seen[-8:]})"
+                )
             async for block in response.aiter_bytes():
                 digest.update(block)
+        seen.append(_open_handles())
         return digest.hexdigest()
 
     async def pull_many(token: str, indices: list[int], workers: int) -> list[tuple[int, str]]:
@@ -242,7 +300,7 @@ async def test_five_gib_download_survives_refresh_and_stays_flat(
     tracemalloc.start()
     try:
         baseline = tracemalloc.get_traced_memory()[0]
-        # First pass: one gigabyte, single stream, before any refresh.
+        # First pass: one gigabyte before any refresh.
         first_pass = await pull_many(
             manifest["download"]["token"],
             list(range(FIRST_PASS_BYTES // CHUNK_BYTES)),
@@ -255,6 +313,12 @@ async def test_five_gib_download_survives_refresh_and_stays_flat(
 
     assert len(first_pass) == FIRST_PASS_BYTES // CHUNK_BYTES
     assert all(digest == CHUNK_SHA256 for _index, digest in first_pass)
+    # Sixty-four completed ranges must have handed their admission slots
+    # back. A leaked slot here is invisible until it locks the transfer
+    # out at some arbitrary chunk later, which is exactly how it showed
+    # up while writing this test.
+    assert max(seen) <= workers, f"more ranges in flight than workers: {seen}"
+    assert seen[-1] == 0, f"file handles were not released after the last chunk: {seen[-8:]}"
     # A buffered implementation would sit at ~5 GiB by now. A streaming
     # one never holds more than a handful of read blocks.
     assert first_growth < 64 * MIB, (
@@ -277,23 +341,23 @@ async def test_five_gib_download_survives_refresh_and_stays_flat(
     assert stale.status_code == 401, "the previous credential must stop working at once"
 
     remaining = list(range(FIRST_PASS_BYTES // CHUNK_BYTES, CHUNK_COUNT))
-    # Strided, so four workers interleave across the file rather than
-    # each taking one contiguous slab.
-    lanes = [remaining[offset::WORKERS] for offset in range(WORKERS)]
 
     tracemalloc.start()
     try:
         baseline = tracemalloc.get_traced_memory()[0]
-        lanes_out = await asyncio.gather(*(pull_many(new_token, lane, workers) for lane in lanes))
+        # One shared pool of ``max_concurrency`` workers over every
+        # remaining chunk. Four independent four-worker lanes would be
+        # sixteen concurrent ranges, which the server correctly refuses.
+        rest = await pull_many(new_token, remaining, workers)
         _current, peak = tracemalloc.get_traced_memory()
         second_growth = peak - baseline
     finally:
         tracemalloc.stop()
 
-    covered = [pair for lane in lanes_out for pair in lane]
-    assert len(covered) == len(remaining), "every remaining chunk must be fetched"
-    assert sorted(index for index, _digest in covered) == remaining
-    for _index, digest in covered:
+    assert sorted(index for index, _digest in rest) == remaining, (
+        "every remaining chunk must be fetched exactly once"
+    )
+    for _index, digest in rest:
         assert digest == CHUNK_SHA256, "a reassembled chunk does not match the source"
     assert second_growth < 64 * MIB, (
         f"four concurrent streams grew the heap by {second_growth}; "

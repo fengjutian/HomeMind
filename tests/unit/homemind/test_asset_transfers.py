@@ -677,26 +677,45 @@ def test_concurrent_range_requests_are_capped(env: _Env) -> None:
     env.manager.release_content(third)
 
 
+def _held_range_slots() -> int:
+    """Range slots currently held process-wide.
+
+    The admission table is module-level state on purpose -- the manager
+    is rebuilt per request by the router -- which makes it shared across
+    every test in one process. A test asserting on a budget must read
+    the baseline rather than assume it starts at zero.
+    """
+    from homemind.infra.family.asset_transfers import _ADMISSION
+
+    return int(_ADMISSION._open_handles)
+
+
 def test_process_wide_handle_budget_bounds_several_devices(env: _Env) -> None:
     """The per-transfer cap does not bound the household.
 
-    Four devices, one range each: that is four open handles against a
-    budget of two. The per-transfer limits would each pass happily, so
-    only the process-wide budget can refuse the last one.
+    Three devices, one range each: three open handles against a budget
+    of two. The per-transfer limits would each pass happily, so only the
+    process-wide budget can refuse the last one.
     """
     handles: list = []
     for index in range(3):
         _device, device_token = env.pair(f"tv-{index}")
-        handle = run(env.manager.create_transfer(device_token, asset_id=env.asset.id,
-                                                 request_key=f"k{index}"))
+        handle = run(
+            env.manager.create_transfer(
+                device_token, asset_id=env.asset.id, request_key=f"k{index}"
+            )
+        )
         # The data plane is addressed by the transfer credential, not the
         # device's long-lived one.
         handles.append((handle.token, handle.transfer.id))
 
-    env.manager.max_open_handles = 2
+    baseline = _held_range_slots()
+
+    env.manager.max_open_handles = baseline + 2
     try:
         first = env.manager.authorize_content(handles[0][0], range_header="bytes=0-9")
         second = env.manager.authorize_content(handles[1][0], range_header="bytes=0-9")
+        assert _held_range_slots() == baseline + 2
         with pytest.raises(HomeMindError) as caught:
             env.manager.authorize_content(handles[2][0], range_header="bytes=0-9")
         assert caught.value.code is HomeMindErrorCode.ASSET_TRANSFER_LIMIT_EXCEEDED
@@ -709,6 +728,7 @@ def test_process_wide_handle_budget_bounds_several_devices(env: _Env) -> None:
         env.manager.release_content(third)
     finally:
         env.manager.max_open_handles = 64
+    assert _held_range_slots() == baseline, "every slot must come back"
 
 
 def test_released_range_does_not_leak_the_slot(env: _Env) -> None:
@@ -718,7 +738,8 @@ def test_released_range_does_not_leak_the_slot(env: _Env) -> None:
         resolved = env.manager.authorize_content(handle.token, range_header="bytes=0-9")
         env.manager.release_content(resolved)
     # 50 sequential reads must not accumulate into a full slot table.
-    assert env.manager.authorize_content(handle.token, range_header="bytes=0-9")
+    resolved = env.manager.authorize_content(handle.token, range_header="bytes=0-9")
+    env.manager.release_content(resolved)
 
 
 def test_changed_file_is_refused_mid_download(env: _Env) -> None:

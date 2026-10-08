@@ -582,6 +582,51 @@ async def test_state_survives_a_restart(rig: _Rig, payload: Path) -> None:
     assert again.json()["bytes_downloaded"] == 321
 
 
+@pytest.mark.asyncio
+async def test_device_revocation_stops_the_download_over_http(
+    rig: _Rig,
+    payload: Path,
+) -> None:
+    """Revocation must reach bytes already in flight.
+
+    The transfer and its credential were minted while the device was
+    healthy, so only a check on the data plane -- not at creation -- can
+    stop them. This is the assertion that the check is there.
+    """
+    family_id, device_id, device_token, _a, manifest = await _ready(rig, payload)
+    url = f"{TRANSFERS}/{manifest['transfer_id']}/content"
+    data = _data_headers(manifest["download"]["token"])
+
+    before = await rig.client.head(url, headers=data)
+    assert before.status_code == 200
+
+    revoked = await rig.client.post(
+        f"/api/homemind/families/{family_id}/devices/{device_id}/revoke-token",
+        headers=rig.auth,
+    )
+    assert revoked.status_code == 204, revoked.text
+
+    after = await rig.client.get(url, headers={**data, "Range": "bytes=0-9"})
+    # Revoking the device also revokes its download credentials, so the
+    # data plane refuses at the credential check before it ever reaches
+    # the device check. Either refusal is correct; what must not happen
+    # is bytes.
+    assert after.status_code in (401, 403), "a revoked device may not keep pulling bytes"
+    assert after.json()["error"]["code"] in (
+        "HOMEMIND_ASSET_TRANSFER_TOKEN_INVALID",
+        "HOMEMIND_ASSET_TRANSFER_FORBIDDEN",
+    )
+
+    # And the device can no longer renew its credential either. A rejected
+    # device credential is 400 across the runtime surface, matching
+    # heartbeat and command dispatch.
+    refresh = await rig.client.post(
+        f"{TRANSFERS}/{manifest['transfer_id']}/refresh",
+        headers={"Authorization": f"Bearer {device_token}"},
+    )
+    assert refresh.status_code == 400, refresh.text
+
+
 async def test_openapi_documents_the_data_plane(tmp_octop_home: Path) -> None:
     """The device author reads Scalar, so the routes must be described.
 

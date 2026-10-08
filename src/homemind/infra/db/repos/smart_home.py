@@ -56,6 +56,14 @@ class SmartProviderRow:
     enabled: bool
     last_seen_at: int | None
     last_error: str | None
+    #: Plan phase 5 health fields. ``last_seen_at`` is written on every probe
+    #: (including failures), so it cannot answer "when did this last work" —
+    #: ``last_success_at`` can.
+    last_sync_at: int | None
+    last_success_at: int | None
+    last_error_code: str | None
+    reauth_required: bool
+    rate_limited_until: int | None
     created_by: int
     created_at: int
     updated_at: int
@@ -76,6 +84,19 @@ class SmartProviderRow:
             enabled=bool(data["enabled"]),
             last_seen_at=(int(data["last_seen_at"]) if data["last_seen_at"] is not None else None),
             last_error=data["last_error"],
+            last_sync_at=(
+                int(data["last_sync_at"]) if data.get("last_sync_at") is not None else None
+            ),
+            last_success_at=(
+                int(data["last_success_at"]) if data.get("last_success_at") is not None else None
+            ),
+            last_error_code=data.get("last_error_code"),
+            reauth_required=bool(data.get("reauth_required") or 0),
+            rate_limited_until=(
+                int(data["rate_limited_until"])
+                if data.get("rate_limited_until") is not None
+                else None
+            ),
             created_by=int(data["created_by"]),
             created_at=int(data["created_at"]),
             updated_at=int(data["updated_at"]),
@@ -93,6 +114,10 @@ class SmartEntityRow:
     name: str
     capabilities: list[str]
     state: dict[str, Any]
+    #: Plan phase 5: stable composite key of the *physical* device, so the
+    #: entities one lamp exposes group together and a rename cannot fork it.
+    device_key: str | None
+    capabilities_typed: list[str]
     last_state_at: int | None
     last_changed_at: int | None
     created_at: int
@@ -102,6 +127,7 @@ class SmartEntityRow:
     def from_row(cls, row: DbRow) -> SmartEntityRow:
         data = _row_data(row)
         capabilities = _loads(data.get("capabilities_json"), [])
+        typed = _loads(data.get("capabilities_typed_json"), [])
         state = _loads(data.get("state_json"), {})
         return cls(
             id=str(data["entity_id"]),
@@ -113,6 +139,8 @@ class SmartEntityRow:
             name=str(data["name"]),
             capabilities=[str(c) for c in capabilities] if isinstance(capabilities, list) else [],
             state=state if isinstance(state, dict) else {},
+            device_key=data.get("device_key"),
+            capabilities_typed=[str(c) for c in typed] if isinstance(typed, list) else [],
             last_state_at=(
                 int(data["last_state_at"]) if data["last_state_at"] is not None else None
             ),
@@ -232,6 +260,34 @@ class SmartHomeRepo:
             last_error=None if ok else (error or "probe failed"),
         )
 
+    def record_sync_result(
+        self,
+        provider_id: str,
+        *,
+        ok: bool,
+        error: str | None = None,
+        error_code: str | None = None,
+        reauth_required: bool = False,
+        rate_limited_until: int | None = None,
+    ) -> SmartProviderRow | None:
+        """Record a full sync attempt, not just a liveness probe.
+
+        Unlike :meth:`record_probe` this distinguishes *seen* from *worked*: a
+        failed sync still bumps ``last_sync_at`` but leaves ``last_success_at``
+        alone, so the UI can say "never worked" instead of implying freshness.
+        """
+        ts = now_ts()
+        values: dict[str, object] = {
+            "last_sync_at": ts,
+            "last_error": None if ok else (error or "sync failed"),
+            "last_error_code": None if ok else error_code,
+            "reauth_required": 1 if (reauth_required and not ok) else 0,
+            "rate_limited_until": rate_limited_until,
+        }
+        if ok:
+            values["last_success_at"] = ts
+        return self.update_provider(provider_id, **values)
+
     def delete_provider(self, provider_id: str) -> bool:
         with self._db.transaction() as conn:
             cursor = conn.execute(
@@ -253,6 +309,8 @@ class SmartHomeRepo:
         capabilities: list[str] | None = None,
         state: dict[str, Any] | None = None,
         changed_at: int | None = None,
+        device_key: str | None = None,
+        capabilities_typed: list[str] | None = None,
     ) -> SmartEntityRow:
         """Record one entity, replacing its previous row's state.
 
@@ -273,6 +331,8 @@ class SmartHomeRepo:
                 conn.execute(
                     "UPDATE homemind_family_smart_entities SET name = ?, domain = ?, "
                     "capabilities_json = ?, state_json = ?, last_state_at = ?, "
+                    "device_key = COALESCE(?, device_key), "
+                    "capabilities_typed_json = ?, "
                     "last_changed_at = COALESCE(?, last_changed_at), updated_at = ? "
                     "WHERE entity_id = ?",
                     (
@@ -281,6 +341,8 @@ class SmartHomeRepo:
                         json.dumps(capabilities or [], ensure_ascii=False),
                         json.dumps(state or {}, ensure_ascii=False, sort_keys=True),
                         timestamp,
+                        device_key,
+                        json.dumps(capabilities_typed or [], ensure_ascii=False),
                         changed_at,
                         timestamp,
                         entity_id,
@@ -290,8 +352,9 @@ class SmartHomeRepo:
                 conn.execute(
                     "INSERT INTO homemind_family_smart_entities(entity_id, family_id, "
                     "provider_id, external_entity_id, domain, name, capabilities_json, "
-                    "state_json, last_state_at, last_changed_at, created_at, updated_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "state_json, device_key, capabilities_typed_json, "
+                    "last_state_at, last_changed_at, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         entity_id,
                         family_id,
@@ -301,6 +364,8 @@ class SmartHomeRepo:
                         name,
                         json.dumps(capabilities or [], ensure_ascii=False),
                         json.dumps(state or {}, ensure_ascii=False, sort_keys=True),
+                        device_key,
+                        json.dumps(capabilities_typed or [], ensure_ascii=False),
                         timestamp,
                         changed_at,
                         timestamp,
@@ -308,6 +373,29 @@ class SmartHomeRepo:
                     ),
                 )
         return self.get_entity(entity_id)  # type: ignore[return-value]
+
+    def group_entities_by_device(
+        self, provider_id: str, family_id: str
+    ) -> dict[str, list[SmartEntityRow]]:
+        """Entities of one provider grouped by physical device key.
+
+        Plan phase 5 acceptance: "the several HA entities of one physical
+        device aggregate into a single HomeMind device". Entities saved before
+        this column existed have a NULL key and fall back to their own id so
+        they still group one-per-key instead of collapsing together.
+        """
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_smart_entities "
+                "WHERE provider_id = ? AND family_id = ? ORDER BY name ASC",
+                (provider_id, family_id),
+            ).fetchall()
+        grouped: dict[str, list[SmartEntityRow]] = {}
+        for row in rows:
+            entity = SmartEntityRow.from_row(row)
+            key = entity.device_key or f"{provider_id}:entity:{entity.external_entity_id}"
+            grouped.setdefault(key, []).append(entity)
+        return grouped
 
     def get_entity(self, entity_id: str) -> SmartEntityRow | None:
         with self._db.connect() as conn:

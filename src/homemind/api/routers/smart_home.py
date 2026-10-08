@@ -19,6 +19,7 @@ from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.smart_home_manager import FamilySmartHomeManager
+from homemind.infra.family.smart_home_factory import build_adapter
 from octop.api.deps import current_user, get_server
 from octop.infra.server import OctopServer
 from octop.infra.users.identity import User
@@ -117,7 +118,27 @@ def _manager(server: OctopServer) -> FamilySmartHomeManager:
     assert server.services is not None
     run_migrations(server.services.db)
     services = HomeMindServices.from_pool(server.services.db)
-    return FamilySmartHomeManager(FamilyManager(services.family_repo), services.smart_home_repo)
+    # Adapter factory wired to the real secret store: a provider row plus a
+    # resolved credential becomes a live adapter, so sync/command stop
+    # short-circuiting to `adapterUnavailable`.
+    secret_store = _SecretStoreAdapter(server.services.secret_repo)
+    return FamilySmartHomeManager(
+        FamilyManager(services.family_repo),
+        services.smart_home_repo,
+        adapter_factory=lambda provider: build_adapter(provider, secret_store),
+    )
+
+
+class _SecretStoreAdapter:
+    """Adapts octop's ``SecretRepo`` to the narrow store the factory needs."""
+
+    __slots__ = ("_repo",)
+
+    def __init__(self, repo: Any) -> None:
+        self._repo = repo
+
+    def get(self, key: str) -> bytes | None:
+        return self._repo.get(key)
 
 
 @router.post(
