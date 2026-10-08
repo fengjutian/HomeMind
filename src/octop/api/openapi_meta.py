@@ -38,6 +38,17 @@ Public endpoints (no token): `/api/docs`, `/api/openapi.json`, `/api/health`,
 `/api/auth/invite/redeem`, `/api/connectors/oauth/callback`,
 and `/api/internal/mcp/*`.
 
+## Uploads
+
+Small files use the classic multipart route `POST /api/agents/{agent_id}/upload`.
+Large files use the resumable session API: open a session with
+`POST /api/uploads/sessions`, `PUT` each part to
+`/api/uploads/sessions/{upload_id}/parts/{part_number}` as a **raw binary body**
+(no multipart wrapper, `Content-Length` plus `X-Chunk-SHA256` required), then
+`POST .../complete`. `GET /api/uploads/sessions/{upload_id}` returns bounded
+`missing_ranges`, so a client that reloads mid-upload re-sends only what is
+missing. Sessions are owner-scoped: another user's session reads as `404`.
+
 ## Agent scope
 
 Many agent-scoped routes use the agent ID in the URL path (`/api/agents/{agent_id}/…`).

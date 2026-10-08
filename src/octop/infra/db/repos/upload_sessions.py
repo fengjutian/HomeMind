@@ -221,8 +221,24 @@ class UploadSessionRepo:
         return int(r[0]) if r else 0
 
     def sum_received_bytes(self, *, statuses: list[str] | None = None) -> int:
-        """Bytes currently held in staging — the global quota check."""
+        """Bytes actually on disk in staging — for metrics and reporting."""
         sql = "SELECT COALESCE(SUM(received_bytes), 0) FROM upload_sessions"
+        params: list[object] = []
+        if statuses:
+            sql += f" WHERE status IN ({sql_in_placeholders(len(statuses))})"
+            params.extend(statuses)
+        with self._db.connect() as conn:
+            r = conn.execute(sql, params).fetchone()
+        return int(r[0]) if r else 0
+
+    def sum_reserved_bytes(self, *, statuses: list[str] | None = None) -> int:
+        """Declared ``total_bytes`` of live sessions.
+
+        The quota must be reserved against *declared* size, not received bytes:
+        otherwise opening many sessions without sending a part would each pass
+        the gate and collectively exceed the staging quota.
+        """
+        sql = "SELECT COALESCE(SUM(total_bytes), 0) FROM upload_sessions"
         params: list[object] = []
         if statuses:
             sql += f" WHERE status IN ({sql_in_placeholders(len(statuses))})"

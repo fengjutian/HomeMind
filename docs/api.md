@@ -475,6 +475,28 @@ endpoint (public, mounted directly in `api/app.py`).
 | `POST` | `/agents/{aid}/files/access-urls` | user | refresh inbound media URLs (signed) |
 | `GET`  | `/agents/{aid}/files/{path}` | owner | read an inbound file |
 
+### Resumable upload sessions
+
+Large-file uploads use a server-managed session instead of one multipart body.
+Parts are raw binary (never multipart-wrapped) and sessions are owner-scoped:
+another user's session answers `404`, never `403`.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| `POST`   | `/uploads/sessions` | owner of `{agent_id}` | open a session; returns the **server-assigned** `chunk_size` (a smaller request is clamped up to the protocol minimum) and `missing_ranges` |
+| `GET`    | `/uploads/sessions/{upload_id}` | owner | bounded `missing_ranges` + `missing_truncated`, so huge files never return an unbounded array |
+| `PUT`    | `/uploads/sessions/{upload_id}/parts/{part_number}` | owner | raw binary body; requires `Content-Length` matching the part geometry and `X-Chunk-SHA256` |
+| `POST`   | `/uploads/sessions/{upload_id}/complete` | owner | exclusive claim → stream-merge → verify size + SHA-256 → land in the workspace |
+| `DELETE` | `/uploads/sessions/{upload_id}` | owner | cancel and reclaim staging bytes (`204`) |
+
+`PUT` semantics: re-sending byte-identical content is idempotent; a different
+digest for the same part number is `409 UPLOAD_PART_CONFLICT`; a body longer or
+shorter than the declared geometry is refused. `complete` on an incomplete
+upload is `409 UPLOAD_INCOMPLETE` and keeps every part so the client can finish.
+
+Currently `CHAT_ATTACHMENT` and `WORKSPACE_FILE` are wired; `KNOWLEDGE_DOCUMENT`
+and `FAMILY_ASSET` are refused explicitly until they have a destination.
+
 ## Updates, ollama, i18n, plugins, slash, preferences
 
 | Method | Path | Auth | Notes |

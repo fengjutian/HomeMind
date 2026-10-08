@@ -435,6 +435,7 @@
     "UPLOAD_SESSION_NOT_FOUND": "未找到上传会话。",
     "UPLOAD_SESSION_EXPIRED": "上传会话已过期，请重新开始上传。",
     "UPLOAD_SESSION_NOT_OPEN": "该上传会话当前不接受数据。",
+    "UPLOAD_PURPOSE_UNSUPPORTED": "上传用途 {purpose} 暂不可用。",
     "UPLOAD_PART_CONFLICT": "分片 {part_number} 已存在且内容不同。",
     "UPLOAD_INCOMPLETE": "上传未完成：仍缺少 {missing_count} 个分片。",
     "UPLOAD_CHECKSUM_MISMATCH": "上传内容校验失败，文件已损坏。",

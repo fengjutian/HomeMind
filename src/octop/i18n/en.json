@@ -435,6 +435,7 @@
     "UPLOAD_SESSION_NOT_FOUND": "Upload session not found.",
     "UPLOAD_SESSION_EXPIRED": "Upload session expired. Start a new upload.",
     "UPLOAD_SESSION_NOT_OPEN": "This upload session is not accepting data right now.",
+    "UPLOAD_PURPOSE_UNSUPPORTED": "Upload purpose {purpose} is not available yet.",
     "UPLOAD_PART_CONFLICT": "Part {part_number} already exists with different content.",
     "UPLOAD_INCOMPLETE": "Upload is incomplete: {missing_count} part(s) still missing.",
     "UPLOAD_CHECKSUM_MISMATCH": "Uploaded content failed checksum verification.",
