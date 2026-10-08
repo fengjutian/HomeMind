@@ -208,6 +208,13 @@ GET    /api/agents             → team 行附加 member_ids
 
 `octop` 在 `.venv` 中是**非可编辑安装的 1.0.1 拷贝**，源码树已是 1.0.2b6。直接用 `.venv\Scripts\python.exe -m pytest` 会导入旧包，出现 `ModuleNotFoundError: octop.infra.agents.teams`。同时，若已有 `homemind run` 开发服务器在跑，`uv run pytest` 会被 uv 环境锁阻塞（本次实测空转 6 分钟无输出）。
 
+**Windows locale 陷阱**：本机默认编码是 GBK。若测试用 `Path.read_text()`（不显式指定 `encoding=`）读取含非 ASCII 注释的 SQL 文件，会抛 `UnicodeDecodeError: 'gbk' codec`。这会让 `tests/unit/db` 出现约 19 个**与本次改动无关**的假失败。加 `PYTHONUTF8=1` 即恢复。本地验证必须带该变量：
+
+```powershell
+$env:PYTHONPATH="src"; $env:PYTHONUTF8="1"
+.\.venv\Scripts\python.exe -m pytest <paths> -q -p no:cacheprovider
+```
+
 正确入口仍是 **`uv run pytest`**。本次因上述两个原因改用：
 
 ```powershell

@@ -13,7 +13,15 @@ except ImportError:  # pragma: no cover - optional PostgreSQL driver
 
 from octop.infra.db.pool import DatabasePool
 from octop.infra.db.repos._base import DbRow, map_rows, now_ts, sql_in_placeholders
-from octop.infra.uploads.protocol import UploadStatus
+
+# Storage vocabulary as plain literals: this module is SQL-only and may not
+# import sibling domain packages (``infra/db/repos/`` boundary in AGENTS.md).
+# ``test_upload_session_repo.py::test_repo_status_literals_match_the_protocol``
+# fails if these ever drift from ``octop.infra.uploads.protocol.UploadStatus``.
+_STATUS_OPEN = "OPEN"
+_STATUS_ASSEMBLING = "ASSEMBLING"
+_STATUS_COMPLETED = "COMPLETED"
+_TERMINAL_STATUSES = (_STATUS_COMPLETED, "ABORTED", "EXPIRED")
 
 
 def _is_unique_violation(exc: BaseException) -> bool:
@@ -80,7 +88,7 @@ class UploadSessionRow:
             chunk_size=int(r["chunk_size"]),
             expected_sha256=opt("expected_sha256"),
             received_bytes=int(r["received_bytes"] or 0),
-            status=str(r["status"] or UploadStatus.OPEN.value),
+            status=str(r["status"] or _STATUS_OPEN),
             expires_at=int(r["expires_at"]),
             created_at=int(r["created_at"]),
             updated_at=int(r["updated_at"]),
@@ -139,7 +147,7 @@ class UploadSessionRepo:
         relative_target: str | None = None,
         mime_type: str | None = None,
         expected_sha256: str | None = None,
-        status: str = UploadStatus.OPEN.value,
+        status: str = _STATUS_OPEN,
     ) -> UploadSessionRow:
         ts = now_ts()
         with self._db.transaction() as conn:
@@ -208,13 +216,7 @@ class UploadSessionRepo:
             r = conn.execute(
                 "SELECT COUNT(*) FROM upload_sessions "
                 "WHERE owner_user_id = ? AND status NOT IN (?, ?, ?) AND expires_at > ?",
-                (
-                    owner_user_id,
-                    UploadStatus.COMPLETED.value,
-                    UploadStatus.ABORTED.value,
-                    UploadStatus.EXPIRED.value,
-                    now,
-                ),
+                (owner_user_id, *_TERMINAL_STATUSES, now),
             ).fetchone()
         return int(r[0]) if r else 0
 
@@ -236,13 +238,7 @@ class UploadSessionRepo:
                 "SELECT * FROM upload_sessions "
                 "WHERE expires_at <= ? AND status NOT IN (?, ?, ?) "
                 "ORDER BY id ASC LIMIT ?",
-                (
-                    now,
-                    UploadStatus.COMPLETED.value,
-                    UploadStatus.ABORTED.value,
-                    UploadStatus.EXPIRED.value,
-                    limit,
-                ),
+                (now, *_TERMINAL_STATUSES, limit),
             ).fetchall()
         return map_rows(rows, UploadSessionRow)
 
@@ -286,13 +282,13 @@ class UploadSessionRepo:
             cur = conn.execute(
                 "UPDATE upload_sessions SET status = ?, updated_at = ? "
                 "WHERE upload_id = ? AND status = ?",
-                (UploadStatus.ASSEMBLING.value, now_ts(), upload_id, UploadStatus.OPEN.value),
+                (_STATUS_ASSEMBLING, now_ts(), upload_id, _STATUS_OPEN),
             )
             return int(getattr(cur, "rowcount", 0) or 0) > 0
 
     def release_to_open(self, upload_id: str, *, last_error: str | None = None) -> None:
         """Give a failed assembly back to the client so it can resume."""
-        self.set_status(upload_id, status=UploadStatus.OPEN.value, last_error=last_error)
+        self.set_status(upload_id, status=_STATUS_OPEN, last_error=last_error)
 
     def mark_completed(self, upload_id: str, *, final_resource_id: str) -> UploadSessionRow | None:
         ts = now_ts()
@@ -301,7 +297,7 @@ class UploadSessionRepo:
                 "UPDATE upload_sessions SET status = ?, final_resource_id = ?, "
                 "completed_at = ?, last_error = NULL, updated_at = ? WHERE upload_id = ?",
                 (
-                    UploadStatus.COMPLETED.value,
+                    _STATUS_COMPLETED,
                     final_resource_id,
                     ts,
                     ts,

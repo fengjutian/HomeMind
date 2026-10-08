@@ -14,7 +14,12 @@ from octop.infra.db.repos.upload_sessions import (
     UploadSessionRepo,
 )
 from octop.infra.db.repos.users import UserRepo
-from octop.infra.uploads.protocol import UploadPurpose, UploadStatus, part_bounds
+from octop.infra.uploads.protocol import (
+    TERMINAL_UPLOAD_STATUSES,
+    UploadPurpose,
+    UploadStatus,
+    part_bounds,
+)
 from octop.infra.utils.paths import PathLayout
 
 CHUNK = 1024
@@ -260,6 +265,20 @@ def test_list_for_owner_filters_by_status(repo: UploadSessionRepo, owner_id: int
     open_rows = repo.list_for_owner(owner_id, statuses=[UploadStatus.OPEN.value])
     assert [row.upload_id for row in open_rows] == ["u-open"]
     assert len(repo.list_for_owner(owner_id)) == 2
+
+
+def test_repo_status_literals_match_the_protocol() -> None:
+    """The repo stores statuses as plain literals to stay SQL-only.
+
+    That duplicates vocabulary, so pin it: if a status is added or renamed in
+    the protocol, this fails instead of the two sides silently diverging.
+    """
+    from octop.infra.db.repos import upload_sessions as repo_mod
+
+    assert UploadStatus.OPEN.value == repo_mod._STATUS_OPEN
+    assert UploadStatus.ASSEMBLING.value == repo_mod._STATUS_ASSEMBLING
+    assert UploadStatus.COMPLETED.value == repo_mod._STATUS_COMPLETED
+    assert set(repo_mod._TERMINAL_STATUSES) == {s.value for s in TERMINAL_UPLOAD_STATUSES}
 
 
 def test_staging_paths_stay_inside_the_staging_root(tmp_path: Path) -> None:
