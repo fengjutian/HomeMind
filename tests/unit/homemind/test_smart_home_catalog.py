@@ -4,82 +4,20 @@ about what the assistant can and cannot control (plan phase 5)."""
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
-import pytest
-
-from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
-from homemind.infra.db.services import HomeMindServices
-from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.smart_home import SmartCommand
 from homemind.infra.family.smart_home_manager import FamilySmartHomeManager
-from octop.infra.db.migrate import run_migrations as run_octop_migrations
-from octop.infra.db.pool import SqlitePool
-from octop.infra.db.repos.users import UserRepo as OctopUserRepo
-from octop.infra.users.identity import Role, User
-
-
-@pytest.fixture
-def db(tmp_path: Path) -> SqlitePool:
-    pool = SqlitePool(tmp_path / "octop.db")
-    run_octop_migrations(pool)
-    run_homemind_migrations(pool)
-    return pool
-
-
-@pytest.fixture
-def env(db: SqlitePool) -> dict[str, Any]:
-    services = HomeMindServices.from_pool(db)
-    user_row = OctopUserRepo(db).create(username="owner", password_hash="h", role="user")
-    owner = User(user_row, "owner", Role.USER, "Owner")
-    family = FamilyManager(services.family_repo).create_family(
-        owner, name="Smart Family", timezone="Asia/Shanghai", locale="zh"
-    )
-    manager = FamilySmartHomeManager(FamilyManager(services.family_repo), services.smart_home_repo)
-    provider = manager.create_provider(
-        family.id,
-        owner,
-        kind="HOME_ASSISTANT",
-        name="Home",
-        base_url="http://ha.local:8123",
-    )
-    return {
-        "owner": owner,
-        "family_id": family.id,
-        "manager": manager,
-        "provider_id": provider.id,
-    }
-
-
-def _seed(
-    env: dict[str, Any],
-    *,
-    domain: str,
-    external: str,
-    device_key: str | None,
-    typed: list[str],
-) -> None:
-    env["manager"].repo.upsert_entity(
-        env["family_id"],
-        provider_id=env["provider_id"],
-        external_entity_id=external,
-        domain=domain,
-        name=f"Device {external}",
-        state={"state": "on"},
-        device_key=device_key,
-        capabilities_typed=typed,
-    )
-
-
-def _use(manager: FamilySmartHomeManager, commands: list[SmartCommand]) -> None:
-    manager._adapter_factory = lambda _p: _StubAdapter(commands)  # type: ignore[attr-defined]
-
+from tests.unit.homemind.conftest import seed_entity as _seed
 
 _LIGHT_COMMANDS = [
     SmartCommand(name="turn_on", domain="light", service="light.turn_on"),
     SmartCommand(name="turn_off", domain="light", service="light.turn_off"),
 ]
+
+
+def _use(manager: FamilySmartHomeManager, commands: list[SmartCommand]) -> None:
+    manager._adapter_factory = lambda _p: _StubAdapter(commands)  # type: ignore[attr-defined]
 
 
 def test_read_only_device_is_listed_without_commands(env: dict[str, Any]) -> None:

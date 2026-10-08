@@ -101,6 +101,120 @@ HA_COMMANDS: tuple[SmartCommand, ...] = (
             "properties": {"temperature": {"type": "number"}},
         },
     ),
+    SmartCommand(
+        name="set_hvac_mode",
+        domain="climate",
+        service="set_hvac_mode",
+        description="Set the HVAC mode (always requires approval)",
+        payload_schema={
+            "type": "object",
+            "required": ["hvac_mode"],
+            "properties": {
+                "hvac_mode": {
+                    "type": "string",
+                    "enum": ["heat", "cool", "off", "heat_cool", "auto", "dry", "fan_only"],
+                }
+            },
+        },
+    ),
+    # --- cover: curtains, blinds, garage doors -------------------------------
+    # HIGH risk: a cover opening is a physical act with privacy and
+    # wake-up consequences, so it always goes through approval.
+    SmartCommand(
+        name="open_cover",
+        domain="cover",
+        service="open_cover",
+        description="Open a cover (always requires approval)",
+        payload_schema={"type": "object", "properties": {}},
+    ),
+    SmartCommand(
+        name="close_cover",
+        domain="cover",
+        service="close_cover",
+        description="Close a cover (always requires approval)",
+        payload_schema={"type": "object", "properties": {}},
+    ),
+    SmartCommand(
+        name="stop_cover",
+        domain="cover",
+        service="stop_cover",
+        description="Stop a cover mid-travel (always requires approval)",
+        payload_schema={"type": "object", "properties": {}},
+    ),
+    SmartCommand(
+        name="set_cover_position",
+        domain="cover",
+        service="set_cover_position",
+        description="Move a cover to a percentage (always requires approval)",
+        payload_schema={
+            "type": "object",
+            "required": ["position"],
+            "properties": {"position": {"type": "number"}},
+        },
+    ),
+    # --- fan: ceiling fans and air circulators ------------------------------
+    SmartCommand(
+        name="turn_on",
+        domain="fan",
+        service="turn_on",
+        description="Switch a fan on (always requires approval)",
+        payload_schema={"type": "object", "properties": {}},
+    ),
+    SmartCommand(
+        name="turn_off",
+        domain="fan",
+        service="turn_off",
+        description="Switch a fan off (always requires approval)",
+        payload_schema={"type": "object", "properties": {}},
+    ),
+    SmartCommand(
+        name="set_fan_percentage",
+        domain="fan",
+        service="set_percentage",
+        description="Set a fan speed percentage (always requires approval)",
+        payload_schema={
+            "type": "object",
+            "required": ["percentage"],
+            "properties": {"percentage": {"type": "number"}},
+        },
+    ),
+    # --- vacuum --------------------------------------------------------------
+    # Start / pause / return are the low-to-medium risk commands the plan
+    # allows. Map and camera control are deliberately absent: a camera moving
+    # through the home is not something an agent gets.
+    SmartCommand(
+        name="start",
+        domain="vacuum",
+        service="start",
+        description="Start a cleaning cycle (always requires approval)",
+        payload_schema={"type": "object", "properties": {}},
+    ),
+    SmartCommand(
+        name="pause",
+        domain="vacuum",
+        service="pause",
+        description="Pause a cleaning cycle (always requires approval)",
+        payload_schema={"type": "object", "properties": {}},
+    ),
+    SmartCommand(
+        name="return_to_base",
+        domain="vacuum",
+        service="return_to_base",
+        description="Send the vacuum back to its dock (always requires approval)",
+        payload_schema={"type": "object", "properties": {}},
+    ),
+    # --- humidifier ----------------------------------------------------------
+    SmartCommand(
+        name="set_humidity",
+        domain="humidifier",
+        service="set_humidity",
+        description="Set a target relative humidity (always requires approval)",
+        payload_schema={
+            "type": "object",
+            "required": ["humidity"],
+            "properties": {"humidity": {"type": "number"}},
+        },
+    ),
 )
 
 

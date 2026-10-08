@@ -183,9 +183,7 @@ class FamilySmartHomeManager:
                     external_entity_id=entity.external_id,
                     domain=entity.domain,
                     name=entity.name,
-                    capabilities=[
-                        command.name for command in adapter.commands_for(entity.domain)
-                    ],
+                    capabilities=[command.name for command in adapter.commands_for(entity.domain)],
                     state={"state": entity.state, "attributes": entity.attributes},
                     device_key=descriptor.device_id,
                     capabilities_typed=[c.value for c in descriptor.capabilities],

@@ -22,13 +22,13 @@ from homemind.infra.family.smart_home import (
     risk_for,
 )
 from homemind.infra.family.smart_home_adapters import HA_COMMANDS, HomeAssistantAdapter
-from tests.unit.homemind.test_smart_home_catalog import env, _seed  # noqa: F401
 from homemind.infra.family.smart_home_descriptors import (
     CapabilityKind,
     describe_entity,
     device_key_for,
 )
 from tests.unit.homemind import ha_fixtures as fx
+from tests.unit.homemind.conftest import seed_entity as _seed
 
 
 @pytest.fixture
@@ -301,9 +301,7 @@ class TestEntityPruning:
         remaining = {e.external_entity_id for e in repo.list_entities(env["family_id"])}
         assert remaining == {"light.lamp"}
 
-    def test_empty_snapshot_is_not_treated_as_everything_removed(
-        self, env: dict[str, Any]
-    ) -> None:
+    def test_empty_snapshot_is_not_treated_as_everything_removed(self, env: dict[str, Any]) -> None:
         """A poll that returns nothing must never wipe the device map."""
         _seed(env, domain="light", external="light.lamp", device_key="d1", typed=["light"])
         repo = env["manager"].repo
