@@ -29,8 +29,8 @@ from homemind.infra.db.repos.smart_home import (
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.smart_home import (
+    ALWAYS_APPROVE_RISKS,
     RISK_BLOCKED,
-    RISK_HIGH,
     CommandNotAllowed,
     CommandPreview,
     SmartCommand,
@@ -173,7 +173,9 @@ class FamilySmartHomeManager:
         self.repo.record_sync_result(provider.id, ok=True)
         rows: list[SmartEntityRow] = []
         for entity in entities:
-            descriptor = describe_entity(entity, provider_id=provider.id)
+            descriptor = describe_entity(
+                entity, provider_id=provider.id, adapter_kind=provider.kind
+            )
             rows.append(
                 self.repo.upsert_entity(
                     family_id,
@@ -181,11 +183,20 @@ class FamilySmartHomeManager:
                     external_entity_id=entity.external_id,
                     domain=entity.domain,
                     name=entity.name,
-                    capabilities=[command.name for command in adapter.commands_for(entity.domain)],
+                    capabilities=[
+                        command.name for command in adapter.commands_for(entity.domain)
+                    ],
                     state={"state": entity.state, "attributes": entity.attributes},
                     device_key=descriptor.device_id,
                     capabilities_typed=[c.value for c in descriptor.capabilities],
                 )
+            )
+        # Drop rows for devices the provider no longer reports. An *empty*
+        # snapshot is treated as "we do not know", never as "the house is
+        # empty" — a timed-out poll must not erase the family's device map.
+        if entities:
+            self.repo.prune_missing_entities(
+                family_id, provider.id, [e.external_id for e in entities]
             )
         return rows
 
@@ -398,7 +409,7 @@ class FamilySmartHomeManager:
         risk = risk_for(entity.domain)
         if risk == RISK_BLOCKED:
             return True
-        if risk == RISK_HIGH:
+        if risk in ALWAYS_APPROVE_RISKS:
             return True
         return family_policy == "APPROVE_ALL"
 

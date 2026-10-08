@@ -41,6 +41,11 @@ HIGH_RISK_DOMAINS: frozenset[str] = frozenset({"climate", "cover", "fan", "humid
 # policy.
 LOW_RISK_DOMAINS: frozenset[str] = frozenset({"light", "switch", "input_boolean", "scene"})
 
+# Writable, but never silent: a vacuum moves on its own through the house.
+# Medium is its own tier so the UI can say "needs confirmation" without
+# implying the same thing as a front door or a thermostat.
+MEDIUM_RISK_DOMAINS: frozenset[str] = frozenset({"vacuum"})
+
 #: Nothing here may be executed at all. Listed explicitly so adding a
 #: domain to the adapter cannot quietly make it writable.
 READ_ONLY_DOMAINS: frozenset[str] = frozenset(
@@ -51,6 +56,9 @@ RISK_LOW = "LOW"
 RISK_MEDIUM = "MEDIUM"
 RISK_HIGH = "HIGH"
 RISK_BLOCKED = "BLOCKED"
+
+#: Risk levels that never execute without a human saying yes.
+ALWAYS_APPROVE_RISKS: frozenset[str] = frozenset({RISK_MEDIUM, RISK_HIGH})
 
 
 class SmartHomeError(RuntimeError):
@@ -75,6 +83,8 @@ def risk_for(domain: str) -> str:
         return RISK_BLOCKED
     if domain in HIGH_RISK_DOMAINS:
         return RISK_HIGH
+    if domain in MEDIUM_RISK_DOMAINS:
+        return RISK_MEDIUM
     if domain in READ_ONLY_DOMAINS:
         return RISK_BLOCKED
     if domain in LOW_RISK_DOMAINS:

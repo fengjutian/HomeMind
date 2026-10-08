@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from octop.infra.db.pool import DatabasePool
-from octop.infra.db.repos._base import DbRow, map_rows, now_ts
+from octop.infra.db.repos._base import DbRow, map_rows, now_ts, sql_in_placeholders
 from octop.infra.utils.ulid import new_ulid
 
 PROVIDER_KIND_HOME_ASSISTANT = "HOME_ASSISTANT"
@@ -461,6 +461,30 @@ class SmartHomeRepo:
                 "DELETE FROM homemind_family_smart_entities WHERE entity_id = ?", (entity_id,)
             )
         return bool(cursor.rowcount > 0)
+
+    def prune_missing_entities(
+        self, family_id: str, provider_id: str, seen_external_ids: list[str]
+    ) -> list[str]:
+        """Delete rows for entities the provider no longer reports.
+
+        A device removed in Home Assistant otherwise stays in this table
+        forever, so the dashboard keeps showing a ghost that can never be
+        reached. Only rows for this family+provider are considered, and a
+        provider that reports nothing is treated as "we do not know" rather
+        than "everything is gone" — an empty snapshot must not wipe the map.
+        """
+        if not seen_external_ids:
+            return []
+        placeholders = sql_in_placeholders(len(seen_external_ids))
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                "DELETE FROM homemind_family_smart_entities "
+                f"WHERE family_id = ? AND provider_id = ? "
+                f"AND external_entity_id NOT IN ({placeholders})",
+                (family_id, provider_id, *seen_external_ids),
+            )
+            removed = int(getattr(cursor, "rowcount", 0) or 0)
+        return ["deleted"] * removed
 
     def delete_entities_for_provider(self, provider_id: str) -> int:
         with self._db.transaction() as conn:

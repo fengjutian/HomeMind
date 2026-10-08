@@ -38,10 +38,12 @@ __all__ = [
     "DeviceDescriptor",
     "DeviceState",
     "PropertyDescriptor",
+    "SourceKind",
     "agent_view",
     "capabilities_for_domain",
     "describe_entity",
     "device_key_for",
+    "source_for",
 ]
 
 
@@ -89,6 +91,9 @@ CAPABILITY_BY_DOMAIN: dict[str, CapabilityKind] = {
 #: reports brightness is a light *with* brightness, not a different device kind.
 _ATTRIBUTE_CAPABILITIES: dict[str, CapabilityKind] = {
     "brightness": CapabilityKind.BRIGHTNESS,
+    # Home Assistant reports the current value as ``color_temp_kelvin``; the
+    # bare ``color_temp`` is the legacy spelling still seen on some firmware.
+    "color_temp_kelvin": CapabilityKind.COLOR_TEMPERATURE,
     "color_temp": CapabilityKind.COLOR_TEMPERATURE,
     "color_temperature": CapabilityKind.COLOR_TEMPERATURE,
 }
@@ -158,6 +163,47 @@ class CommandDescriptor:
         }
 
 
+class SourceKind(StrEnum):
+    """How a device reaches HomeMind. **Display only.**
+
+    Plan phase 6: the source is shown in the UI so a household can tell a
+    Matter device from a vendor's own cloud. It never widens what the
+    assistant may do — that stays a property of the domain, in
+    :func:`~homemind.infra.family.smart_home.risk_for`.
+    """
+
+    HOME_ASSISTANT = "home_assistant"
+    MATTER = "matter"
+    MQTT = "mqtt"
+    UNKNOWN = "unknown"
+
+
+#: Home Assistant reports the bridge an entity arrived through in
+#: ``attributes``. Mapping is on *that* vocabulary, never on a brand name:
+#: a Xiaomi lamp surfaced through the Xiaomi Home integration and one surfaced
+#: through Matter both report a device_id, and both stay ``HOME_ASSISTANT``
+#: unless the integration says otherwise.
+_SOURCE_BY_INTEGRATION: dict[str, SourceKind] = {
+    "matter": SourceKind.MATTER,
+    "homeassistant": SourceKind.HOME_ASSISTANT,
+}
+
+
+def source_for(attributes: dict[str, Any] | None, *, adapter_kind: str = "") -> SourceKind:
+    """Best-effort provenance of a device. Never used to change permissions."""
+    attrs = attributes or {}
+    declared = str(attrs.get("integration") or attrs.get("source") or "").strip().lower()
+    if declared in _SOURCE_BY_INTEGRATION:
+        return _SOURCE_BY_INTEGRATION[declared]
+    if adapter_kind == "mqtt":
+        return SourceKind.MQTT
+    if declared:
+        # A named integration we do not model yet (Xiaomi Home, Huawei
+        # HarmonyOS, …). Shown verbatim as the vendor's own cloud path.
+        return SourceKind.HOME_ASSISTANT
+    return SourceKind.HOME_ASSISTANT if adapter_kind else SourceKind.UNKNOWN
+
+
 @dataclass(frozen=True)
 class DeviceDescriptor:
     """Identity and static facts about one physical device."""
@@ -174,6 +220,9 @@ class DeviceDescriptor:
     online: bool = True
     room: str | None = None
     entity_ids: tuple[str, ...] = ()
+    #: Provenance, for display. Has no effect on risk or writability.
+    source: SourceKind = SourceKind.HOME_ASSISTANT
+    source_detail: str | None = None
 
     @property
     def risk(self) -> str:
@@ -198,6 +247,8 @@ class DeviceDescriptor:
             "online": self.online,
             "room": self.room,
             "entity_ids": list(self.entity_ids),
+            "source": self.source.value,
+            "source_detail": self.source_detail,
             "risk": self.risk,
             "read_only": self.is_read_only,
         }
@@ -258,15 +309,17 @@ def _properties_for(entity: SmartEntity, *, writable: bool) -> dict[str, Propert
             maximum=_as_float(attributes.get("brightness_range_max"), 255),
             last_changed_at=changed,
         )
-    if "color_temp" in attributes:
+    if "color_temp" in attributes or "color_temp_kelvin" in attributes:
         properties["color_temperature"] = PropertyDescriptor(
             name="color_temperature",
             type="number",
-            value=_as_float_or_none(attributes.get("color_temp")),
+            value=_as_float_or_none(
+                attributes.get("color_temp_kelvin", attributes.get("color_temp"))
+            ),
             unit="K",
             writable=writable,
-            minimum=_as_float_or_none(attributes.get("min_color_temp")),
-            maximum=_as_float_or_none(attributes.get("max_color_temp")),
+            minimum=_as_float_or_none(attributes.get("min_color_temp_kelvin")),
+            maximum=_as_float_or_none(attributes.get("max_color_temp_kelvin")),
             last_changed_at=changed,
         )
     for key, unit in (
@@ -315,11 +368,16 @@ def _as_float_or_none(value: Any) -> float | None:
 
 
 def describe_entity(
-    entity: SmartEntity, *, provider_id: str, online: bool = True
+    entity: SmartEntity,
+    *,
+    provider_id: str,
+    online: bool = True,
+    adapter_kind: str = "",
 ) -> DeviceDescriptor:
     """Build a descriptor from one adapter entity."""
     attributes = entity.attributes or {}
     capabilities = capabilities_for_domain(entity.domain, attributes)
+    integration = str(attributes.get("integration") or "").strip()
     return DeviceDescriptor(
         device_id=device_key_for(provider_id, entity),
         name=entity.name,
@@ -333,6 +391,8 @@ def describe_entity(
         online=online,
         room=_clean(attributes.get("area") or attributes.get("friendly_name_area")),
         entity_ids=(entity.external_id,),
+        source=source_for(attributes, adapter_kind=adapter_kind),
+        source_detail=integration or None,
     )
 
 
