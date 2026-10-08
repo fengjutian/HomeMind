@@ -13,6 +13,7 @@
 import { lazy, Suspense, useEffect, useRef } from "react";
 import { Spin } from "antd";
 import type { OnMount } from "@monaco-editor/react";
+import { useTheme } from "../../../../context/ThemeContext";
 import { getEditorLanguage } from "../utils/editorLanguage";
 import styles from "../index.module.less";
 
@@ -35,6 +36,7 @@ export default function CodeEditor({
   language,
 }: CodeEditorProps) {
   const resolvedLanguage = language ?? getEditorLanguage(path);
+  const { isDark } = useTheme();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<{
     updateOptions: (opts: { automaticLayout?: boolean }) => void;
