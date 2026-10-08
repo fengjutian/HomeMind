@@ -139,6 +139,13 @@ class BridgeManager:
         self._advertise_base_url = advertise_base_url.rstrip("/")
         self._token_signer = token_signer
         self._sessions: dict[str, BridgeSession] = {}
+        #: Per-connection handshake outcome, for diagnostics and capability
+        #: gating. Absent for a peer that predates negotiation.
+        self._negotiated: dict[str, Hello] = {}
+        #: Stable id for *this* instance. Two instances dialing the same
+        #: connection resolve the conflict by comparing these, never by
+        #: arrival order.
+        self._instance_id = new_ulid()
         self._client_tasks: dict[str, asyncio.Task[None]] = {}
         self._turn_waiters: dict[str, asyncio.Queue[dict[str, Any]]] = {}
         self._browser_waiters: dict[str, asyncio.Queue[dict[str, Any]]] = {}
@@ -756,15 +763,15 @@ class BridgeManager:
             async with websockets.connect(url, open_timeout=20, max_size=32 * 1024 * 1024) as ws:
                 owner = self._repo.get(connection_id)
                 local_user = self._users.get(owner.owner_user_id) if owner is not None else None
-                hello = {
-                    "type": "hello",
-                    "protocol_version": PROTOCOL_VERSION,
-                    "connection_id": connection_id,
-                    "role": "initiator",
-                    "advertise_base_url": self._advertise_base_url or "http://127.0.0.1",
-                    "advertise_username": (local_user.username if local_user is not None else ""),
-                    "display_name": owner.display_name if owner else None,
-                }
+                hello = build_hello(
+                    connection_id=connection_id,
+                    role="initiator",
+                    base_url=self._advertise_base_url or "http://127.0.0.1",
+                    username=(local_user.username if local_user is not None else ""),
+                    display_name=owner.display_name if owner else "",
+                    instance_id=self._instance_id,
+                    octop_version=_local_version(),
+                )
                 await ws.send(json.dumps(hello, ensure_ascii=False))
 
                 # Wait for hello_ack before advertising the session as connected.
@@ -783,12 +790,14 @@ class BridgeManager:
                         continue
                     if str(ack.get("type") or "") != "hello_ack":
                         continue
-                    peer_version = int(ack.get("protocol_version") or 0)
-                    if peer_version != PROTOCOL_VERSION:
+                    try:
+                        negotiated = negotiate(ack)
+                    except ProtocolIncompatible as exc:
                         raise OctopError(
                             ErrorCode.BRIDGE_PEER_UNREACHABLE,
-                            f"bridge protocol mismatch: peer={peer_version} local={PROTOCOL_VERSION}",
-                        )
+                            f"bridge protocol incompatible: {exc}",
+                        ) from exc
+                    self._negotiated[connection_id] = negotiated
                     break
 
                 session = BridgeSession(
@@ -839,14 +848,18 @@ class BridgeManager:
         if not isinstance(payload, dict) or str(payload.get("type") or "") != "hello":
             await websocket.close(code=4000, reason="hello required")
             return
-        peer_version = int(payload.get("protocol_version") or 0)
-        if peer_version != PROTOCOL_VERSION:
-            await websocket.close(code=4002, reason="protocol mismatch")
-            return
         connection_id = str(payload.get("connection_id") or "").strip()
         if not connection_id:
             await websocket.close(code=4000, reason="connection_id required")
             return
+        try:
+            negotiated = negotiate(payload)
+        except ProtocolIncompatible as exc:
+            # A major mismatch is a real incompatibility, not a transient
+            # failure — say so instead of a bare "protocol mismatch".
+            await websocket.close(code=4002, reason=str(exc)[:120])
+            return
+        self._negotiated[connection_id] = negotiated
         advertise_base = str(payload.get("advertise_base_url") or "").strip() or "http://127.0.0.1"
         advertise_user = str(payload.get("advertise_username") or "").strip() or "peer"
         preferred_name = str(payload.get("display_name") or "").strip()
@@ -891,7 +904,15 @@ class BridgeManager:
         await session.send_json(
             {
                 "type": "hello_ack",
-                "protocol_version": PROTOCOL_VERSION,
+                # Reply with the same negotiation fields the peer sent us, so
+                # both ends learn the other's capabilities in one round trip.
+                "protocol_version": LOCAL_VERSION_STRING,
+                "protocol_major": PROTOCOL_MAJOR,
+                "protocol_minor": PROTOCOL_MINOR,
+                "capabilities": sorted(c.value for c in LOCAL_CAPABILITIES),
+                "max_frame_bytes": MAX_FRAME_BYTES,
+                "instance_id": self._instance_id,
+                "octop_version": _local_version(),
                 "connection_id": connection_id,
                 "peer_username": user.username,
             }

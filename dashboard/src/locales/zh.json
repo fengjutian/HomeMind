@@ -6821,5 +6821,29 @@
     "startedAt": "开始",
     "completedAt": "完成",
     "transaction": "关联事务"
+  },
+  "smartHome": {
+    "title": "智能家居",
+    "connectViaHomeAssistant": "通过 Home Assistant 接入",
+    "connectViaHomeAssistantHint": "请先把小米、华为等厂商设备接入 Home Assistant，再在这里连接该实例。HomeMind 不会索取你的厂商账号密码。",
+    "noDirectVendorConnection": "本版本不支持厂商直连。",
+    "learnMore": "接入指南",
+    "source": "来源",
+    "sourceHomeAssistant": "Home Assistant",
+    "sourceMatter": "Matter",
+    "sourceMqtt": "MQTT",
+    "sourceUnknown": "未知",
+    "room": "房间",
+    "model": "型号",
+    "manufacturer": "厂商",
+    "firmware": "固件",
+    "capabilities": "能力",
+    "notControllable": "本版本仅只读",
+    "unreachable": "接入方未连接",
+    "commands": "可用命令",
+    "noCommands": "该设备暂无可用命令。",
+    "deviceCount": "{{count}} 个设备",
+    "deviceCount_other": "{{count}} 个设备",
+    "requiresApproval": "需要审批"
   }
 }

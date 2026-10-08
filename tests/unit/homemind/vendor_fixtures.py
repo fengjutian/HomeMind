@@ -46,7 +46,10 @@ def _state(
     return {
         "entity_id": entity_id,
         "state": state,
-        "attributes": {"friendly_name": entity_id.split(".", 1)[1].replace("_", " ").title(), **attributes},
+        "attributes": {
+            "friendly_name": entity_id.split(".", 1)[1].replace("_", " ").title(),
+            **attributes,
+        },
         "last_changed": updated,
         "last_updated": updated,
     }

@@ -6821,5 +6821,29 @@
     "startedAt": "Started",
     "completedAt": "Finished",
     "transaction": "Transaction"
+  },
+  "smartHome": {
+    "title": "Smart home",
+    "connectViaHomeAssistant": "Connect through Home Assistant",
+    "connectViaHomeAssistantHint": "Bring your Xiaomi, Huawei and other vendor devices into Home Assistant first, then connect that instance here. HomeMind never asks for your vendor account password.",
+    "noDirectVendorConnection": "Direct vendor connections are not available in this release.",
+    "learnMore": "Setup guide",
+    "source": "Source",
+    "sourceHomeAssistant": "Home Assistant",
+    "sourceMatter": "Matter",
+    "sourceMqtt": "MQTT",
+    "sourceUnknown": "Unknown",
+    "room": "Room",
+    "model": "Model",
+    "manufacturer": "Manufacturer",
+    "firmware": "Firmware",
+    "capabilities": "Capabilities",
+    "notControllable": "Read-only in this release",
+    "unreachable": "Provider not connected",
+    "commands": "Available commands",
+    "noCommands": "No commands are available for this device.",
+    "deviceCount": "{{count}} device",
+    "deviceCount_other": "{{count}} devices",
+    "requiresApproval": "Requires approval"
   }
 }
