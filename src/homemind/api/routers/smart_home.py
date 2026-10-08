@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.manager import FamilyManager
-from homemind.infra.family.smart_home_manager import FamilySmartHomeManager
 from homemind.infra.family.smart_home_factory import build_adapter
+from homemind.infra.family.smart_home_manager import FamilySmartHomeManager
 from octop.api.deps import current_user, get_server
 from octop.infra.server import OctopServer
 from octop.infra.users.identity import User
@@ -138,7 +138,8 @@ class _SecretStoreAdapter:
         self._repo = repo
 
     def get(self, key: str) -> bytes | None:
-        return self._repo.get(key)
+        raw: bytes | None = self._repo.get(key)
+        return raw
 
 
 @router.post(

@@ -20,24 +20,22 @@ import logging
 from collections.abc import Callable
 from typing import Protocol
 
-from homemind.infra.family.smart_home import SmartHomeAdapter
-from homemind.infra.family.smart_home_adapters import (
-    HomeAssistantAdapter,
-    MqttSmartHomeAdapter,
-)
 from homemind.infra.db.repos.smart_home import (
     PROVIDER_KIND_HOME_ASSISTANT,
     PROVIDER_KIND_MQTT,
     SmartProviderRow,
+)
+from homemind.infra.family.smart_home import SmartHomeAdapter
+from homemind.infra.family.smart_home_adapters import (
+    HomeAssistantAdapter,
+    MqttSmartHomeAdapter,
 )
 
 logger = logging.getLogger(__name__)
 
 #: Provider kinds this factory knows how to build. A new kind is refused here
 #: rather than silently producing a provider that cannot sync.
-BUILDABLE_KINDS: frozenset[str] = frozenset(
-    {PROVIDER_KIND_HOME_ASSISTANT, PROVIDER_KIND_MQTT}
-)
+BUILDABLE_KINDS: frozenset[str] = frozenset({PROVIDER_KIND_HOME_ASSISTANT, PROVIDER_KIND_MQTT})
 
 
 class SecretStore(Protocol):
@@ -93,9 +91,7 @@ def build_adapter(
         # fail a provider that is perfectly usable.
         token = resolve_secret(store, provider.secret_ref)
         if not token:
-            logger.warning(
-                "home assistant provider %s has no credential reference", provider.id
-            )
+            logger.warning("home assistant provider %s has no credential reference", provider.id)
             return None
         return HomeAssistantAdapter(base_url=provider.base_url, token=token)
 

@@ -38,6 +38,7 @@ from homemind.infra.family.smart_home import (
     SmartHomeAdapter,
     risk_for,
 )
+from homemind.infra.family.smart_home_descriptors import describe_entity
 from octop.infra.users.identity import User
 
 logger = logging.getLogger(__name__)
@@ -155,12 +156,15 @@ class FamilySmartHomeManager:
             logger.warning(
                 "SmartHome: %s could not list entities: %s", provider.kind, type(exc).__name__
             )
-            self.repo.record_probe(provider.id, ok=False, error=type(exc).__name__)
+            self.repo.record_sync_result(
+                provider.id, ok=False, error=type(exc).__name__, error_code="LIST_FAILED"
+            )
             return self.repo.list_entities(family_id, provider_id=provider.id)
 
-        self.repo.record_probe(provider.id, ok=True)
+        self.repo.record_sync_result(provider.id, ok=True)
         rows: list[SmartEntityRow] = []
         for entity in entities:
+            descriptor = describe_entity(entity, provider_id=provider.id)
             rows.append(
                 self.repo.upsert_entity(
                     family_id,
@@ -170,9 +174,20 @@ class FamilySmartHomeManager:
                     name=entity.name,
                     capabilities=[command.name for command in adapter.commands_for(entity.domain)],
                     state={"state": entity.state, "attributes": entity.attributes},
+                    device_key=descriptor.device_id,
+                    capabilities_typed=[c.value for c in descriptor.capabilities],
                 )
             )
         return rows
+
+    def list_devices(self, family_id: str, provider_id: str) -> dict[str, list[SmartEntityRow]]:
+        """Entities of one provider grouped onto their physical devices.
+
+        Plan phase 5 acceptance: the several entities one lamp exposes read as
+        a single device, and a rename never forks it.
+        """
+        self._provider(family_id, provider_id)
+        return self.repo.group_entities_by_device(provider_id, family_id)
 
     def list_entities(
         self, family_id: str, user: User, *, domain: str | None = None
