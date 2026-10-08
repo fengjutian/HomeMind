@@ -28,7 +28,7 @@ CurrentUser = Annotated[User, Depends(current_user)]
         "Read-only view of the in-process counter registry. The "
         "counters cover permission decisions, transaction "
         "lifecycle, memory candidate flow, asset scan job, device "
-        "runtime, and invites."
+        "runtime, device asset transfers, and invites."
     ),
 )
 async def snapshot(user: CurrentUser) -> dict[str, int]:

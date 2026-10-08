@@ -234,6 +234,7 @@ class HomeMindServer(OctopServer):
             family_manager,
             hm.family_device_repo,
             on_command_result=resume_device_transaction(transactions, hm.family_device_repo),
+            transfer_repo=hm.asset_transfer_repo,
         )
         self._memory_maintenance = MaintenanceRunner(
             db=self.services.db,
@@ -247,6 +248,7 @@ class HomeMindServer(OctopServer):
             notification_manager=notifications,
             transaction_manager=transactions,
             device_manager=device_runtime,
+            transfer_repo=hm.asset_transfer_repo,
         )
         await self._memory_maintenance.start()
 

@@ -231,6 +231,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const {
       attachments,
       uploading,
+      uploadProgress,
+      cancelUpload,
       dragOver,
       fileInputRef,
       handleFileSelect,
@@ -742,6 +744,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           <ChatInputPreviewBar
             attachments={attachments}
             uploading={uploading}
+            uploadProgress={uploadProgress}
+            onCancelUpload={cancelUpload}
             selectedConnectors={selectedConnectors}
             selectedModel={selectedModel}
             availableConnectors={availableConnectors}

@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
 
+from homemind.infra.db.repos.asset_transfers import AssetTransferRepo
 from homemind.infra.db.repos.family_devices import (
     FamilyDeviceCommandRow,
     FamilyDeviceCredentialRow,
@@ -176,6 +177,7 @@ class DeviceRuntimeManager:
         command_lease_seconds: int = DEFAULT_COMMAND_LEASE_SECONDS,
         heartbeat_timeout_seconds: int = DEFAULT_HEARTBEAT_TIMEOUT_SECONDS,
         on_command_result: Callable[[str, str, dict[str, Any]], None] | None = None,
+        transfer_repo: AssetTransferRepo | None = None,
     ) -> None:
         self.family = family
         self.repo = repo
@@ -187,6 +189,17 @@ class DeviceRuntimeManager:
         # ``AWAITING_DEVICE``. Optional so the runtime keeps working with
         # no transaction layer at all.
         self.on_command_result = on_command_result
+        # Optional. A revoked or removed device must not leave live
+        # download credentials behind, so revocation and deletion cancel
+        # its asset transfers as part of the same operation.
+        self.transfer_repo = transfer_repo
+
+    def _cancel_transfers_for_device(self, device_id: str) -> None:
+        if self.transfer_repo is None:
+            return
+        cancelled = self.transfer_repo.cancel_for_device(device_id, int(time.time()))
+        if cancelled:
+            _hm_inc("asset_transfer_cancelled_total", len(cancelled))
 
     # ---------------------------------------------------------------- pairing
 
@@ -295,6 +308,7 @@ class DeviceRuntimeManager:
         self.family.require_manager(family_id, user)
         device = self._assert_device(family_id, device_id)
         count = self.repo.revoke_all_credentials_for_device(device.id)
+        self._cancel_transfers_for_device(device.id)
         _hm_inc("device_revoke_token_total")
         return count
 
@@ -470,6 +484,10 @@ class DeviceRuntimeManager:
     def delete_device(self, family_id: str, device_id: str, user: User) -> bool:
         self.family.require_manager(family_id, user)
         self._assert_device(family_id, device_id)
+        # Cancel first: the foreign key cascades the transfer rows away
+        # with the device, and the cancellation is what the family needs
+        # to know a download stopped for this reason.
+        self._cancel_transfers_for_device(device_id)
         return self.repo.delete(device_id)
 
     # ------------------------------------------------------------ commands

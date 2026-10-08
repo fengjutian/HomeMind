@@ -5,6 +5,7 @@ import { uploadFile } from "../../../api/modules/upload";
 import {
   RESUMABLE_THRESHOLD_BYTES,
   ResumableUpload,
+  type UploadProgress,
 } from "../../../api/resumableUploader";
 import { agentAttachmentAccessUrl } from "../../../utils/toolMediaBlocks";
 import type { ChatAttachment } from "./useChat";
@@ -14,29 +15,50 @@ import { apiErrorMessage } from "../../../utils/apiError";
 import { inferAttachmentKind } from "../utils/chatAttachments";
 import { useServerUploadLimit } from "../../../hooks/useServerUploadLimit";
 
+interface ChatUploadResult {
+  path: string;
+  workspace_path: string;
+  filename: string;
+  media_type: string;
+  url: string;
+  access_url: string;
+}
+
+/** Resumable path for files above the threshold; small files keep XHR. */
+async function uploadViaSession(
+  file: File,
+  agentId: string,
+  onProgress: (p: UploadProgress) => void,
+  register: (upload: ResumableUpload) => void,
+): Promise<ChatUploadResult> {
+  const upload = new ResumableUpload(file, {
+    purpose: "CHAT_ATTACHMENT",
+    agentId,
+  });
+  upload.onProgress(onProgress);
+  register(upload);
+  const completed = await upload.start();
+  return {
+    path: completed.path,
+    workspace_path: completed.workspace_path,
+    filename: completed.filename,
+    media_type: completed.media_type,
+    url: completed.url,
+    access_url: completed.access_url,
+  };
+}
+
 export function useChatAttachments(agentId: string | null | undefined) {
   const { t } = useTranslation();
   const { maxUploadBytes, maxUploadMb } = useServerUploadLimit();
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(
+    null,
+  );
+  const activeUploadRef = useRef<ResumableUpload | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const uploadViaSession = async (file: File) => {
-    const upload = new ResumableUpload(file, {
-      purpose: "CHAT_ATTACHMENT",
-      agentId,
-    });
-    const completed = await upload.start();
-    return {
-      path: completed.path,
-      workspace_path: completed.workspace_path,
-      filename: completed.filename,
-      media_type: completed.media_type,
-      url: completed.url,
-      access_url: completed.access_url,
-    };
-  };
 
   const processFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -69,7 +91,19 @@ export function useChatAttachments(agentId: string | null | undefined) {
             // dropped connection does not restart the whole upload.
             const res =
               file.size > RESUMABLE_THRESHOLD_BYTES
-                ? await uploadViaSession(file)
+                ? await uploadViaSession(
+                    file,
+                    agentId,
+                    (p) =>
+                      setUploadProgress(
+                        p.status === "done" || p.status === "cancelled"
+                          ? null
+                          : p,
+                      ),
+                    (u) => {
+                      activeUploadRef.current = u;
+                    },
+                  )
                 : await uploadFile(agentId, file);
             const workspacePath = res.path || res.workspace_path;
             const previewUrl =
@@ -98,6 +132,8 @@ export function useChatAttachments(agentId: string | null | undefined) {
         );
       } finally {
         setUploading(false);
+        activeUploadRef.current = null;
+        setUploadProgress(null);
       }
     },
     [agentId, maxUploadBytes, maxUploadMb, t],
@@ -178,9 +214,15 @@ export function useChatAttachments(agentId: string | null | undefined) {
     [processFiles],
   );
 
+  const cancelUpload = useCallback(() => {
+    void activeUploadRef.current?.cancel();
+  }, []);
+
   return {
     attachments,
     uploading,
+    uploadProgress,
+    cancelUpload,
     dragOver,
     fileInputRef,
     processFiles,

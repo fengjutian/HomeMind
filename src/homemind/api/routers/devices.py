@@ -125,7 +125,9 @@ class FamilyDeviceCommandCreateBody(BaseModel):
     capability: str = Field(min_length=1, max_length=100)
     payload: dict[str, Any] = Field(default_factory=dict)
     expires_in_seconds: int = Field(
-        default=300, ge=1, le=86400,
+        default=300,
+        ge=1,
+        le=86400,
         description="Seconds from now until the command expires.",
     )
     transaction_id: str | None = Field(default=None, max_length=100)
@@ -136,7 +138,9 @@ def _manager(server: OctopServer) -> DeviceRuntimeManager:
     run_migrations(server.services.db)
     services = HomeMindServices.from_pool(server.services.db)
     return DeviceRuntimeManager(
-        FamilyManager(services.family_repo), services.family_device_repo,
+        FamilyManager(services.family_repo),
+        services.family_device_repo,
+        transfer_repo=services.asset_transfer_repo,
     )
 
 
@@ -181,7 +185,9 @@ def _command_response(row: FamilyDeviceCommandRow) -> FamilyDeviceCommandRespons
     response_model=list[FamilyDeviceResponse],
     summary="List family devices",
 )
-async def list_devices(family_id: str, server: Server, user: CurrentUser) -> list[FamilyDeviceResponse]:
+async def list_devices(
+    family_id: str, server: Server, user: CurrentUser
+) -> list[FamilyDeviceResponse]:
     rows = _manager(server).list_devices(family_id, user)
     return [_device_response(row) for row in rows]
 
@@ -192,7 +198,10 @@ async def list_devices(family_id: str, server: Server, user: CurrentUser) -> lis
     summary="Get a family device",
 )
 async def get_device(
-    family_id: str, device_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    device_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> FamilyDeviceResponse:
     return _device_response(_manager(server).get_device(family_id, device_id, user))
 
@@ -244,7 +253,9 @@ async def update_device(
     user: CurrentUser,
 ) -> FamilyDeviceResponse:
     row = _manager(server).update_device(
-        family_id, device_id, user,
+        family_id,
+        device_id,
+        user,
         name=body.name,
         platform=body.platform,
         capabilities=body.capabilities,
@@ -258,7 +269,10 @@ async def update_device(
     summary="Delete a family device",
 )
 async def delete_device(
-    family_id: str, device_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    device_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> Response:
     _manager(server).delete_device(family_id, device_id, user)
     return Response(status_code=204)
@@ -275,7 +289,10 @@ async def delete_device(
     ),
 )
 async def rotate_token(
-    family_id: str, device_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    device_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> FamilyDeviceRotateResponse:
     token = _manager(server).rotate_token(family_id, device_id, user)
     return FamilyDeviceRotateResponse(token=token)
@@ -287,7 +304,10 @@ async def rotate_token(
     summary="Revoke all active credentials for a device",
 )
 async def revoke_token(
-    family_id: str, device_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    device_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> Response:
     _manager(server).revoke_token(family_id, device_id, user)
     return Response(status_code=204)
@@ -393,6 +413,9 @@ async def list_commands(
     limit: int = Query(default=50, ge=1, le=500),
 ) -> list[FamilyDeviceCommandResponse]:
     rows = _manager(server).list_recent_commands(
-        family_id, device_id, user, limit=limit,
+        family_id,
+        device_id,
+        user,
+        limit=limit,
     )
     return [_command_response(row) for row in rows]

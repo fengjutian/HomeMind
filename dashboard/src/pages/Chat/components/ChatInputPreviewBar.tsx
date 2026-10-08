@@ -10,11 +10,24 @@ import { inferKindFromNameAndMime } from "../utils/chatAttachments";
 import { ChatMediaPlayer } from "./ChatMediaPlayer";
 import ContextChip from "./ContextChip";
 import { modelShortLabel } from "../../../utils/modelOptions";
+import type { UploadProgress } from "../../../api/resumableUploader";
 import styles from "../index.module.less";
+
+/** Compact transfer rate, e.g. "1.2 MB/s". */
+function formatRate(bytesPerSecond: number): string {
+  if (bytesPerSecond < 1024) return `${bytesPerSecond} B/s`;
+  if (bytesPerSecond < 1024 * 1024) {
+    return `${(bytesPerSecond / 1024).toFixed(0)} KB/s`;
+  }
+  return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
+}
 
 interface ChatInputPreviewBarProps {
   attachments: ChatAttachment[];
   uploading: boolean;
+  /** Live progress for a resumable upload; absent for the small-file path. */
+  uploadProgress?: UploadProgress | null;
+  onCancelUpload?: () => void;
   selectedConnectors: string[];
   selectedKnowledgeBaseIds: string[];
   selectedModel?: string | null;
@@ -90,6 +103,8 @@ function ComposerImagePreview({
 export default function ChatInputPreviewBar({
   attachments,
   uploading,
+  uploadProgress,
+  onCancelUpload,
   selectedConnectors,
   selectedKnowledgeBaseIds,
   availableConnectors,
@@ -100,6 +115,7 @@ export default function ChatInputPreviewBar({
   selectedModel,
   onModelChange,
 }: ChatInputPreviewBarProps) {
+  const { t } = useTranslation();
   // Show the chip whenever a model is explicitly selected, mirroring how
   // connectors behave — not only when it differs from the
   // agent default (that was the old "override" behavior).
@@ -215,6 +231,33 @@ export default function ChatInputPreviewBar({
         <div className={styles.imagePreviewItem}>
           <div className={styles.imagePreviewLoading}>
             <div className={styles.uploadSpinner} />
+            {uploadProgress && uploadProgress.totalBytes > 0 && (
+              <div className={styles.uploadProgressWrap}>
+                <div className={styles.uploadProgressTrack}>
+                  <div
+                    className={styles.uploadProgressBar}
+                    style={{ width: `${uploadProgress.percent}%` }}
+                  />
+                </div>
+                <span className={styles.uploadProgressLabel}>
+                  {uploadProgress.percent}% ·{" "}
+                  {formatRate(uploadProgress.bytesPerSecond)}
+                  {uploadProgress.etaSeconds !== null &&
+                    ` · ${t("upload.eta", "{{seconds}}s left", {
+                      seconds: uploadProgress.etaSeconds,
+                    })}`}
+                </span>
+                {onCancelUpload && (
+                  <button
+                    className={styles.imagePreviewRemove}
+                    onClick={onCancelUpload}
+                    type="button"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

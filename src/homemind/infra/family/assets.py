@@ -14,6 +14,7 @@ from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 from zoneinfo import ZoneInfo
 
+from homemind.infra.db.repos.asset_transfers import AssetTransferRepo
 from homemind.infra.db.repos.families import FamilyRepo
 from homemind.infra.db.repos.family_assets import (
     FamilyAssetRepo,
@@ -103,9 +104,7 @@ def _photo_metadata(path: Path, timezone: ZoneInfo) -> PhotoMetadata:
             exif = image.getexif()
             make = exif.get(ExifTags.Base.Make)
             model = exif.get(ExifTags.Base.Model)
-            date_text = exif.get(ExifTags.Base.DateTimeOriginal) or exif.get(
-                ExifTags.Base.DateTime
-            )
+            date_text = exif.get(ExifTags.Base.DateTimeOriginal) or exif.get(ExifTags.Base.DateTime)
             taken_at = None
             if isinstance(date_text, str):
                 try:
@@ -143,6 +142,7 @@ class FamilyAssetManager:
         *,
         permission_evaluator: FamilyPermissionEvaluator | None = None,
         search_indexer: Any | None = None,
+        transfer_repo: AssetTransferRepo | None = None,
     ) -> None:
         self.family = FamilyManager(family_repo)
         self.repo = asset_repo
@@ -150,6 +150,9 @@ class FamilyAssetManager:
         # Optional unified search index; absent in tests and in a plain
         # Octop deployment.
         self.search_indexer = search_indexer
+        # Optional device-transfer repo. Present so deleting an index entry
+        # cancels the downloads it is serving instead of orphaning them.
+        self.transfer_repo = transfer_repo
 
     def scan_directory(
         self,
@@ -348,7 +351,9 @@ class FamilyAssetManager:
 
             logging.getLogger(__name__).warning(
                 "search index update failed for asset %s/%s: %s",
-                family_id, asset.id, exc,
+                family_id,
+                asset.id,
+                exc,
             )
 
     def refresh_metadata_for_job(self, asset_id: str, path: str) -> None:
@@ -382,7 +387,8 @@ class FamilyAssetManager:
         parsed = urlparse(source.directory_uri)
         if parsed.scheme != "file":
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "asset source is not a local directory",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "asset source is not a local directory",
             )
         return Path(url2pathname(unquote(parsed.path)))
 
@@ -438,12 +444,12 @@ class FamilyAssetManager:
         self.family.require_manager(family_id, user)
         return self.repo.list_sources(family_id)
 
-    def scan_source(
-        self, family_id: str, source_id: str, user: User
-    ) -> AssetScanResult:
+    def scan_source(self, family_id: str, source_id: str, user: User) -> AssetScanResult:
         self.family.require_manager(family_id, user)
         return self.scan_source_internal(
-            family_id, source_id, created_by_user_id=user.id,
+            family_id,
+            source_id,
+            created_by_user_id=user.id,
         )
 
     def search(
@@ -479,9 +485,7 @@ class FamilyAssetManager:
             raise OctopError(ErrorCode.FORBIDDEN, "family asset access denied")
         return asset
 
-    def photo_metadata(
-        self, family_id: str, asset_id: str, user: User
-    ) -> PhotoMetadataRow | None:
+    def photo_metadata(self, family_id: str, asset_id: str, user: User) -> PhotoMetadataRow | None:
         self.get(family_id, asset_id, user)
         return self.repo.get_photo_metadata(asset_id)
 
@@ -501,9 +505,7 @@ class FamilyAssetManager:
             raise OctopError(ErrorCode.NOT_FOUND, "family asset content not found")
         return path
 
-    def duplicate_groups(
-        self, family_id: str, user: User
-    ) -> list[list[FamilyAssetRow]]:
+    def duplicate_groups(self, family_id: str, user: User) -> list[list[FamilyAssetRow]]:
         self.family.require_access(family_id, user)
         groups: list[list[FamilyAssetRow]] = []
         for group in self.repo.duplicate_groups(family_id):
@@ -512,10 +514,21 @@ class FamilyAssetManager:
                 groups.append(visible)
         return groups
 
-    def delete_index(self, family_id: str, asset_id: str, user: User) -> None:
+    def delete_index(self, family_id: str, asset_id: str, user: User) -> list[Any]:
+        """Remove an asset from the index. Returns the transfers cancelled.
+
+        A transfer row is the audit record of what a device was pulling,
+        so deleting an index entry cancels its live downloads rather than
+        orphaning them, and the caller learns which ones so it can tell
+        the family.
+        """
         self.family.require_manager(family_id, user)
         self.get(family_id, asset_id, user)
+        cancelled: list[Any] = []
+        if self.transfer_repo is not None:
+            cancelled = self.transfer_repo.cancel_for_asset(asset_id, now_ts())
         self.repo.delete(asset_id)
+        return cancelled
 
     def _can_read(self, asset: FamilyAssetRow, user: User) -> bool:
         action = f"{asset.asset_type.lower()}.read"

@@ -54,6 +54,14 @@ EVENT_INVITE_REDEEMED = "family.invite.redeemed"
 EVENT_MEMORY_CANDIDATE_CREATED = "family.memory_candidate.created"
 EVENT_REMINDER_DUE = "family.reminder.due"
 
+# Device asset transfers. Deliberately coarse: one event per task
+# transition, never one per Range request, because a 5 GiB download is
+# hundreds of requests and an audit trail of those is unreadable noise.
+EVENT_TRANSFER_CREATED = "family.asset_transfer.created"
+EVENT_TRANSFER_COMPLETED = "family.asset_transfer.completed"
+EVENT_TRANSFER_FAILED = "family.asset_transfer.failed"
+EVENT_TRANSFER_CANCELLED = "family.asset_transfer.cancelled"
+
 EVENT_TYPES: frozenset[str] = frozenset(
     {
         EVENT_APPROVAL_CREATED,
@@ -68,11 +76,25 @@ EVENT_TYPES: frozenset[str] = frozenset(
         EVENT_INVITE_REDEEMED,
         EVENT_MEMORY_CANDIDATE_CREATED,
         EVENT_REMINDER_DUE,
+        EVENT_TRANSFER_CREATED,
+        EVENT_TRANSFER_COMPLETED,
+        EVENT_TRANSFER_FAILED,
+        EVENT_TRANSFER_CANCELLED,
     }
 )
 
-# Only a family manager gets the full audit view of a transaction.
-_MANAGER_ONLY_EVENTS: frozenset[str] = frozenset({EVENT_APPROVAL_CREATED, EVENT_APPROVAL_DECIDED})
+# Only a family manager gets the full audit view of a transaction, or of
+# who pulled which household file to which device.
+_MANAGER_ONLY_EVENTS: frozenset[str] = frozenset(
+    {
+        EVENT_APPROVAL_CREATED,
+        EVENT_APPROVAL_DECIDED,
+        EVENT_TRANSFER_CREATED,
+        EVENT_TRANSFER_COMPLETED,
+        EVENT_TRANSFER_FAILED,
+        EVENT_TRANSFER_CANCELLED,
+    }
+)
 
 
 @dataclass(frozen=True)

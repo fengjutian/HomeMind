@@ -116,6 +116,7 @@ def _manager(server: OctopServer) -> DeviceRuntimeManager:
     return DeviceRuntimeManager(
         FamilyManager(services.family_repo),
         services.family_device_repo,
+        transfer_repo=services.asset_transfer_repo,
     )
 
 

@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.assets import FamilyAssetManager
+from homemind.infra.family.events import EVENT_TRANSFER_CANCELLED, emit_family_event
 from homemind.infra.family.invites import (
     DEFAULT_INVITE_TTL_SECONDS,
     FamilyInviteManager,
@@ -242,7 +243,11 @@ def _asset_manager(server: OctopServer) -> FamilyAssetManager:
     assert server.services is not None
     run_migrations(server.services.db)
     services = HomeMindServices.from_pool(server.services.db)
-    return FamilyAssetManager(services.family_repo, services.family_asset_repo)
+    return FamilyAssetManager(
+        services.family_repo,
+        services.family_asset_repo,
+        transfer_repo=services.asset_transfer_repo,
+    )
 
 
 def _invite_manager(server: OctopServer) -> FamilyInviteManager:
@@ -298,9 +303,7 @@ async def get_family(family_id: str, server: Server, user: CurrentUser) -> objec
 async def update_family(
     family_id: str, body: FamilyUpdateBody, server: Server, user: CurrentUser
 ) -> object:
-    return _manager(server).update_family(
-        family_id, user, body.model_dump(exclude_unset=True)
-    )
+    return _manager(server).update_family(family_id, user, body.model_dump(exclude_unset=True))
 
 
 @router.delete("/{family_id}", status_code=204, summary="Delete a family")
@@ -380,10 +383,15 @@ async def create_relationship(
     ),
 )
 async def transfer_ownership(
-    family_id: str, body: FamilyTransferOwnershipBody, server: Server, user: CurrentUser,
+    family_id: str,
+    body: FamilyTransferOwnershipBody,
+    server: Server,
+    user: CurrentUser,
 ) -> object:
     return _manager(server).transfer_ownership(
-        family_id, user, to_member_id=body.to_member_id,
+        family_id,
+        user,
+        to_member_id=body.to_member_id,
     )
 
 
@@ -397,7 +405,9 @@ async def transfer_ownership(
     ),
 )
 async def leave_family(
-    family_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> Response:
     _manager(server).leave_family(family_id, user)
     return Response(status_code=204)
@@ -420,7 +430,10 @@ async def bind_member_user(
     user: CurrentUser,
 ) -> object:
     return _manager(server).bind_user(
-        family_id, member_id, user, target_user_id=body.user_id,
+        family_id,
+        member_id,
+        user,
+        target_user_id=body.user_id,
     )
 
 
@@ -430,7 +443,10 @@ async def bind_member_user(
     summary="Unbind a member from its platform account",
 )
 async def unbind_member_user(
-    family_id: str, member_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    member_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> object:
     return _manager(server).unbind_user(family_id, member_id, user)
 
@@ -496,9 +512,7 @@ async def update_space(
     )
 
 
-@router.delete(
-    "/{family_id}/spaces/{space_id}", status_code=204, summary="Delete a family space"
-)
+@router.delete("/{family_id}/spaces/{space_id}", status_code=204, summary="Delete a family space")
 async def delete_space(
     family_id: str, space_id: str, server: Server, user: CurrentUser
 ) -> Response:
@@ -609,9 +623,7 @@ async def search_assets(
     response_model=list[FamilyAssetSourceResponse],
     summary="List configured family asset sources",
 )
-async def list_asset_sources(
-    family_id: str, server: Server, user: CurrentUser
-) -> object:
+async def list_asset_sources(family_id: str, server: Server, user: CurrentUser) -> object:
     return _asset_manager(server).list_sources(family_id, user)
 
 
@@ -691,14 +703,36 @@ async def get_photo_metadata(
 async def delete_asset_index(
     family_id: str, asset_id: str, server: Server, user: CurrentUser
 ) -> Response:
-    _asset_manager(server).delete_index(family_id, asset_id, user)
+    manager = _asset_manager(server)
+    # Deleting the index entry cancels any download it was serving; the
+    # cancellation is what the family needs an audit trail for.
+    cancelled = manager.delete_index(family_id, asset_id, user)
+    bus = getattr(server, "family_event_bus", None)
+    for transfer in cancelled:
+        await emit_family_event(
+            bus,
+            EVENT_TRANSFER_CANCELLED,
+            family_id,
+            {
+                "transfer_id": transfer.id,
+                "device_id": transfer.device_id,
+                "asset_id": asset_id,
+                "reason": "ASSET_DELETED",
+            },
+        )
     return Response(status_code=204)
 
 
 class PermissionEvaluateBody(BaseModel):
-    action: str = Field(min_length=1, max_length=200, description="Permission action (e.g. filesystem.read).")
-    space_id: str | None = Field(default=None, description="Target space id; null for unscoped actions.")
-    asset_id: str | None = Field(default=None, description="Optional asset id used to resolve private-space ownership.")
+    action: str = Field(
+        min_length=1, max_length=200, description="Permission action (e.g. filesystem.read)."
+    )
+    space_id: str | None = Field(
+        default=None, description="Target space id; null for unscoped actions."
+    )
+    asset_id: str | None = Field(
+        default=None, description="Optional asset id used to resolve private-space ownership."
+    )
 
 
 class PermissionDecisionResponse(BaseModel):
@@ -743,6 +777,7 @@ def evaluate_permission(
     )
     # Record decision for stage 12 observability.
     from homemind.infra.metrics import inc as _hm_inc
+
     if decision.effect.value == "ALLOW":
         _hm_inc("permission_allow_total")
     elif decision.effect.value == "DENY":
@@ -778,7 +813,9 @@ class FamilyInviteCreateBody(BaseModel):
     display_name: str = Field(min_length=1, max_length=100)
     role: MemberRole = MemberRole.MEMBER
     ttl_seconds: int = Field(
-        default=DEFAULT_INVITE_TTL_SECONDS, ge=60, le=30 * 24 * 3600,
+        default=DEFAULT_INVITE_TTL_SECONDS,
+        ge=60,
+        le=30 * 24 * 3600,
     )
 
 
@@ -842,7 +879,9 @@ async def list_invites(
     include_redeemed: bool = Query(default=False),
 ) -> list[FamilyInviteResponse]:
     rows = _invite_manager(server).list_invites(
-        family_id, user, include_redeemed=include_redeemed,
+        family_id,
+        user,
+        include_redeemed=include_redeemed,
     )
     return [
         FamilyInviteResponse(

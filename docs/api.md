@@ -143,7 +143,28 @@ family `OWNER` or `ADMIN` role; a server administrator may also manage any famil
 | `GET` | `/homemind/families/{id}/assets/duplicates` | member | Exact duplicate groups based on SHA-256 |
 | `GET` | `/homemind/families/{id}/assets/{asset_id}` | member | Indexed file metadata and source URI |
 | `GET` | `/homemind/families/{id}/assets/{asset_id}/photo-metadata` | member | Dimensions, EXIF camera/time, and GPS when available |
-| `DELETE` | `/homemind/families/{id}/assets/{asset_id}` | manager | Remove metadata from the index; never deletes the source file |
+| `DELETE` | `/homemind/families/{id}/assets/{asset_id}` | manager | Remove metadata from the index; never deletes the source file; cancels live device downloads of that asset |
+
+### Device asset transfers
+
+Asynchronous large-file distribution for paired devices. Two planes, two credentials: the **control plane**
+takes the long-lived device bearer token, the **data plane** takes a short-lived `Transfer` credential and
+serves bytes. A dashboard JWT is valid on neither; a device credential is never accepted on the data plane.
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| `POST` | `/homemind/runtime/transfers` | device | Authorize one download; body `{asset_id, request_key}`. `201` on creation, `200` when `request_key` replays an existing transfer. Returns the manifest plus a download credential shown once |
+| `GET` | `/homemind/runtime/transfers/{id}` | device | Status and manifest for a transfer owned by this device; never returns a usable credential |
+| `POST` | `/homemind/runtime/transfers/{id}/refresh` | device | Revoke the current download credential and mint a new one; `412` when the file changed after creation |
+| `POST` | `/homemind/runtime/transfers/{id}/progress` | device | Body `{bytes_downloaded}`; monotonic, never an error to report a smaller value |
+| `POST` | `/homemind/runtime/transfers/{id}/complete` | device | Body `{size_bytes, sha256}`; checked against the manifest, then all download credentials are revoked. Idempotent |
+| `POST` | `/homemind/runtime/transfers/{id}/fail` | device | Body `{code, detail}`; detail is stripped of URL queries, absolute paths and secrets |
+| `HEAD` | `/homemind/runtime/transfers/{id}/content` | transfer | `Content-Length`, `ETag`, `Accept-Ranges: bytes`, `Cache-Control: private, no-store` |
+| `GET` | `/homemind/runtime/transfers/{id}/content` | transfer | Whole file (`200`) or one range (`206`). Multi-range, malformed and unsatisfiable ranges return `416` with `Content-Range: bytes */<size>`; an `If-Match` that is not the manifest ETag returns `412` |
+
+Task states are `PENDING` → `ACTIVE` → `COMPLETED` / `FAILED`, with `CANCELLED` (device revoked, asset deleted,
+manual cancel) and `EXPIRED` (idle past the TTL) as the other terminal states. Terminal states are final: a late
+report never reopens them.
 
 ## Agents
 

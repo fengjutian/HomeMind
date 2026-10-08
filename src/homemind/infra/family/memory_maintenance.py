@@ -22,6 +22,7 @@ import contextlib
 import logging
 from typing import Any
 
+from homemind.infra.db.repos.asset_transfers import AssetTransferRepo
 from homemind.infra.db.repos.family_context import FamilyContextRepo
 from homemind.infra.db.repos.family_devices import FamilyDeviceRepo
 from homemind.infra.db.repos.memory_candidates import (
@@ -39,6 +40,7 @@ from homemind.infra.family.notifications import NotificationManager
 from homemind.infra.family.transactions import FamilyTransactionManager
 from homemind.infra.metrics import inc as _hm_inc
 from octop.infra.db.pool import DatabasePool
+from octop.infra.db.repos._base import now_ts
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +63,7 @@ class MaintenanceRunner:
         device_manager: DeviceRuntimeManager | None = None,
         notification_manager: NotificationManager | None = None,
         transaction_manager: FamilyTransactionManager | None = None,
+        transfer_repo: AssetTransferRepo | None = None,
         interval_seconds: float = 24 * 60 * 60,
     ) -> None:
         self._db = db
@@ -70,7 +73,8 @@ class MaintenanceRunner:
         self._evidence_repo = evidence_repo
         self._family_manager = family_manager or FamilyManager(family_repo)
         self._context_manager = context_manager or FamilyContextManager(
-            self._family_manager, context_repo,
+            self._family_manager,
+            context_repo,
         )
         self._lifecycle = lifecycle or MemoryLifecycleManager(
             self._family_manager,
@@ -88,6 +92,9 @@ class MaintenanceRunner:
             )
         )
         self._transaction_manager = transaction_manager
+        # Optional: a transfer whose device went quiet must not keep its
+        # download credential alive forever.
+        self._transfer_repo = transfer_repo
         # Optional so a deployment without the notification tables still
         # sweeps memories and devices.
         self._notifications = notification_manager
@@ -134,11 +141,10 @@ class MaintenanceRunner:
             "families": 0,
             "devices_offline": 0,
             "approvals_expired": 0,
+            "asset_transfers_expired": 0,
         }
         with self._db.connect() as conn:
-            rows = conn.execute(
-                "SELECT family_id FROM homemind_families"
-            ).fetchall()
+            rows = conn.execute("SELECT family_id FROM homemind_families").fetchall()
         family_ids = [str(row["family_id"]) for row in rows]
         for family_id in family_ids:
             try:
@@ -188,11 +194,17 @@ class MaintenanceRunner:
             # approval is cancelled so the dashboard stops showing a
             # pending badge nobody can act on.
             try:
-                totals["approvals_expired"] = (
-                    self._transaction_manager.expire_pending_approvals()
-                )
+                totals["approvals_expired"] = self._transaction_manager.expire_pending_approvals()
             except Exception:
                 logger.exception("MaintenanceRunner: approval expiry sweep crashed")
+        if self._transfer_repo is not None:
+            # A download whose device stopped reporting is neither a
+            # success nor a failure. Expiring it is what stops its
+            # short-lived credential from outliving the job.
+            try:
+                totals["asset_transfers_expired"] = len(self._transfer_repo.expire_before(now_ts()))
+            except Exception:
+                logger.exception("MaintenanceRunner: asset transfer expiry sweep crashed")
         return totals
 
     def _sweep_family(self, family_id: str, totals: dict[str, int]) -> None:

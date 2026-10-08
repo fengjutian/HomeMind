@@ -40,7 +40,8 @@ class _Rig:
 
     async def family(self, name: str = "Transfer Family") -> str:
         response = await self.client.post(
-            "/api/homemind/families", headers=self.auth,
+            "/api/homemind/families",
+            headers=self.auth,
             json={"name": name, "timezone": "Asia/Shanghai", "locale": "zh"},
         )
         assert response.status_code == 201, response.text
@@ -48,9 +49,12 @@ class _Rig:
 
     async def pair(self, family_id: str, name: str = "living-tv") -> tuple[str, str]:
         created = await self.client.post(
-            f"/api/homemind/families/{family_id}/devices", headers=self.auth,
+            f"/api/homemind/families/{family_id}/devices",
+            headers=self.auth,
             json={
-                "name": name, "device_type": "tv", "platform": "android",
+                "name": name,
+                "device_type": "tv",
+                "platform": "android",
                 "capabilities": ["asset.download"],
             },
         )
@@ -64,12 +68,14 @@ class _Rig:
 
     async def index_asset(self, family_id: str, payload: Path) -> str:
         scanned = await self.client.post(
-            f"/api/homemind/families/{family_id}/assets/scan", headers=self.auth,
+            f"/api/homemind/families/{family_id}/assets/scan",
+            headers=self.auth,
             json={"directory": str(payload.parent), "recursive": False},
         )
         assert scanned.status_code == 200, scanned.text
         listed = await self.client.get(
-            f"/api/homemind/families/{family_id}/assets", headers=self.auth,
+            f"/api/homemind/families/{family_id}/assets",
+            headers=self.auth,
         )
         assert listed.status_code == 200, listed.text
         assets = listed.json()
@@ -78,10 +84,14 @@ class _Rig:
         return str(match[0]["id"])
 
     async def transfer(
-        self, device_token: str, asset_id: str, request_key: str = "k1",
+        self,
+        device_token: str,
+        asset_id: str,
+        request_key: str = "k1",
     ) -> tuple[int, dict]:
         response = await self.client.post(
-            TRANSFERS, headers={"Authorization": f"Bearer {device_token}"},
+            TRANSFERS,
+            headers={"Authorization": f"Bearer {device_token}"},
             json={"asset_id": asset_id, "request_key": request_key},
         )
         return response.status_code, response.json()
@@ -106,10 +116,10 @@ def payload(tmp_path: Path) -> Path:
     return media
 
 
-async def _ready(rig: _Rig, payload: Path):
-    """``(device_id, device_token, asset_id, manifest)`` for one asset."""
-    family_id = await rig.family()
-    device_id, device_token = await rig.pair(family_id)
+async def _ready(rig: _Rig, payload: Path, suffix: str = ""):
+    """``(family_id, device_id, device_token, asset_id, manifest)`` for one asset."""
+    family_id = await rig.family(f"Transfer Family{suffix}")
+    device_id, device_token = await rig.pair(family_id, f"living-tv{suffix}")
     asset_id = await rig.index_asset(family_id, payload)
     status, manifest = await rig.transfer(device_token, asset_id)
     assert status == 201, manifest
@@ -173,24 +183,37 @@ async def test_progress_is_monotonic_over_http(rig: _Rig, payload: Path) -> None
 async def test_complete_requires_the_manifest_digest(rig: _Rig, payload: Path) -> None:
     _f, _d, device_token, _a, manifest = await _ready(rig, payload)
     headers = {"Authorization": f"Bearer {device_token}"}
-    url = f"{TRANSFERS}/{manifest['transfer_id']}/complete"
 
+    # A transfer whose digest disagrees is failed, not completed.
     bad = await rig.client.post(
-        url, headers=headers, json={"size_bytes": len(BODY), "sha256": "b" * 64},
+        f"{TRANSFERS}/{manifest['transfer_id']}/complete",
+        headers=headers,
+        json={"size_bytes": len(BODY), "sha256": "b" * 64},
     )
     assert bad.status_code == 409
     assert bad.json()["error"]["code"] == "HOMEMIND_ASSET_TRANSFER_HASH_MISMATCH"
 
-    good = await rig.client.post(
-        url, headers=headers,
+    # FAILED is terminal: a corrected retry must not sneak a success in.
+    retry = await rig.client.post(
+        f"{TRANSFERS}/{manifest['transfer_id']}/complete",
+        headers=headers,
         json={"size_bytes": len(BODY), "sha256": manifest["asset"]["sha256"]},
     )
-    assert good.status_code == 200 and good.json()["status"] == "COMPLETED"
+    assert retry.status_code == 409
 
-    # Replaying the terminal outcome must not change it.
+    # A clean transfer completes, and stays completed on replay.
+    _f2, _d2, token2, _a2, good = await _ready(rig, payload, suffix="-b")
+    second = {"Authorization": f"Bearer {token2}"}
+    ok = await rig.client.post(
+        f"{TRANSFERS}/{good['transfer_id']}/complete",
+        headers=second,
+        json={"size_bytes": len(BODY), "sha256": good["asset"]["sha256"]},
+    )
+    assert ok.status_code == 200 and ok.json()["status"] == "COMPLETED"
     replay = await rig.client.post(
-        url, headers=headers,
-        json={"size_bytes": len(BODY), "sha256": manifest["asset"]["sha256"]},
+        f"{TRANSFERS}/{good['transfer_id']}/complete",
+        headers=second,
+        json={"size_bytes": len(BODY), "sha256": good["asset"]["sha256"]},
     )
     assert replay.status_code == 200 and replay.json()["status"] == "COMPLETED"
 
@@ -233,8 +256,13 @@ async def test_fail_report_is_recorded(rig: _Rig, payload: Path) -> None:
 async def test_missing_credential_is_rejected(rig: _Rig, payload: Path) -> None:
     family_id = await rig.family()
     _device_id, _token = await rig.pair(family_id)
-    response = await rig.client.get(TRANSFERS, headers={})
+    asset_id = await rig.index_asset(family_id, payload)
+    response = await rig.client.post(
+        TRANSFERS,
+        json={"asset_id": asset_id, "request_key": "k"},
+    )
     assert response.status_code == 400
+    assert response.json()["error"]["code"] == "FAMILY_INVALID"
 
 
 @pytest.mark.asyncio
@@ -262,7 +290,8 @@ async def test_cross_family_asset_is_not_found(rig: _Rig, payload: Path) -> None
     asset_id = await rig.index_asset(stranger_family, payload)
 
     response = await rig.client.post(
-        TRANSFERS, headers={"Authorization": f"Bearer {device_token}"},
+        TRANSFERS,
+        headers={"Authorization": f"Bearer {device_token}"},
         json={"asset_id": asset_id, "request_key": "k"},
     )
     assert response.status_code == 404
@@ -386,9 +415,7 @@ async def test_device_credential_cannot_read_the_data_plane(rig: _Rig, payload: 
 
     as_bearer = await rig.client.get(url, headers={"Authorization": f"Bearer {device_token}"})
     assert as_bearer.status_code == 401
-    assert (
-        as_bearer.json()["error"]["code"] == "HOMEMIND_ASSET_TRANSFER_TOKEN_INVALID"
-    )
+    assert as_bearer.json()["error"]["code"] == "HOMEMIND_ASSET_TRANSFER_TOKEN_INVALID"
 
 
 @pytest.mark.asyncio
@@ -396,7 +423,8 @@ async def test_dashboard_jwt_cannot_read_the_data_plane(rig: _Rig, payload: Path
     """A logged-in family member is not a download credential either."""
     _f, _d, _dt, _a, manifest = await _ready(rig, payload)
     response = await rig.client.get(
-        f"{TRANSFERS}/{manifest['transfer_id']}/content", headers=rig.auth,
+        f"{TRANSFERS}/{manifest['transfer_id']}/content",
+        headers=rig.auth,
     )
     assert response.status_code == 401
 
@@ -422,25 +450,39 @@ async def test_completion_revokes_every_download_credential(rig: _Rig, payload: 
         json={"size_bytes": len(BODY), "sha256": manifest["asset"]["sha256"]},
     )
     response = await rig.client.get(
-        f"{TRANSFERS}/{manifest['transfer_id']}/content", headers=_data_headers(token),
+        f"{TRANSFERS}/{manifest['transfer_id']}/content",
+        headers=_data_headers(token),
     )
-    assert response.status_code == 409, "the task is terminal, so reads stop"
+    assert response.status_code == 401, "completion must kill every download credential"
+    assert response.json()["error"]["code"] == "HOMEMIND_ASSET_TRANSFER_TOKEN_INVALID"
 
 
 @pytest.mark.asyncio
-async def test_asset_deletion_stops_an_active_download(rig: _Rig, payload: Path) -> None:
-    family_id, _d, _dt, asset_id, manifest = await _ready(rig, payload)
+async def test_asset_deletion_cancels_an_active_download(rig: _Rig, payload: Path) -> None:
+    family_id, _d, device_token, asset_id, manifest = await _ready(rig, payload)
     token = manifest["download"]["token"]
+    headers = {"Authorization": f"Bearer {device_token}"}
 
     deleted = await rig.client.delete(
-        f"/api/homemind/families/{family_id}/assets/{asset_id}", headers=rig.auth,
+        f"/api/homemind/families/{family_id}/assets/{asset_id}",
+        headers=rig.auth,
     )
     assert deleted.status_code == 204
 
+    # The bytes stop. The task row survives as CANCELLED, so the device's
+    # own status report still gets an answer instead of a 404.
     response = await rig.client.get(
-        f"{TRANSFERS}/{manifest['transfer_id']}/content", headers=_data_headers(token),
+        f"{TRANSFERS}/{manifest['transfer_id']}/content",
+        headers=_data_headers(token),
     )
-    assert response.status_code in (404, 409), "a deleted asset serves no bytes"
+    assert response.status_code in (401, 404, 409), "a deleted asset serves no bytes"
+
+    status = await rig.client.get(
+        f"{TRANSFERS}/{manifest['transfer_id']}",
+        headers=headers,
+    )
+    assert status.status_code == 200
+    assert status.json()["status"] == "CANCELLED"
 
 
 @pytest.mark.asyncio
@@ -467,13 +509,14 @@ async def test_four_parallel_ranges_reassemble_the_file(rig: _Rig, payload: Path
     parts = await asyncio.gather(*(fetch(index) for index in range(4)))
     assembled = bytearray(len(BODY))
     for start, data in parts:
-        assembled[start:start + len(data)] = data
+        assembled[start : start + len(data)] = data
     assert bytes(assembled) == BODY
 
 
 @pytest.mark.asyncio
 async def test_resume_after_interruption_only_needs_missing_ranges(
-    rig: _Rig, payload: Path,
+    rig: _Rig,
+    payload: Path,
 ) -> None:
     """A device that stops at 35% and restarts re-reads only the rest."""
     import hashlib
@@ -484,7 +527,8 @@ async def test_resume_after_interruption_only_needs_missing_ranges(
     stop_at = int(len(BODY) * 0.35)
 
     partial = await rig.client.get(
-        url, headers={**_data_headers(token), "Range": f"bytes=0-{stop_at - 1}"},
+        url,
+        headers={**_data_headers(token), "Range": f"bytes=0-{stop_at - 1}"},
     )
     assert partial.status_code == 206
     local = bytearray(len(BODY))
@@ -499,7 +543,8 @@ async def test_resume_after_interruption_only_needs_missing_ranges(
 
     # Restart: only the tail is requested.
     tail = await rig.client.get(
-        url, headers={**_data_headers(token), "Range": f"bytes={stop_at}-"},
+        url,
+        headers={**_data_headers(token), "Range": f"bytes={stop_at}-"},
     )
     assert tail.status_code == 206
     local[stop_at:] = tail.content
@@ -517,7 +562,8 @@ async def test_state_survives_a_restart(rig: _Rig, payload: Path) -> None:
     headers = {"Authorization": f"Bearer {device_token}"}
     await rig.client.post(
         f"{TRANSFERS}/{manifest['transfer_id']}/progress",
-        headers=headers, json={"bytes_downloaded": 321},
+        headers=headers,
+        json={"bytes_downloaded": 321},
     )
 
     assert rig.server.services is not None
@@ -529,17 +575,29 @@ async def test_state_survives_a_restart(rig: _Rig, payload: Path) -> None:
 
     # And the HTTP surface still answers from the rebuilt state.
     again = await rig.client.get(
-        f"{TRANSFERS}/{manifest['transfer_id']}", headers=headers,
+        f"{TRANSFERS}/{manifest['transfer_id']}",
+        headers=headers,
     )
     assert again.status_code == 200
     assert again.json()["bytes_downloaded"] == 321
 
 
-@pytest.mark.asyncio
-async def test_openapi_documents_the_data_plane(rig: _Rig) -> None:
-    """The device author reads Scalar, so the routes must be described."""
-    response = await rig.client.get("/api/openapi.json")
-    assert response.status_code == 200
+async def test_openapi_documents_the_data_plane(tmp_octop_home: Path) -> None:
+    """The device author reads Scalar, so the routes must be described.
+
+    API docs are off by default, so this one runs its own app with
+    ``enable_api_docs`` rather than weakening the default.
+    """
+    from fastapi.testclient import TestClient
+
+    from tests.support.app import write_octop_config
+
+    write_octop_config(tmp_octop_home, enable_api_docs=True)
+    async with octop_client(tmp_octop_home, app_factory=build_homemind_app) as (_client, srv):
+        app = build_homemind_app(srv)
+        with TestClient(app) as http:
+            response = http.get("/api/openapi.json")
+    assert response.status_code == 200, response.text
     paths = response.json()["paths"]
     assert "/api/homemind/runtime/transfers" in paths
     content = paths["/api/homemind/runtime/transfers/{transfer_id}/content"]

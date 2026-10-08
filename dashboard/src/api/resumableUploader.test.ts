@@ -11,13 +11,23 @@ import {
   type ResumableTransport,
   type UploadSession,
 } from "./resumableUploader";
-import type { CompletedUpload, CreateSessionInput } from "./modules/uploadSessions";
+import type {
+  CompletedUpload,
+  CreateSessionInput,
+} from "./modules/uploadSessions";
 
 const CHUNK = 1024;
 
-function makeFile(size: number, name = "big.bin", lastModified = 1_700_000_000_000) {
+function makeFile(
+  size: number,
+  name = "big.bin",
+  lastModified = 1_700_000_000_000,
+) {
   const blob = new Blob([new Uint8Array(size).fill(7)]);
-  return new File([blob], name, { lastModified, type: "application/octet-stream" });
+  return new File([blob], name, {
+    lastModified,
+    type: "application/octet-stream",
+  });
 }
 
 function session(overrides: Partial<UploadSession> = {}): UploadSession {
@@ -73,7 +83,10 @@ function fakeTransport(over: Partial<ResumableTransport> = {}): Recorder {
   const transport: ResumableTransport = {
     create: vi.fn(async (input: CreateSessionInput) => {
       created.push(input);
-      return session({ filename: input.filename, total_bytes: input.total_bytes });
+      return session({
+        filename: input.filename,
+        total_bytes: input.total_bytes,
+      });
     }),
     status: vi.fn(async () => session()),
     putPart,
@@ -172,10 +185,16 @@ describe("resume", () => {
       received_bytes: CHUNK,
       missing_ranges: [{ offset: CHUNK, size: 2 * CHUNK }],
     });
-    const { transport, putPart } = fakeTransport({ status: vi.fn(async () => partial) });
+    const { transport, putPart } = fakeTransport({
+      status: vi.fn(async () => partial),
+    });
     const resumeFrom: PendingUpload = {
       uploadId: "upload-1",
-      fingerprint: { name: "big.bin", size: 3 * CHUNK, lastModified: 1_700_000_000_000 },
+      fingerprint: {
+        name: "big.bin",
+        size: 3 * CHUNK,
+        lastModified: 1_700_000_000_000,
+      },
       target,
       createdAt: 1,
     };
@@ -206,7 +225,11 @@ describe("resume", () => {
     });
     const resumeFrom: PendingUpload = {
       uploadId: "gone",
-      fingerprint: { name: "big.bin", size: 3 * CHUNK, lastModified: 1_700_000_000_000 },
+      fingerprint: {
+        name: "big.bin",
+        size: 3 * CHUNK,
+        lastModified: 1_700_000_000_000,
+      },
       target,
       createdAt: 1,
     };
@@ -226,12 +249,16 @@ describe("resume", () => {
 describe("retry policy", () => {
   it("does not retry 401/403/404/409/413", () => {
     for (const code of [401, 403, 404, 409, 413]) {
-      expect(isRetryable(new Error(`Request failed: ${code} Boom`))).toBe(false);
+      expect(isRetryable(new Error(`Request failed: ${code} Boom`))).toBe(
+        false,
+      );
     }
   });
 
   it("retries 5xx and transport errors", () => {
-    expect(isRetryable(new Error("Request failed: 500 Server Error"))).toBe(true);
+    expect(isRetryable(new Error("Request failed: 500 Server Error"))).toBe(
+      true,
+    );
     expect(isRetryable(new Error("Request failed: 429 Too Many"))).toBe(true);
     expect(isRetryable(new TypeError("Failed to fetch"))).toBe(true);
   });

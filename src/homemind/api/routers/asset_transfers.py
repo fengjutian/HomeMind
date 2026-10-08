@@ -18,7 +18,7 @@ the same rule cannot be implemented twice with two different outcomes.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, Response
@@ -28,7 +28,6 @@ from pydantic import BaseModel, Field
 from homemind.api.headers import bearer_token, transfer_token
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.repos.asset_transfers import AssetTransferRow
-from homemind.infra.db.repos.family_assets import FamilyAssetRow
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.asset_transfers import (
@@ -38,6 +37,12 @@ from homemind.infra.family.asset_transfers import (
     TransferHandle,
 )
 from homemind.infra.family.device_runtime import DeviceRuntimeManager
+from homemind.infra.family.events import (
+    EVENT_TRANSFER_COMPLETED,
+    EVENT_TRANSFER_CREATED,
+    EVENT_TRANSFER_FAILED,
+    emit_family_event,
+)
 from homemind.infra.family.manager import FamilyManager
 from octop.api.deps import get_server
 from octop.infra.server import OctopServer
@@ -143,8 +148,9 @@ def _manager(server: OctopServer) -> AssetTransferManager:
 
 def _status_response(
     transfer: AssetTransferRow,
-    asset: FamilyAssetRow,
     *,
+    name: str,
+    mime_type: str,
     handle: TransferHandle | None = None,
 ) -> TransferStatusResponse:
     download = None
@@ -161,9 +167,9 @@ def _status_response(
         transfer_id=transfer.id,
         status=transfer.status,
         asset=TransferAssetInfo(
-            asset_id=asset.id,
-            name=asset.name,
-            mime_type=asset.mime_type or "application/octet-stream",
+            asset_id=transfer.asset_id,
+            name=name,
+            mime_type=mime_type or "application/octet-stream",
             size_bytes=transfer.size_bytes,
             sha256=transfer.sha256,
             etag=transfer.etag,
@@ -185,14 +191,20 @@ def _response_for(
     manager: AssetTransferManager,
     transfer: AssetTransferRow,
 ) -> TransferStatusResponse:
-    """Build the status body for a row the manager already returned."""
+    """Build the status body from the transfer row's own snapshot.
+
+    The asset row may already be gone -- deleting an index entry cancels
+    its transfers but keeps the audit row, and a device asking "what
+    happened to my download?" must get ``CANCELLED``, not a 503. The
+    version fields come from the transfer regardless, because those are
+    what the device would resume against.
+    """
     asset = manager.asset_repo.get(transfer.asset_id)
-    if asset is None:
-        raise HomeMindError(
-            HomeMindErrorCode.ASSET_TRANSFER_SOURCE_UNAVAILABLE,
-            "asset is no longer indexed",
-        )
-    return _status_response(transfer, asset)
+    return _status_response(
+        transfer,
+        name=asset.name if asset is not None else transfer.asset_id,
+        mime_type=asset.mime_type if asset is not None else "",
+    )
 
 
 def _content_disposition(filename: str, disposition: str = "attachment") -> str:
@@ -229,6 +241,23 @@ def _data_headers(resolved: ResolvedContent) -> dict[str, str]:
 # ------------------------------------------------------------- control plane
 
 
+async def _audit(
+    server: OctopServer,
+    family_id: str,
+    event_type: str,
+    payload: dict[str, Any],
+) -> None:
+    """Announce a task transition to the family's managers.
+
+    One event per transition, never one per Range request. The bus lives
+    on the server and is absent in a plain Octop deployment or a test
+    rig, so a download must not depend on anyone watching -- the transfer
+    row is the durable record; this is the live view of it.
+    """
+    bus = getattr(server, "family_event_bus", None)
+    await emit_family_event(bus, event_type, family_id, payload)
+
+
 @router.post(
     "/runtime/transfers",
     response_model=TransferStatusResponse,
@@ -255,7 +284,24 @@ async def create_transfer(
     )
     if not handle.created:
         response.status_code = 200
-    return _status_response(handle.transfer, handle.asset, handle=handle)
+    else:
+        await _audit(
+            server,
+            handle.transfer.family_id,
+            EVENT_TRANSFER_CREATED,
+            {
+                "transfer_id": handle.transfer.id,
+                "device_id": handle.transfer.device_id,
+                "asset_id": handle.transfer.asset_id,
+                "size_bytes": handle.transfer.size_bytes,
+            },
+        )
+    return _status_response(
+        handle.transfer,
+        name=handle.asset.name,
+        mime_type=handle.asset.mime_type,
+        handle=handle,
+    )
 
 
 @router.get(
@@ -296,7 +342,12 @@ async def refresh_transfer(
     authorization: Annotated[str | None, Header()] = None,
 ) -> TransferStatusResponse:
     handle = await _manager(server).refresh_token(bearer_token(authorization), transfer_id)
-    return _status_response(handle.transfer, handle.asset, handle=handle)
+    return _status_response(
+        handle.transfer,
+        name=handle.asset.name,
+        mime_type=handle.asset.mime_type,
+        handle=handle,
+    )
 
 
 @router.post(
@@ -342,12 +393,27 @@ async def complete_transfer(
     authorization: Annotated[str | None, Header()] = None,
 ) -> TransferStatusResponse:
     manager = _manager(server)
+    # Read the row first so a replayed completion does not emit a second
+    # audit event for a transition that already happened.
+    before = manager.transfer_repo.get(transfer_id)
     transfer = await manager.complete(
         bearer_token(authorization),
         transfer_id,
         size_bytes=body.size_bytes,
         sha256=body.sha256,
     )
+    if before is not None and not before.is_terminal:
+        await _audit(
+            server,
+            transfer.family_id,
+            EVENT_TRANSFER_COMPLETED,
+            {
+                "transfer_id": transfer.id,
+                "device_id": transfer.device_id,
+                "asset_id": transfer.asset_id,
+                "size_bytes": transfer.size_bytes,
+            },
+        )
     return _response_for(manager, transfer)
 
 
@@ -368,12 +434,25 @@ async def fail_transfer(
     authorization: Annotated[str | None, Header()] = None,
 ) -> TransferStatusResponse:
     manager = _manager(server)
+    before = manager.transfer_repo.get(transfer_id)
     transfer = await manager.fail(
         bearer_token(authorization),
         transfer_id,
         code=body.code,
         detail=body.detail,
     )
+    if before is not None and not before.is_terminal:
+        await _audit(
+            server,
+            transfer.family_id,
+            EVENT_TRANSFER_FAILED,
+            {
+                "transfer_id": transfer.id,
+                "device_id": transfer.device_id,
+                "asset_id": transfer.asset_id,
+                "code": transfer.failure_code,
+            },
+        )
     return _response_for(manager, transfer)
 
 

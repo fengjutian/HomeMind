@@ -163,8 +163,13 @@ function fingerprintOf(file: File): FileFingerprint {
   return { name: file.name, size: file.size, lastModified: file.lastModified };
 }
 
-export function fingerprintMatches(a: FileFingerprint, b: FileFingerprint): boolean {
-  return a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
+export function fingerprintMatches(
+  a: FileFingerprint,
+  b: FileFingerprint,
+): boolean {
+  return (
+    a.name === b.name && a.size === b.size && a.lastModified === b.lastModified
+  );
 }
 
 export class ResumableUpload {
@@ -187,7 +192,11 @@ export class ResumableUpload {
   private cancelRequested = false;
   private current: UploadProgress;
 
-  constructor(file: File, target: UploadTarget, options: ResumableOptions = {}) {
+  constructor(
+    file: File,
+    target: UploadTarget,
+    options: ResumableOptions = {},
+  ) {
     this.file = file;
     this.target = target;
     this.transport = options.transport ?? defaultTransport;
@@ -261,7 +270,9 @@ export class ResumableUpload {
     // Unblock parked workers so they observe the cancel immediately.
     this.releasePauseGate();
     if (this.session) {
-      await this.transport.cancel(this.session.upload_id).catch(() => undefined);
+      await this.transport
+        .cancel(this.session.upload_id)
+        .catch(() => undefined);
       await this.store.remove(this.session.upload_id).catch(() => undefined);
     }
     this.emit({ status: "cancelled", percent: 0 });
@@ -304,12 +315,17 @@ export class ResumableUpload {
     } catch (err) {
       if (err instanceof CancelledError) throw err;
       const status = this.cancelRequested ? "cancelled" : "error";
-      this.emit({ status, error: err instanceof Error ? err.message : String(err) });
+      this.emit({
+        status,
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw err;
     }
   }
 
-  private async openSession(resumeFrom: PendingUpload | null): Promise<UploadSession> {
+  private async openSession(
+    resumeFrom: PendingUpload | null,
+  ): Promise<UploadSession> {
     if (
       resumeFrom &&
       fingerprintMatches(resumeFrom.fingerprint, fingerprintOf(this.file)) &&
@@ -340,7 +356,11 @@ export class ResumableUpload {
       mime_type: this.file.type || null,
     });
     this.uploadedBytes = 0;
-    this.emit({ uploadId: created.upload_id, bytesSent: 0, status: "uploading" });
+    this.emit({
+      uploadId: created.upload_id,
+      bytesSent: 0,
+      status: "uploading",
+    });
     return created;
   }
 
@@ -385,7 +405,10 @@ export class ResumableUpload {
     chunk: number,
   ): Promise<void> {
     const start = (partNumber - 1) * chunk;
-    const blob = this.file.slice(start, Math.min(start + chunk, this.file.size));
+    const blob = this.file.slice(
+      start,
+      Math.min(start + chunk, this.file.size),
+    );
     const sha256 = await this.digest(blob);
 
     let attempt = 0;
@@ -397,10 +420,17 @@ export class ResumableUpload {
         return;
       } catch (err) {
         attempt += 1;
-        if (attempt >= MAX_PART_ATTEMPTS || !isRetryable(err) || this.cancelRequested) {
+        if (
+          attempt >= MAX_PART_ATTEMPTS ||
+          !isRetryable(err) ||
+          this.cancelRequested
+        ) {
           throw err;
         }
-        const backoff = Math.min(BASE_BACKOFF_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+        const backoff = Math.min(
+          BASE_BACKOFF_MS * 2 ** (attempt - 1),
+          MAX_BACKOFF_MS,
+        );
         await this.sleep(backoff);
       }
     }
@@ -414,9 +444,12 @@ export class ResumableUpload {
       uploadId: this.session?.upload_id ?? null,
       status: this.pauseRequested ? "paused" : "uploading",
       bytesSent: this.uploadedBytes,
-      percent: this.file.size ? Math.round((this.uploadedBytes / this.file.size) * 100) : 0,
+      percent: this.file.size
+        ? Math.round((this.uploadedBytes / this.file.size) * 100)
+        : 0,
       bytesPerSecond: Math.round(bytesPerSecond),
-      etaSeconds: bytesPerSecond > 0 ? Math.round(remaining / bytesPerSecond) : null,
+      etaSeconds:
+        bytesPerSecond > 0 ? Math.round(remaining / bytesPerSecond) : null,
       error: null,
     });
   }

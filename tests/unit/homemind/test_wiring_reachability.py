@@ -59,13 +59,21 @@ def _bootstrap(tmp_path: Path):
     services = HomeMindServices.from_pool(pool)
     family_manager = FamilyManager(services.family_repo)
     family = family_manager.create_family(
-        owner, name="Happy", timezone="Asia/Shanghai", locale="zh",
+        owner,
+        name="Happy",
+        timezone="Asia/Shanghai",
+        locale="zh",
     )
     hub = _RecordingHub()
     hub.open(1, "conn-1")
     return (
-        pool, services, FamilyEventBus(services, hub=hub), hub,
-        family_manager, owner, family.id,
+        pool,
+        services,
+        FamilyEventBus(services, hub=hub),
+        hub,
+        family_manager,
+        owner,
+        family.id,
     )
 
 
@@ -83,18 +91,26 @@ def test_command_enqueue_emits_approval_created(tmp_path: Path) -> None:
     pool, services, bus, hub, family_manager, owner, family_id = _bootstrap(tmp_path)
     devices = DeviceRuntimeManager(family_manager, services.family_device_repo)
     pairing = devices.create_pairing_code(
-        family_id, owner,
-        device_name="pi", device_type="rpi", platform="linux",
+        family_id,
+        owner,
+        device_name="pi",
+        device_type="rpi",
+        platform="linux",
         capabilities=["filesystem.delete"],
         root_path="/mnt/photos",
     )
     device, _token, _expires = devices.complete_pairing(
-        pairing.code, address="192.0.2.10",
+        pairing.code,
+        address="192.0.2.10",
     )
     command = devices.enqueue_command(
-        family_id, device.id,
-        capability="filesystem.delete", payload={"path": "a.jpg"},
-        requested_by=owner.id, expires_at=10**10, user=owner,
+        family_id,
+        device.id,
+        capability="filesystem.delete",
+        payload={"path": "a.jpg"},
+        requested_by=owner.id,
+        expires_at=10**10,
+        user=owner,
     )
     assert command.status == "WAITING_APPROVAL"
 
@@ -103,7 +119,9 @@ def test_command_enqueue_emits_approval_created(tmp_path: Path) -> None:
 
     asyncio.run(
         emit_command_event(
-            _Server(), family_id, EVENT_APPROVAL_CREATED,  # type: ignore[arg-type]
+            _Server(),
+            family_id,
+            EVENT_APPROVAL_CREATED,  # type: ignore[arg-type]
             {"command_id": command.id, "is_unsafe": command.is_unsafe},
         )
     )
@@ -121,16 +139,23 @@ def test_approve_then_cancel_push_two_distinct_events(tmp_path: Path) -> None:
     pool, services, bus, hub, family_manager, owner, family_id = _bootstrap(tmp_path)
     devices = DeviceRuntimeManager(family_manager, services.family_device_repo)
     pairing = devices.create_pairing_code(
-        family_id, owner,
-        device_name="pi", device_type="rpi", platform="linux",
+        family_id,
+        owner,
+        device_name="pi",
+        device_type="rpi",
+        platform="linux",
         capabilities=["filesystem.delete"],
         root_path="/mnt/photos",
     )
     device, _token, _expires = devices.complete_pairing(pairing.code, address=None)
     command = devices.enqueue_command(
-        family_id, device.id,
-        capability="filesystem.delete", payload={"path": "a.jpg"},
-        requested_by=owner.id, expires_at=10**10, user=owner,
+        family_id,
+        device.id,
+        capability="filesystem.delete",
+        payload={"path": "a.jpg"},
+        requested_by=owner.id,
+        expires_at=10**10,
+        user=owner,
     )
     approved = devices.approve_command(family_id, command.id, owner)
     assert approved.status == "PENDING"
@@ -140,7 +165,9 @@ def test_approve_then_cancel_push_two_distinct_events(tmp_path: Path) -> None:
 
     asyncio.run(
         emit_command_event(
-            _Server(), family_id, EVENT_APPROVAL_DECIDED,  # type: ignore[arg-type]
+            _Server(),
+            family_id,
+            EVENT_APPROVAL_DECIDED,  # type: ignore[arg-type]
             {"command_id": approved.id, "decision": "APPROVED"},
         )
     )
@@ -149,15 +176,21 @@ def test_approve_then_cancel_push_two_distinct_events(tmp_path: Path) -> None:
 
     # Cancelling a different command is a distinct event.
     other = devices.enqueue_command(
-        family_id, device.id,
-        capability="filesystem.delete", payload={"path": "b.jpg"},
-        requested_by=owner.id, expires_at=10**10, user=owner,
+        family_id,
+        device.id,
+        capability="filesystem.delete",
+        payload={"path": "b.jpg"},
+        requested_by=owner.id,
+        expires_at=10**10,
+        user=owner,
     )
     cancelled = devices.cancel_command(family_id, other.id, owner)
     assert cancelled.status == "CANCELLED"
     asyncio.run(
         emit_command_event(
-            _Server(), family_id, EVENT_APPROVAL_DECIDED,  # type: ignore[arg-type]
+            _Server(),
+            family_id,
+            EVENT_APPROVAL_DECIDED,  # type: ignore[arg-type]
             {"command_id": cancelled.id, "decision": "CANCELLED"},
         )
     )
@@ -175,8 +208,11 @@ def test_missing_bus_does_not_break_the_write(tmp_path: Path) -> None:
     pool, services, _bus, _hub, family_manager, owner, family_id = _bootstrap(tmp_path)
     devices = DeviceRuntimeManager(family_manager, services.family_device_repo)
     pairing = devices.create_pairing_code(
-        family_id, owner,
-        device_name="pi", device_type="rpi", platform="linux",
+        family_id,
+        owner,
+        device_name="pi",
+        device_type="rpi",
+        platform="linux",
         capabilities=["ping"],
     )
     device, _token, _expires = devices.complete_pairing(pairing.code, address=None)
@@ -186,7 +222,10 @@ def test_missing_bus_does_not_break_the_write(tmp_path: Path) -> None:
 
     asyncio.run(
         emit_command_event(
-            _NoBus(), family_id, EVENT_APPROVAL_CREATED, {}  # type: ignore[arg-type]
+            _NoBus(),
+            family_id,
+            EVENT_APPROVAL_CREATED,
+            {},  # type: ignore[arg-type]
         )
     )
     pool.close()
@@ -201,7 +240,8 @@ def test_daily_sweep_expires_stale_approvals(tmp_path: Path) -> None:
 
     pool, services, _bus, _hub, family_manager, owner, family_id = _bootstrap(tmp_path)
     family_manager.create_permission(
-        family_id, owner,
+        family_id,
+        owner,
         subject_member_id=family_manager.repo.list_members(family_id)[0].id,
         space_id=None,
         action="task.create",
@@ -209,7 +249,8 @@ def test_daily_sweep_expires_stale_approvals(tmp_path: Path) -> None:
         expires_at=None,
     )
     context_manager = FamilyContextManager(
-        family_manager, services.family_context_repo,
+        family_manager,
+        services.family_context_repo,
     )
     transactions = FamilyTransactionManager(
         family_manager,
@@ -220,8 +261,10 @@ def test_daily_sweep_expires_stale_approvals(tmp_path: Path) -> None:
         approval_ttl_seconds=60,
     )
     transaction, approval = transactions.plan(
-        family_id, owner,
-        action="task.create", payload={"title": "倒垃圾"},
+        family_id,
+        owner,
+        action="task.create",
+        payload={"title": "倒垃圾"},
     )
     assert approval is not None
     assert approval.status == "PENDING"
@@ -242,8 +285,7 @@ def test_daily_sweep_expires_stale_approvals(tmp_path: Path) -> None:
     # Backdate the approval past its window.
     with pool.connect() as conn:
         conn.execute(
-            "UPDATE homemind_family_approvals SET approval_expires_at = 1 "
-            "WHERE approval_id = ?",
+            "UPDATE homemind_family_approvals SET approval_expires_at = 1 WHERE approval_id = ?",
             (approval.id,),
         )
     totals = runner.run_once()
@@ -256,4 +298,81 @@ def test_daily_sweep_expires_stale_approvals(tmp_path: Path) -> None:
 
     # A second sweep is a no-op.
     assert runner.run_once()["approvals_expired"] == 0
+    pool.close()
+
+
+def test_daily_sweep_expires_stale_asset_transfers(tmp_path: Path) -> None:
+    """The maintenance runner must actually expire idle downloads.
+
+    ``AssetTransferRepo.expire_before`` existing is not enough: without a
+    caller, a transfer whose device went quiet keeps a live download
+    credential forever.
+    """
+
+    from pathlib import Path as _Path
+
+    from homemind.infra.db.repos.asset_transfers import AssetTransferRepo
+    from homemind.infra.db.repos.family_assets import FamilyAssetRepo
+
+    pool, services, _bus, _hub, family_manager, owner, family_id = _bootstrap(tmp_path)
+    payload = _Path(tmp_path) / "sweep-me.mp4"
+    payload.write_bytes(b"x" * 32)
+    asset = FamilyAssetRepo(pool).upsert_asset(
+        family_id=family_id,
+        source_id=None,
+        space_id=None,
+        asset_type="VIDEO",
+        name=payload.name,
+        uri=payload.as_uri(),
+        mime_type="video/mp4",
+        size_bytes=32,
+        content_hash="a" * 64,
+        captured_at=None,
+        metadata_json="{}",
+        created_by=owner.id,
+        visibility="FAMILY",
+    )
+    device = services.family_device_repo.create(
+        family_id,
+        name="tv",
+        device_type="tv",
+        platform="android",
+        capabilities=["asset.download"],
+    )
+    transfers = AssetTransferRepo(pool)
+    transfer = transfers.create(
+        family_id=family_id,
+        asset_id=asset.id,
+        device_id=device.id,
+        request_key="sweep",
+        size_bytes=32,
+        sha256="a" * 64,
+        source_mtime_ns=None,
+        etag='"v1"',
+        chunk_size=16,
+        expires_at=1,  # already lapsed
+    )
+    transfers.issue_token(transfer.id, "hash-sweep", expires_at=9_999_999_999)
+
+    context_manager = FamilyContextManager(
+        family_manager,
+        services.family_context_repo,
+    )
+    runner = MaintenanceRunner(
+        db=pool,
+        family_repo=services.family_repo,
+        context_repo=services.family_context_repo,
+        candidate_repo=services.memory_candidate_repo,
+        evidence_repo=services.memory_evidence_repo,
+        family_manager=family_manager,
+        context_manager=context_manager,
+        transfer_repo=transfers,
+    )
+
+    assert runner.run_once()["asset_transfers_expired"] == 1
+    assert transfers.get(transfer.id).status == "EXPIRED"  # type: ignore[union-attr]
+    assert transfers.resolve_active_token("hash-sweep", now=100) is None
+
+    # A second sweep must not re-report the same row.
+    assert runner.run_once()["asset_transfers_expired"] == 0
     pool.close()

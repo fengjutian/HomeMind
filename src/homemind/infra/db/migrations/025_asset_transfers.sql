@@ -21,7 +21,13 @@ CREATE TABLE IF NOT EXISTS homemind_asset_transfers (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   transfer_id      TEXT NOT NULL UNIQUE,
   family_id        TEXT NOT NULL REFERENCES homemind_families(family_id) ON DELETE CASCADE,
-  asset_id         TEXT NOT NULL REFERENCES homemind_family_assets(asset_id) ON DELETE CASCADE,
+  -- Intentionally NOT a foreign key. A transfer row is the audit record
+  -- of what a device was pulling, so it has to outlive the index entry:
+  -- ``FamilyAssetManager.delete_index`` cancels the live transfers first,
+  -- and the CANCELLED rows keep answering the device's status report.
+  -- An enforced FK here would make deleting an asset fail outright.
+  -- The column still holds the public string id, never the integer key.
+  asset_id         TEXT NOT NULL,
   device_id        TEXT NOT NULL REFERENCES homemind_family_devices(device_id) ON DELETE CASCADE,
   request_key      TEXT NOT NULL,
   status           TEXT NOT NULL DEFAULT 'PENDING',

@@ -354,7 +354,9 @@ def test_active_count_ignores_terminal_and_expired_rows(env: _Env) -> None:
     env.transfers.complete(done.id, 1100)
 
     assert {row.id for row in env.transfers.list_for_device(device.id)} == {
-        live.id, done.id, lapsed.id,
+        live.id,
+        done.id,
+        lapsed.id,
     }
     # Before the lapse: 'live' and 'lapsed' both hold a claim.
     assert env.transfers.count_active_for_device(device.id, now=900) == 2

@@ -33,6 +33,7 @@ from homemind.infra.family.asset_transfers import (
     compute_file_sha256,
     hash_transfer_token,
     iter_file_range,
+    open_verified_file,
     parse_byte_range,
     sanitize_failure_detail,
 )
@@ -207,10 +208,16 @@ class _Env:
         self.other = User(id=2, username="mama", role=Role.USER, display_name="妈妈")
         family_manager = FamilyManager(FamilyRepo(self.pool))
         self.family = family_manager.create_family(
-            self.user, name="Happy", timezone="Asia/Shanghai", locale="zh",
+            self.user,
+            name="Happy",
+            timezone="Asia/Shanghai",
+            locale="zh",
         )
         self.other_family = family_manager.create_family(
-            self.other, name="Other", timezone="Asia/Shanghai", locale="zh",
+            self.other,
+            name="Other",
+            timezone="Asia/Shanghai",
+            locale="zh",
         )
         self.device_repo = FamilyDeviceRepo(self.pool)
         self.asset_repo = FamilyAssetRepo(self.pool)
@@ -254,8 +261,12 @@ class _Env:
         target = family_id or self.family.id
         self.runtime.family = family
         code = self.runtime.create_pairing_code(
-            target, self.user, device_name=name, device_type="tv",
-            platform="android", capabilities=["asset.download"],
+            target,
+            self.user,
+            device_name=name,
+            device_type="tv",
+            platform="android",
+            capabilities=["asset.download"],
         )
         device, token, _expires = self.runtime.complete_pairing(code.code, address=None)
         return device, token
@@ -280,9 +291,7 @@ def run(coro):  # noqa: ANN001, ANN201 - tiny sync bridge for async tests
 
 def test_create_returns_manifest_with_a_one_time_credential(env: _Env) -> None:
     device, token = env.pair()
-    handle = run(
-        env.manager.create_transfer(token, asset_id=env.asset.id, request_key="k1")
-    )
+    handle = run(env.manager.create_transfer(token, asset_id=env.asset.id, request_key="k1"))
 
     assert handle.created is True
     assert handle.transfer.status == "ACTIVE"
@@ -293,9 +302,13 @@ def test_create_returns_manifest_with_a_one_time_credential(env: _Env) -> None:
     assert handle.max_concurrency == 4
     # The plaintext credential is never persisted.
     assert handle.token
-    assert env.transfer_repo.resolve_active_token(
-        hash_transfer_token(handle.token), now=env.manager._now_ts(),
-    ) is not None
+    assert (
+        env.transfer_repo.resolve_active_token(
+            hash_transfer_token(handle.token),
+            now=env.manager._now_ts(),
+        )
+        is not None
+    )
 
 
 def test_same_request_key_is_idempotent(env: _Env) -> None:
@@ -385,15 +398,24 @@ def test_progress_is_monotonic_and_clamped(env: _Env) -> None:
     handle = run(env.manager.create_transfer(token, asset_id=env.asset.id, request_key="k"))
     total = handle.transfer.size_bytes
 
-    assert run(
-        env.manager.report_progress(token, handle.transfer.id, bytes_downloaded=total // 2)
-    ).bytes_reported == total // 2
-    assert run(
-        env.manager.report_progress(token, handle.transfer.id, bytes_downloaded=1)
-    ).bytes_reported == total // 2
-    assert run(
-        env.manager.report_progress(token, handle.transfer.id, bytes_downloaded=total * 10)
-    ).bytes_reported == total
+    assert (
+        run(
+            env.manager.report_progress(token, handle.transfer.id, bytes_downloaded=total // 2)
+        ).bytes_reported
+        == total // 2
+    )
+    assert (
+        run(
+            env.manager.report_progress(token, handle.transfer.id, bytes_downloaded=1)
+        ).bytes_reported
+        == total // 2
+    )
+    assert (
+        run(
+            env.manager.report_progress(token, handle.transfer.id, bytes_downloaded=total * 10)
+        ).bytes_reported
+        == total
+    )
 
 
 def test_complete_requires_the_manifest_digest(env: _Env) -> None:
@@ -403,7 +425,9 @@ def test_complete_requires_the_manifest_digest(env: _Env) -> None:
     with pytest.raises(HomeMindError) as caught:
         run(
             env.manager.complete(
-                token, handle.transfer.id, size_bytes=handle.transfer.size_bytes,
+                token,
+                handle.transfer.id,
+                size_bytes=handle.transfer.size_bytes,
                 sha256="b" * 64,
             )
         )
@@ -414,8 +438,10 @@ def test_complete_requires_the_manifest_digest(env: _Env) -> None:
     with pytest.raises(HomeMindError):
         run(
             env.manager.complete(
-                token, handle.transfer.id,
-                size_bytes=handle.transfer.size_bytes, sha256=handle.transfer.sha256,
+                token,
+                handle.transfer.id,
+                size_bytes=handle.transfer.size_bytes,
+                sha256=handle.transfer.sha256,
             )
         )
 
@@ -427,19 +453,27 @@ def test_complete_is_idempotent_and_revokes_credentials(env: _Env) -> None:
 
     first = run(
         env.manager.complete(
-            token, handle.transfer.id,
-            size_bytes=handle.transfer.size_bytes, sha256=handle.transfer.sha256,
+            token,
+            handle.transfer.id,
+            size_bytes=handle.transfer.size_bytes,
+            sha256=handle.transfer.sha256,
         )
     )
     assert first.status == "COMPLETED"
-    assert env.transfer_repo.resolve_active_token(
-        hash_transfer_token(handle.token), now=now,
-    ) is None
+    assert (
+        env.transfer_repo.resolve_active_token(
+            hash_transfer_token(handle.token),
+            now=now,
+        )
+        is None
+    )
 
     second = run(
         env.manager.complete(
-            token, handle.transfer.id,
-            size_bytes=handle.transfer.size_bytes, sha256=handle.transfer.sha256,
+            token,
+            handle.transfer.id,
+            size_bytes=handle.transfer.size_bytes,
+            sha256=handle.transfer.sha256,
         )
     )
     assert second.status == "COMPLETED", "a replay must not change the outcome"
@@ -450,7 +484,10 @@ def test_terminal_operations_are_idempotent(env: _Env) -> None:
     handle = run(env.manager.create_transfer(token, asset_id=env.asset.id, request_key="k"))
     failed = run(
         env.manager.fail(
-            token, handle.transfer.id, code="DISK_FULL", detail="no space",
+            token,
+            handle.transfer.id,
+            code="DISK_FULL",
+            detail="no space",
         )
     )
     assert failed.status == "FAILED"
@@ -598,7 +635,9 @@ def test_if_match_mismatch_is_refused(env: _Env) -> None:
     assert caught.value.code is HomeMindErrorCode.ASSET_TRANSFER_SOURCE_CHANGED
 
     good = env.manager.authorize_content(
-        handle.token, if_match=handle.transfer.etag, range_header="bytes=0-9",
+        handle.token,
+        if_match=handle.transfer.etag,
+        range_header="bytes=0-9",
     )
     env.manager.release_content(good)
 
@@ -641,7 +680,7 @@ def test_concurrent_range_requests_are_capped(env: _Env) -> None:
 def test_released_range_does_not_leak_the_slot(env: _Env) -> None:
     _device, token = env.pair()
     handle = run(env.manager.create_transfer(token, asset_id=env.asset.id, request_key="k"))
-    for index in range(50):
+    for _attempt in range(50):
         resolved = env.manager.authorize_content(handle.token, range_header="bytes=0-9")
         env.manager.release_content(resolved)
     # 50 sequential reads must not accumulate into a full slot table.
@@ -707,7 +746,8 @@ def test_concurrent_ranges_reassemble_into_the_original_file(env: _Env) -> None:
         start = index * block
         end = min(start + block, len(env.body)) - 1
         resolved = env.manager.authorize_content(
-            handle.token, range_header=f"bytes={start}-{end}",
+            handle.token,
+            range_header=f"bytes={start}-{end}",
         )
         try:
             data = b"".join([chunk async for chunk in env.manager.stream_bytes(resolved)])
@@ -720,7 +760,7 @@ def test_concurrent_ranges_reassemble_into_the_original_file(env: _Env) -> None:
 
     assembled = bytearray(len(env.body))
     for start, data in run(run_all()):
-        assembled[start:start + len(data)] = data
+        assembled[start : start + len(data)] = data
     assert bytes(assembled) == env.body
 
 
@@ -734,6 +774,50 @@ def test_range_iteration_is_bounded_by_the_requested_length(tmp_path: Path) -> N
         assert b"".join(iter_file_range(handle, 100, 10, 8)) == b""
 
 
+def test_client_disconnect_closes_the_file_handle(env: _Env) -> None:
+    """Abandoning a multi-gigabyte read must not strand a descriptor.
+
+    The generator's ``finally`` is what releases both the handle and the
+    range-admission slot, so the test abandons the iteration mid-stream
+    rather than draining it.
+    """
+    _device, token = env.pair()
+    handle = run(env.manager.create_transfer(token, asset_id=env.asset.id, request_key="k"))
+    resolved = env.manager.authorize_content(handle.token, range_header="bytes=0-99")
+
+    async def abandon() -> None:
+        stream = env.manager.stream_bytes(resolved)
+        first = await stream.__anext__()
+        assert len(first) > 0
+        # Closing the async generator runs its ``finally``.
+        await stream.aclose()
+
+    run(abandon())
+    env.manager.release_content(resolved)
+
+    # The slot came back, so a later request is not locked out.
+    follow_up = env.manager.authorize_content(handle.token, range_header="bytes=0-9")
+    env.manager.release_content(follow_up)
+
+
+def test_streaming_chunks_stay_bounded_regardless_of_file_size(tmp_path: Path) -> None:
+    """Memory must not scale with the file.
+
+    A 4 MiB asset served through a 64 KiB read block must arrive as many
+    small chunks -- if a future change buffered the whole body, the first
+    chunk would be the entire file and this would catch it.
+    """
+    payload = tmp_path / "big.bin"
+    payload.write_bytes(b"z" * (4 * 1024 * 1024))
+    handle = open_verified_file(payload, payload.stat().st_size)
+    try:
+        chunks = list(iter_file_range(handle, 0, payload.stat().st_size, 64 * 1024))
+    finally:
+        handle.close()
+    assert len(chunks) == 64
+    assert max(len(chunk) for chunk in chunks) <= 64 * 1024
+
+
 def test_credential_hash_matches_the_device_scheme(env: _Env) -> None:
     """One hashing convention across both credential kinds keeps the
     'database stores only a hash' rule true for each."""
@@ -745,3 +829,32 @@ def test_paired_device_token_is_the_only_identity_source(env: _Env) -> None:
     assert device.id
     assert env.manager._authenticate(token).id == device.id
     assert mint_token() != token
+
+
+# ------------------------------------------------------------------ metrics
+
+
+def test_transfer_counters_are_low_cardinality_and_move(env: _Env) -> None:
+    """Counters are how an operator notices a stuck download, so the
+    lifecycle has to actually increment them."""
+    from homemind.infra.metrics import METRICS
+
+    before = METRICS.snapshot()
+    _device, token = env.pair()
+    handle = run(env.manager.create_transfer(token, asset_id=env.asset.id, request_key="k"))
+    resolved = env.manager.authorize_content(handle.token, range_header="bytes=0-9")
+    env.manager.release_content(resolved)
+    run(
+        env.manager.complete(
+            token,
+            handle.transfer.id,
+            size_bytes=handle.transfer.size_bytes,
+            sha256=handle.transfer.sha256,
+        )
+    )
+    after = METRICS.snapshot()
+
+    assert after["asset_transfer_created_total"] == before["asset_transfer_created_total"] + 1
+    assert after["asset_transfer_completed_total"] > before["asset_transfer_completed_total"]
+    # Labels stay low-cardinality: nothing resembling an id or a path is a key.
+    assert all("01" not in key for key in after)

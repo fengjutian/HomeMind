@@ -56,7 +56,9 @@ export function createUploadSession(
 }
 
 export function getUploadSession(uploadId: string): Promise<UploadSession> {
-  return request<UploadSession>(`/uploads/sessions/${encodeURIComponent(uploadId)}`);
+  return request<UploadSession>(
+    `/uploads/sessions/${encodeURIComponent(uploadId)}`,
+  );
 }
 
 /**
