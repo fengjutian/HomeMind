@@ -27,6 +27,7 @@ from octop.infra.db.repos.sso import SsoRepo
 from octop.infra.db.repos.thread_messages import ThreadMessageRepo
 from octop.infra.db.repos.threads import ThreadRepo
 from octop.infra.db.repos.trajectory_events import TrajectoryEventRepo
+from octop.infra.db.repos.upload_sessions import UploadSessionRepo
 from octop.infra.db.repos.usage import UsageRepo
 from octop.infra.db.repos.user_policies import UserPolicyRepo
 from octop.infra.db.repos.users import UserRepo
@@ -55,6 +56,7 @@ class RepoBundle:
     settings_repo: SettingsRepo
     storage_backend_repo: BackendRepo
     bridge_connection_repo: BridgeConnectionRepo
+    upload_session_repo: UploadSessionRepo
     connector_repo: ConnectorRepo
     skill_package_repo: SkillPackageRepo
     published_expert_repo: PublishedExpertRepo
@@ -85,6 +87,7 @@ class RepoBundle:
             settings_repo=SettingsRepo(db),
             storage_backend_repo=BackendRepo(db),
             bridge_connection_repo=BridgeConnectionRepo(db),
+            upload_session_repo=UploadSessionRepo(db),
             connector_repo=ConnectorRepo(db),
             skill_package_repo=SkillPackageRepo(db),
             published_expert_repo=PublishedExpertRepo(db),

@@ -3,8 +3,23 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
+
+_SAFE_UPLOAD_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _safe_upload_id(upload_id: str) -> str:
+    """Reject anything that is not a plain id.
+
+    Upload staging is server-managed, so the id is the only client-influenced
+    component of the path. Refusing separators, dots and absolute paths keeps a
+    crafted id from escaping the staging root.
+    """
+    if not isinstance(upload_id, str) or not _SAFE_UPLOAD_ID.match(upload_id):
+        raise ValueError("invalid upload_id")
+    return upload_id
 
 
 @dataclass(frozen=True)
@@ -78,6 +93,26 @@ class PathLayout:
     def knowledge_dir(self) -> Path:
         """Global knowledge base files: ``~/.octop/knowledge/``."""
         return self.root / "knowledge"
+
+    @property
+    def uploads_dir(self) -> Path:
+        """Resumable upload scratch space: ``~/.octop/uploads/``."""
+        return self.root / "uploads"
+
+    @property
+    def uploads_staging_dir(self) -> Path:
+        """Per-session part staging: ``~/.octop/uploads/staging/``."""
+        return self.uploads_dir / "staging"
+
+    def upload_staging_dir(self, upload_id: str) -> Path:
+        """Staging dir for one session. Never accepts a client-supplied path."""
+        return self.uploads_staging_dir / _safe_upload_id(upload_id)
+
+    def ensure_upload_staging_dir(self, upload_id: str) -> Path:
+        """``upload_staging_dir`` with mkdir -p."""
+        out = self.upload_staging_dir(upload_id)
+        out.mkdir(parents=True, exist_ok=True)
+        return out
 
     def agent_workspace(self, agent_id: str) -> Path:
         """Global agent workspace: ~/.octop/agents/<agent_id>/"""
