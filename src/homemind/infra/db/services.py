@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from homemind.infra.db.repos.asset_jobs import AssetJobRepo
+from homemind.infra.db.repos.asset_transfers import AssetTransferRepo
 from homemind.infra.db.repos.face_candidates import FaceCandidateRepo
 from homemind.infra.db.repos.families import FamilyRepo
 from homemind.infra.db.repos.family_albums import FamilyAlbumRepo
@@ -46,6 +47,7 @@ class HomeMindServices:
     memory_evidence_repo: MemoryEvidenceRepo
     photo_intelligence_repo: PhotoIntelligenceRepo
     asset_job_repo: AssetJobRepo
+    asset_transfer_repo: AssetTransferRepo
     search_index_repo: SearchIndexRepo
     smart_home_repo: SmartHomeRepo
     face_candidate_repo: FaceCandidateRepo
@@ -70,6 +72,7 @@ class HomeMindServices:
             memory_evidence_repo=MemoryEvidenceRepo(db),
             photo_intelligence_repo=PhotoIntelligenceRepo(db),
             asset_job_repo=AssetJobRepo(db),
+            asset_transfer_repo=AssetTransferRepo(db),
             search_index_repo=SearchIndexRepo(db),
             smart_home_repo=SmartHomeRepo(db),
             face_candidate_repo=FaceCandidateRepo(db),
