@@ -652,6 +652,33 @@ class BridgeManager:
         if refresher is not None:
             refresher.drop(connection_id)
 
+    def diagnostics_summary(self, owner_user_id: int) -> dict[str, Any]:
+        """Everything the "copy diagnostics" button needs, and nothing more.
+
+        Counters are read from ``METRICS`` (this process) rather than re-derived
+        from the database, so the summary describes the instance actually
+        serving requests.
+        """
+        from octop.infra.bridge.diagnostics import (
+            connection_diagnostic,
+            summarize,
+        )
+        from octop.infra.bridge.protocol import LOCAL_CAPABILITIES
+        from octop.infra.db.repos._base import now_ts
+
+        rows = self._repo.list_for_owner(owner_user_id)
+        diags = [
+            connection_diagnostic(
+                row, negotiated=self._negotiated.get(row.connection_id), now=now_ts()
+            )
+            for row in rows
+        ]
+        return summarize(
+            diags,
+            local_instance_id=self._instance_id,
+            local_capabilities=LOCAL_CAPABILITIES,
+        )
+
     async def revoke_credentials(self, connection_id: str, *, owner_user_id: int) -> None:
         """Invalidate stored credentials and tear the link down immediately.
 
@@ -1307,14 +1334,43 @@ class BridgeManager:
             now=now_ts(),
             hub_instance_id=self._instance_id,
         )
-        result = await sess.tunnel_request(
-            method=method,
-            path=path,
-            query=query,
-            headers=headers,
-            body=body,
-            timeout=float(audit.deadline_at - now_ts()),
-            audit_fields={"audit": audit},
+        from octop.infra.metrics import METRICS
+
+        METRICS.inc("bridge_tunnel_requests_total")
+        METRICS.inc("bridge_tunnel_in_flight")
+        sent_at = now_ts()
+        # Direction and correlation ids go in the log line, never the query or
+        # the body: a bridge log is something an operator will paste elsewhere.
+        logger.info(
+            "bridge tunnel -> %s %s %s",
+            audit.request_id,
+            method.upper(),
+            path,
+        )
+        try:
+            result = await sess.tunnel_request(
+                method=method,
+                path=path,
+                query=query,
+                headers=headers,
+                body=body,
+                timeout=float(audit.deadline_at - now_ts()),
+                audit_fields={"audit": audit},
+            )
+        except TimeoutError:
+            METRICS.inc("bridge_tunnel_timeouts_total")
+            raise
+        except Exception:
+            METRICS.inc("bridge_tunnel_errors_total")
+            raise
+        finally:
+            METRICS.inc("bridge_tunnel_in_flight", -1)
+        METRICS.inc("bridge_tunnel_bytes_total", len(str(result.get("body_b64") or "")) * 3 // 4)
+        logger.info(
+            "bridge tunnel <- %s status=%s in %sms",
+            audit.request_id,
+            result.get("status"),
+            int((now_ts() - sent_at) * 1000),
         )
         if str(result.get("type") or "") == "tunnel.error":
             code_raw = str(result.get("code") or "").strip()

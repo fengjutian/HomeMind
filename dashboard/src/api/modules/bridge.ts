@@ -18,6 +18,56 @@ export interface BridgeConnection {
   has_password: boolean;
   /** Peer-dialed reverse row: no stored password, this side cannot redial. */
   inbound?: boolean;
+  /** Phase 13 state machine. `status` above stays the frozen legacy field. */
+  state?: BridgeState;
+  state_detail?: string | null;
+  retry_may_help?: boolean;
+  peer_protocol?: string | null;
+  peer_instance_id?: string | null;
+  connected_since?: number | null;
+  reconnect_attempts?: number;
+}
+
+/**
+ * Phase 13 states. `ONLINE`/`DEGRADED` carry traffic; the rest explain why the
+ * link is down and whether retrying would help.
+ */
+export type BridgeState =
+  | "DISCONNECTED"
+  | "CONNECTING"
+  | "AUTHENTICATING"
+  | "ONLINE"
+  | "DEGRADED"
+  | "REAUTH_REQUIRED"
+  | "INCOMPATIBLE"
+  | "DISABLED";
+
+export interface BridgeConnectionDiagnostic {
+  connection_id: string;
+  display_name: string;
+  peer_base_url: string;
+  state: BridgeState;
+  retry_may_help: boolean;
+  peer_protocol: string | null;
+  peer_instance_id: string | null;
+  local_protocol: string;
+  capabilities: string[];
+  connected_since: number | null;
+  online_seconds: number | null;
+  reconnect_attempts: number;
+  last_error: string | null;
+  last_seen_at: number | null;
+}
+
+export interface BridgeDiagnostics {
+  instance_id: string;
+  local_protocol: string;
+  local_capabilities: string[];
+  connections_total: number;
+  connections_online: number;
+  connections_needing_human: string[];
+  connections: BridgeConnectionDiagnostic[];
+  metrics: Record<string, number>;
 }
 
 export interface BridgeRemoteAgent {
@@ -58,6 +108,9 @@ export interface BridgeProbeResult {
 
 export const bridgeApi = {
   list: () => request<BridgeConnection[]>("/bridge/connections"),
+
+  /** Phase 16: everything behind "copy diagnostics", free of secrets. */
+  diagnostics: () => request<BridgeDiagnostics>("/bridge/diagnostics"),
 
   probe: (body: {
     peer_base_url: string;

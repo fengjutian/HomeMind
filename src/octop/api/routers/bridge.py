@@ -274,6 +274,24 @@ async def delete_connection(
 
 
 @router.get(
+    "/bridge/diagnostics",
+    summary="Summarise this instance's bridge links for support",
+    description=(
+        'Everything behind the dashboard\'s "copy diagnostics" action: '
+        "per-connection state, protocol version, negotiated capabilities, "
+        "uptime and recent errors, plus this process's bridge counters. "
+        "Contains no password, token, attachment body, or query value."
+    ),
+)
+async def bridge_diagnostics(
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    summary: dict[str, Any] = _bridge(server).diagnostics_summary(owner_user_id=user.id)
+    return summary
+
+
+@router.get(
     "/bridge/connections/{connection_id}/agents",
     summary="List remote agents via bridge",
 )

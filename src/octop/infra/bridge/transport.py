@@ -9,6 +9,8 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from octop.infra.bridge.send_queue import PrioritySendQueue
+
 logger = logging.getLogger(__name__)
 
 SendText = Callable[[str], Awaitable[None]]
@@ -61,6 +63,12 @@ class BridgeSession:
         self._closed = asyncio.Event()
         self._lock = asyncio.Lock()
         self.close_reason: str | None = None
+        self._send_queue = PrioritySendQueue(
+            send_text,
+            dumps=lambda payload: json.dumps(
+                payload, ensure_ascii=False, default=bridge_json_default
+            ),
+        )
 
     @property
     def closed(self) -> bool:
@@ -77,9 +85,17 @@ class BridgeSession:
                 fut.set_exception(ConnectionError("bridge session closed"))
 
     async def send_json(self, payload: dict[str, Any]) -> None:
-        await self._send_text(
-            json.dumps(payload, ensure_ascii=False, default=bridge_json_default),
-        )
+        """Queue one frame for delivery.
+
+        Returns once the frame is *accepted*, not once it is written: the
+        priority pump owns the socket. Ordering is still guaranteed — a lane
+        drains FIFO and the pump is the only writer — but a caller that needs
+        the write to have landed must await the socket itself.
+
+        Routed by frame type, so bulk traffic can never outrank a close or a
+        keepalive, and no lane can buffer without bound.
+        """
+        await self._send_queue.send(payload)
 
     async def handle_message(self, raw: str) -> None:
         try:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
@@ -27,6 +28,9 @@ async def test_send_json_serializes_human_message() -> None:
             },
         }
     )
+    # send_json now hands the frame to the priority pump, which owns the
+    # socket; delivery happens on a later loop turn.
+    await asyncio.sleep(0)
     assert len(sent) == 1
     payload = json.loads(sent[0])
     assert payload["type"] == "turn.chunk"

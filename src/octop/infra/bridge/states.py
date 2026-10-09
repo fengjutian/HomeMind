@@ -42,8 +42,14 @@ class BridgeState(StrEnum):
 
     @property
     def retry_may_help(self) -> bool:
-        """Whether a reconnect attempt is worth making on its own."""
-        return self in _RECOVERABLE
+        """Whether a reconnect attempt is worth making on its own.
+
+        Defined as "not one of the states only a human can clear", rather than
+        as membership in a list of retryable states — otherwise a perfectly
+        healthy ``ONLINE`` connection falls outside both sets and reads as
+        needing intervention.
+        """
+        return self not in _NEEDS_HUMAN
 
     @property
     def needs_human(self) -> bool:
@@ -54,15 +60,6 @@ class BridgeState(StrEnum):
         """A socket is carrying traffic in this state."""
         return self in {BridgeState.ONLINE, BridgeState.DEGRADED}
 
-
-_RECOVERABLE: frozenset[BridgeState] = frozenset(
-    {
-        BridgeState.DISCONNECTED,
-        BridgeState.CONNECTING,
-        BridgeState.AUTHENTICATING,
-        BridgeState.DEGRADED,
-    }
-)
 
 #: States a retry cannot fix on its own.
 _NEEDS_HUMAN: frozenset[BridgeState] = frozenset(
