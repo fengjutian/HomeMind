@@ -13,6 +13,7 @@ import {
   Input,
   Popconfirm,
   Segmented,
+  Space,
   Spin,
   Switch,
   Table,
@@ -55,6 +56,7 @@ import {
   type BridgeRemoteAgent,
 } from "../../../api/modules/bridge";
 import { TabPanelHeader } from "./TabPanelHeader";
+import BridgeDiagnostics from "./BridgeDiagnostics";
 import styles from "./BridgeSettings.module.less";
 
 const BRIDGE_ACCENT = "var(--fn-color-brand)";
@@ -109,6 +111,28 @@ function BridgeIconPicker({
       })}
     </div>
   );
+}
+
+/**
+ * Phase 13 states only a human can clear are shown as errors; everything else
+ * is a warning the operator could simply retry.
+ */
+function stateTagColor(state: string): string {
+  if (state === "REAUTH_REQUIRED" || state === "INCOMPATIBLE") return "error";
+  if (
+    state === "DEGRADED" ||
+    state === "CONNECTING" ||
+    state === "AUTHENTICATING"
+  ) {
+    return "warning";
+  }
+  return "default";
+}
+
+function stateText(state: string, t: (key: string) => string): string {
+  const key = `advancedSettings.bridge.state.${state}`;
+  const label = t(key);
+  return label === key ? state : label;
 }
 
 function statusColor(status: string): string {
@@ -962,11 +986,18 @@ export default function BridgeSettingsPanel({
         title: t("advancedSettings.bridge.colStatus"),
         dataIndex: "status",
         key: "status",
-        width: 110,
+        width: 160,
         render: (_status: string, row) => (
-          <Tag color={statusColor(row.status)}>
-            {connectionStatusText(row, t)}
-          </Tag>
+          <Space direction="vertical" size={2}>
+            <Tag color={statusColor(row.status)}>
+              {connectionStatusText(row, t)}
+            </Tag>
+            {row.state && row.state !== "ONLINE" ? (
+              <Tag color={stateTagColor(row.state)} className={styles.stateTag}>
+                {stateText(row.state, t)}
+              </Tag>
+            ) : null}
+          </Space>
         ),
       },
       {
@@ -1092,6 +1123,10 @@ export default function BridgeSettingsPanel({
           actions={headerActions}
         />
       )}
+
+      <div className={styles.diagnostics}>
+        <BridgeDiagnostics />
+      </div>
 
       {loading ? (
         <div className={styles.loading}>

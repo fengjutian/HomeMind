@@ -3633,7 +3633,37 @@
       "viewTable": "Table",
       "totalConnections": "{{count}} connection(s)",
       "colStatus": "Status",
-      "colAgents": "Experts"
+      "colAgents": "Experts",
+      "state": {
+        "ONLINE": "Online",
+        "DEGRADED": "Degraded",
+        "CONNECTING": "Connecting",
+        "AUTHENTICATING": "Authenticating",
+        "DISCONNECTED": "Disconnected",
+        "REAUTH_REQUIRED": "Sign-in required",
+        "INCOMPATIBLE": "Version mismatch",
+        "DISABLED": "Disabled"
+      },
+      "diagnostics": {
+        "refresh": "Refresh",
+        "copy": "Copy diagnostics",
+        "summary": "{{online}} of {{total}} links online",
+        "needsHuman": "{{count}} link(s) need a human — retrying will not fix them.",
+        "incompatibleDetail": "{{count}} link(s) run a Bridge protocol major version that this instance cannot speak. Upgrade one side to match before reconnecting.",
+        "loadFailed": "Could not load bridge diagnostics",
+        "instance": "This instance",
+        "protocol": "Protocol",
+        "peer": "peer",
+        "capabilities": "Local capabilities",
+        "negotiated": "Negotiated",
+        "instanceId": "Instance id",
+        "connection": "Connection",
+        "state": "State",
+        "uptime": "Uptime",
+        "reconnects": "Reconnect attempts",
+        "lastError": "Last error",
+        "empty": "No bridge connections yet."
+      }
     },
     "captcha": {
       "title": "Login captcha",

@@ -901,7 +901,31 @@ class BridgeManager:
                     self._reconnect_failures[connection_id] = 0
                     await asyncio.sleep(_AUTH_RETRY_DELAY_SEC)
                     continue
-                detail = str(exc)
+                raw_detail = str(exc)
+                raw_low = raw_detail.lower()
+                if "incompatible" in raw_low or "matching major version" in raw_low:
+                    # Major-version mismatch: only an upgrade on one side
+                    # clears it. Persist the steady INCOMPATIBLE state and
+                    # stop the auto-reconnect cycle so the operator sees a
+                    # single, clear reason instead of a flood of identical
+                    # failures. ``_run_outbound_client`` already wrote the
+                    # state, but doing it here too makes the rule hold even
+                    # if the failure reaches the supervisor through some
+                    # other path in the future. The "matching major version"
+                    # arm catches the wire-format close(4002) reason the
+                    # peer sends after ``ProtocolIncompatible`` is raised
+                    # on its side, where the substring only carries the
+                    # second half of our message.
+                    if self._repo.get(connection_id) is not None:
+                        self._set_state(
+                            connection_id,
+                            BridgeState.INCOMPATIBLE,
+                            detail=raw_detail[:500],
+                            clear_detail=False,
+                        )
+                    self._user_stopped.add(connection_id)
+                    return
+                detail = raw_detail
                 low = detail.lower()
                 if "403" in detail or "404" in detail or "rejected websocket" in low:
                     detail = (
@@ -1100,9 +1124,22 @@ class BridgeManager:
                     try:
                         negotiated = negotiate(ack)
                     except ProtocolIncompatible as exc:
+                        # Major version mismatch. Persist INCOMPATIBLE *before*
+                        # the supervisor catches and retries: the supervisor
+                        # otherwise lumps every failure into a transient
+                        # DISCONNECTED, and a permanent incompatibility would
+                        # then look identical to a flaky network.
+                        msg = f"bridge protocol incompatible: {exc}"
+                        if self._repo.get(connection_id) is not None:
+                            self._set_state(
+                                connection_id,
+                                BridgeState.INCOMPATIBLE,
+                                detail=msg[:500],
+                                clear_detail=False,
+                            )
                         raise OctopError(
                             ErrorCode.BRIDGE_PEER_UNREACHABLE,
-                            f"bridge protocol incompatible: {exc}",
+                            msg,
                         ) from exc
                     self._negotiated[connection_id] = negotiated
                     break

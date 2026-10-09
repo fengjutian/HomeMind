@@ -3633,7 +3633,37 @@
       "viewTable": "表格",
       "totalConnections": "共 {{count}} 条连接",
       "colStatus": "状态",
-      "colAgents": "专家"
+      "colAgents": "专家",
+      "state": {
+        "ONLINE": "在线",
+        "DEGRADED": "降级",
+        "CONNECTING": "连接中",
+        "AUTHENTICATING": "认证中",
+        "DISCONNECTED": "未连接",
+        "REAUTH_REQUIRED": "需要重新登录",
+        "INCOMPATIBLE": "版本不兼容",
+        "DISABLED": "已禁用"
+      },
+      "diagnostics": {
+        "refresh": "刷新",
+        "copy": "复制诊断摘要",
+        "summary": "{{total}} 条连接中 {{online}} 条在线",
+        "needsHuman": "{{count}} 条连接需要人工处理，重试无法解决。",
+        "incompatibleDetail": "{{count}} 条连接的 Bridge 协议 major 版本与本实例不兼容，升级其中一侧到匹配版本后再重连。",
+        "loadFailed": "无法加载 Bridge 诊断信息",
+        "instance": "本实例",
+        "protocol": "协议版本",
+        "peer": "对端",
+        "capabilities": "本端能力",
+        "negotiated": "已协商能力",
+        "instanceId": "实例 ID",
+        "connection": "连接",
+        "state": "状态",
+        "uptime": "在线时长",
+        "reconnects": "重连次数",
+        "lastError": "最近错误",
+        "empty": "还没有 Bridge 连接。"
+      }
     },
     "captcha": {
       "title": "登录验证码",

@@ -9,16 +9,17 @@ import styles from "./BridgeDiagnostics.module.less";
 const { Text } = Typography;
 
 /** States only a human can clear; everything else is worth another try. */
-const NEEDS_HUMAN: Record<string, "error" | "warning" | "success" | "default"> = {
-  ONLINE: "success",
-  DEGRADED: "warning",
-  CONNECTING: "warning",
-  AUTHENTICATING: "warning",
-  DISCONNECTED: "default",
-  REAUTH_REQUIRED: "error",
-  INCOMPATIBLE: "error",
-  DISABLED: "default",
-};
+const NEEDS_HUMAN: Record<string, "error" | "warning" | "success" | "default"> =
+  {
+    ONLINE: "success",
+    DEGRADED: "warning",
+    CONNECTING: "warning",
+    AUTHENTICATING: "warning",
+    DISCONNECTED: "default",
+    REAUTH_REQUIRED: "error",
+    INCOMPATIBLE: "error",
+    DISABLED: "default",
+  };
 
 function formatUptime(seconds: number | null): string {
   if (!seconds || seconds <= 0) return "-";
@@ -113,6 +114,19 @@ export default function BridgeDiagnosticsPanel() {
         />
       )}
 
+      {data &&
+        data.connections.some((c) => c.state === "INCOMPATIBLE") && (
+          <Alert
+            type="error"
+            showIcon
+            className={styles.alert}
+            message={t("advancedSettings.bridge.diagnostics.incompatibleDetail", {
+              count: data.connections.filter((c) => c.state === "INCOMPATIBLE")
+                .length,
+            })}
+          />
+        )}
+
       {data && (
         <>
           <Descriptions
@@ -122,13 +136,14 @@ export default function BridgeDiagnosticsPanel() {
             className={styles.descriptions}
             title={t("advancedSettings.bridge.diagnostics.instance")}
           >
-            <Descriptions.Item label={t("advancedSettings.bridge.diagnostics.protocol")}>
+            <Descriptions.Item
+              label={t("advancedSettings.bridge.diagnostics.protocol")}
+            >
               {data.local_protocol}
               {data.connections.some((c) => c.peer_protocol) && (
                 <Text type="secondary">
                   {" "}
-                  ·{" "}
-                  {t("advancedSettings.bridge.diagnostics.peer")}{" "}
+                  · {t("advancedSettings.bridge.diagnostics.peer")}{" "}
                   {data.connections
                     .map((c) => c.peer_protocol ?? "?")
                     .filter((v, i, a) => a.indexOf(v) === i)
@@ -136,10 +151,14 @@ export default function BridgeDiagnosticsPanel() {
                 </Text>
               )}
             </Descriptions.Item>
-            <Descriptions.Item label={t("advancedSettings.bridge.diagnostics.capabilities")}>
+            <Descriptions.Item
+              label={t("advancedSettings.bridge.diagnostics.capabilities")}
+            >
               {data.local_capabilities.join(", ") || "-"}
             </Descriptions.Item>
-            <Descriptions.Item label={t("advancedSettings.bridge.diagnostics.instanceId")}>
+            <Descriptions.Item
+              label={t("advancedSettings.bridge.diagnostics.instanceId")}
+            >
               <Text code copyable>
                 {data.instance_id || "-"}
               </Text>

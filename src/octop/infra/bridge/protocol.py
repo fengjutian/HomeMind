@@ -39,8 +39,13 @@ class ProtocolIncompatible(Exception):
     """Major versions differ — the peers cannot speak the same protocol."""
 
     def __init__(self, ours: str, theirs: str) -> None:
+        # The leading "incompatible" is a deliberate keyword: the wire-side
+        # ``close(code=4002, reason=...)`` truncates this message to a 120-char
+        # reason string, and the supervisor on the dialing side uses a substring
+        # match on that reason to recognise the failure as a permanent (not
+        # transient) one. Operators reading logs benefit from the same word.
         super().__init__(
-            f"bridge protocol {ours} cannot talk to {theirs}; "
+            f"bridge protocol incompatible: {ours} cannot talk to {theirs}; "
             "both instances must run a matching major version"
         )
         self.ours = ours
