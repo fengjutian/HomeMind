@@ -16,7 +16,6 @@ from octop.infra.bridge.crypto import decrypt_payload, encrypt_payload
 from octop.infra.bridge.http_tunnel import decode_body_b64, execute_local_http
 from octop.infra.bridge.icons import rewrite_remote_icon_url
 from octop.infra.bridge.ids import (
-    PROTOCOL_VERSION,
     format_bridge_agent_id,
     rewrite_peer_agent_ids,
     rewrite_peer_stream_frame,
@@ -28,14 +27,33 @@ from octop.infra.bridge.peer_turn import (
     PeerTurnRunner,
     bridge_turn_ws_payload,
 )
+from octop.infra.bridge.protocol import (
+    LOCAL_CAPABILITIES,
+    LOCAL_VERSION_STRING,
+    MAX_FRAME_BYTES,
+    PROTOCOL_MAJOR,
+    PROTOCOL_MINOR,
+    Hello,
+    ProtocolIncompatible,
+    build_hello,
+    negotiate,
+)
 from octop.infra.bridge.transport import BridgeSession
 from octop.infra.db.repos.bridge_connections import BridgeConnectionRepo, BridgeConnectionRow
 from octop.infra.db.repos.secrets import SecretRepo
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.errors import ErrorCode, OctopError
-from octop.infra.utils.ulid import new_short_id
+from octop.infra.utils.ulid import new_short_id, new_ulid
 
 logger = logging.getLogger(__name__)
+
+
+def _local_version() -> str:
+    """This build's version, advertised in hello for diagnostics."""
+    from octop import __version__
+
+    return __version__
+
 
 # Auto-reconnect: backoff after unexpected disconnect; disable after this many failures.
 _AUTO_RECONNECT_MAX_FAILURES = 5

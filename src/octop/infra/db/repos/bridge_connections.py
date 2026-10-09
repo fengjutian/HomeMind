@@ -25,8 +25,18 @@ class BridgeConnectionRow:
     last_error: str | None
     last_seen_at: int | None
     auto_reconnect: bool
-    created_at: int
-    updated_at: int
+    #: Plan phase 13 state machine. ``status`` above is the legacy column,
+    #: kept in step by :meth:`set_state` for older readers. Defaults keep rows
+    #: built directly by callers working on a pre-v22 shape.
+    state: str = "DISCONNECTED"
+    state_changed_at: int | None = None
+    state_detail: str | None = None
+    peer_protocol: str | None = None
+    peer_instance_id: str | None = None
+    connected_since: int | None = None
+    reconnect_attempts: int = 0
+    created_at: int = 0
+    updated_at: int = 0
 
     @classmethod
     def from_row(cls, r: DbRow) -> BridgeConnectionRow:
@@ -56,6 +66,29 @@ class BridgeConnectionRow:
             last_error=r["last_error"],
             last_seen_at=r["last_seen_at"],
             auto_reconnect=bool(int(auto_raw or 0)),
+            # New columns are read defensively: a test or a restore may present
+            # a pre-v22 row, and ``sqlite3.Row`` has no ``.get()``.
+            state=str(r["state"]) if "state" in keys else "DISCONNECTED",
+            state_changed_at=(
+                int(r["state_changed_at"])
+                if "state_changed_at" in keys and r["state_changed_at"] is not None
+                else None
+            ),
+            state_detail=r["state_detail"] if "state_detail" in keys else None,
+            peer_protocol=r["peer_protocol"] if "peer_protocol" in keys else None,
+            peer_instance_id=(
+                r["peer_instance_id"] if "peer_instance_id" in keys else None
+            ),
+            connected_since=(
+                int(r["connected_since"])
+                if "connected_since" in keys and r["connected_since"] is not None
+                else None
+            ),
+            reconnect_attempts=(
+                int(r["reconnect_attempts"] or 0)
+                if "reconnect_attempts" in keys
+                else 0
+            ),
             created_at=int(r["created_at"]),
             updated_at=int(r["updated_at"]),
         )
@@ -171,6 +204,45 @@ class BridgeConnectionRepo:
                 "updated_at = ? WHERE connection_id = ?",
                 (credential_blob, access_token_blob, token_expires_at, ts, connection_id),
             )
+
+    def set_state(
+        self,
+        connection_id: str,
+        state: str,
+        *,
+        legacy_status: str,
+        detail: str | None = None,
+        clear_detail: bool = False,
+        peer_protocol: str | None = None,
+        peer_instance_id: str | None = None,
+    ) -> BridgeConnectionRow | None:
+        """Move a connection to ``state`` and keep the legacy column in step.
+
+        ``legacy_status`` is passed in rather than derived here: this layer is
+        SQL only, and the new→legacy mapping belongs to the bridge domain
+        (``bridge.states``). Two independent maps would drift.
+        """
+        ts = now_ts()
+        connected_since = ts if state == "ONLINE" else None
+        with self._db.transaction() as conn:
+            conn.execute(
+                "UPDATE bridge_connections SET state = ?, status = ?, state_changed_at = ?, "
+                "state_detail = ?, peer_protocol = COALESCE(?, peer_protocol), "
+                "peer_instance_id = COALESCE(?, peer_instance_id), "
+                "connected_since = ?, updated_at = ? WHERE connection_id = ?",
+                (
+                    state,
+                    legacy_status,
+                    ts,
+                    None if clear_detail else detail,
+                    peer_protocol,
+                    peer_instance_id,
+                    connected_since,
+                    ts,
+                    connection_id,
+                ),
+            )
+        return self.get(connection_id)
 
     def update_status(
         self,

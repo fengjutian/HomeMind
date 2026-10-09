@@ -211,9 +211,11 @@ def _parse_capabilities(raw: object) -> frozenset[Capability]:
 
 
 def _as_positive_int(raw: object) -> int:
+    if isinstance(raw, bool) or not isinstance(raw, (int, str)):
+        return 0
     try:
-        value = int(raw)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+        value = int(raw)
+    except ValueError:
         return 0
     return value if value > 0 else 0
 
