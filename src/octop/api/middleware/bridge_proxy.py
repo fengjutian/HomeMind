@@ -185,26 +185,31 @@ def _local_bridge_shadow_response(
 
 
 def _forward_headers(request: Request, remote_agent_id: str) -> dict[str, str]:
-    headers = {
-        k: v
-        for k, v in request.headers.items()
-        if k.lower()
-        not in {
-            "host",
-            "content-length",
-            "authorization",
-            "connection",
-            "transfer-encoding",
-        }
-    }
-    rewritten = False
-    for key in list(headers):
-        if key.lower() == "x-octop-agent-id":
-            headers[key] = remote_agent_id
-            rewritten = True
-            break
-    if not rewritten:
-        headers["X-Octop-Agent-Id"] = remote_agent_id
+    """Headers to send onward, rebuilt rather than copied.
+
+    The browser's own ``Cookie`` and ``Authorization`` must not travel to a
+    *different* instance: the peer re-authenticates as the connection owner, and
+    forwarding the dashboard's session cookie there would hand the peer a
+    credential it has no business holding. Same for proxy metadata — a
+    forwarded ``X-Forwarded-For`` would make the peer log an address the
+    dashboard never observed.
+    """
+    from octop.infra.bridge.http_tunnel import (
+        _IDENTITY_HEADERS,
+        _is_forwarded_metadata,
+    )
+
+    headers: dict[str, str] = {}
+    for key, value in request.headers.items():
+        lowered = key.lower()
+        if lowered in {"host", "content-length", "connection", "transfer-encoding"}:
+            continue
+        if lowered in _IDENTITY_HEADERS:
+            continue
+        if _is_forwarded_metadata(lowered):
+            continue
+        headers[key] = value
+    headers["X-Octop-Agent-Id"] = remote_agent_id
     return headers
 
 

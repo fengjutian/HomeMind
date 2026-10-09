@@ -146,10 +146,13 @@ class BridgeSession:
         headers: dict[str, str] | None = None,
         body: bytes | None = None,
         timeout: float = 120.0,
+        audit_fields: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if self.closed:
             raise ConnectionError("bridge session closed")
         import uuid
+
+        from octop.infra.bridge.audit import TunnelAudit
 
         req_id = uuid.uuid4().hex
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
@@ -162,6 +165,10 @@ class BridgeSession:
             "query": query or "",
             "headers": headers or {},
         }
+        audit: TunnelAudit | None = audit_fields.get("audit") if audit_fields else None
+        if audit is not None:
+            # The peer logs and accounts every request against this identity.
+            frame.update(audit.as_frame_fields())
         if body:
             frame["body_b64"] = base64.b64encode(body).decode("ascii")
         try:

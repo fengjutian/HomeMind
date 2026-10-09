@@ -12,6 +12,7 @@ from urllib.parse import urljoin, urlsplit
 import httpx
 import websockets
 
+from octop.infra.bridge.audit import audit_from_frame, new_audit
 from octop.infra.bridge.crypto import decrypt_payload, encrypt_payload
 from octop.infra.bridge.http_tunnel import decode_body_b64, execute_local_http
 from octop.infra.bridge.icons import rewrite_remote_icon_url
@@ -40,6 +41,12 @@ from octop.infra.bridge.protocol import (
     negotiate,
 )
 from octop.infra.bridge.states import BridgeState, coerce_state, persist_state
+from octop.infra.bridge.token_refresh import (
+    RefreshFailure,
+    TokenRefresher,
+    classify_login_failure,
+    should_refresh,
+)
 from octop.infra.bridge.transport import BridgeSession
 from octop.infra.db.repos.bridge_connections import BridgeConnectionRepo, BridgeConnectionRow
 from octop.infra.db.repos.secrets import SecretRepo
@@ -158,6 +165,66 @@ class DialYielded(Exception):
         self.winner = winner
 
 
+class RefreshRefused(Exception):
+    """A token login failed for a *classified* reason.
+
+    The kind matters more than the message: a revoked credential and a peer
+    that is merely offline need completely different operator responses.
+    """
+
+    def __init__(self, failure: RefreshFailure, detail: str = "") -> None:
+        super().__init__(f"{failure}: {detail}" if detail else str(failure))
+        self.failure = failure
+        self.detail = detail
+
+
+def _status_of(exc: BaseException) -> int | None:
+    """Recover an HTTP status from a peer-auth error, if it carries one.
+
+    ``login_peer`` maps every failure to a bridge error code, so the status is
+    recovered from the message; ``None`` means "never reached the peer".
+    """
+    import re
+
+    match = re.search(r"\b([45]\d{2})\b", str(exc))
+    return int(match.group(1)) if match else None
+
+
+#: Close code the peer uses when it refuses our token.
+_WS_CLOSE_UNAUTHENTICATED = 4001
+
+#: Pause before re-authenticating after the peer rejected our token. Short:
+#: this path is expected to recover on the next login, not to back off hard.
+_AUTH_RETRY_DELAY_SEC = 1.0
+
+
+def _close_code_of(exc: BaseException) -> int | None:
+    """The peer's WebSocket close code, when the exception carries one.
+
+    ``websockets`` attaches the received close frame as ``rcvd``; older shapes
+    put the code on the exception itself.
+    """
+    for source in (getattr(exc, "rcvd", None), exc):
+        code = getattr(source, "code", None)
+        if isinstance(code, int):
+            return code
+    return None
+
+
+def is_auth_rejection(exc: BaseException) -> bool:
+    """Whether the peer refused our token on the WebSocket.
+
+    This is a *different* failure from a rejected login: the token looked fine
+    by expiry, so the login path is never taken and the bad token would be
+    re-presented on every reconnect. Recognising the close code is what lets
+    the link recover on its own.
+    """
+    if _close_code_of(exc) == _WS_CLOSE_UNAUTHENTICATED:
+        return True
+    low = str(exc).lower()
+    return f"{_WS_CLOSE_UNAUTHENTICATED}" in low or "auth:" in low or "missing token" in low
+
+
 def _peer_fields(hello: Hello | None) -> dict[str, str | None]:
     """Keyword arguments for :meth:`BridgeManager._set_state` from a handshake.
 
@@ -195,6 +262,8 @@ class BridgeManager:
         #: connection resolve the conflict by comparing these, never by
         #: arrival order.
         self._instance_id = new_ulid()
+        #: Per-connection single-flight token acquisition (plan phase 14).
+        self._refreshers: dict[str, TokenRefresher] = {}
         self._client_tasks: dict[str, asyncio.Task[None]] = {}
         self._turn_waiters: dict[str, asyncio.Queue[dict[str, Any]]] = {}
         self._browser_waiters: dict[str, asyncio.Queue[dict[str, Any]]] = {}
@@ -570,8 +639,41 @@ class BridgeManager:
         sess = self._sessions.pop(connection_id, None)
         if sess is not None:
             await sess.close()
+        # Forget any cached peer token: a disconnect is a chance for the
+        # credential to have been revoked on the other side, and a token that
+        # survives here is one reconnect will happily reuse.
+        self._forget_token(connection_id)
         if self._repo.get(connection_id) is not None:
             self._set_state(connection_id, BridgeState.DISCONNECTED, clear_detail=True)
+
+    def _forget_token(self, connection_id: str) -> None:
+        """Drop the in-memory token and any in-flight login for a connection."""
+        refresher = self._refreshers.pop(connection_id, None)
+        if refresher is not None:
+            refresher.drop(connection_id)
+
+    async def revoke_credentials(self, connection_id: str, *, owner_user_id: int) -> None:
+        """Invalidate stored credentials and tear the link down immediately.
+
+        Called when the owner explicitly signs out of a peer. A password change
+        that leaves the old token cached would keep a socket alive with a
+        credential the user believes they revoked, and a revoked credential left
+        in the table is a credential left on disk.
+
+        Revocation clears the stored blobs as well as in-memory state — the row
+        survives so the connection can be re-pointed at a new peer.
+        """
+        self.get_owned(connection_id, owner_user_id)
+        await self.disconnect(connection_id)
+        self._user_stopped.discard(connection_id)
+        self._forget_token(connection_id)
+        self._repo.clear_credentials(connection_id)
+        self._set_state(
+            connection_id,
+            BridgeState.REAUTH_REQUIRED,
+            detail="credentials revoked by owner",
+            clear_detail=True,
+        )
 
     async def set_auto_reconnect(
         self, connection_id: str, *, owner_user_id: int, enabled: bool
@@ -759,6 +861,19 @@ class BridgeManager:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
+                if is_auth_rejection(exc):
+                    # The peer refused the token we already had. Drop it so the
+                    # next iteration logs in again; keep the stored password,
+                    # which may still be perfectly good.
+                    self._forget_token(connection_id)
+                    self._repo.clear_credentials(connection_id, keep_password=True)
+                    detail = f"peer rejected the stored token: {str(exc)[:200]}"
+                    self._set_state(
+                        connection_id, BridgeState.DEGRADED, detail=detail, clear_detail=True
+                    )
+                    self._reconnect_failures[connection_id] = 0
+                    await asyncio.sleep(_AUTH_RETRY_DELAY_SEC)
+                    continue
                 detail = str(exc)
                 low = detail.lower()
                 if "403" in detail or "404" in detail or "rejected websocket" in low:
@@ -823,33 +938,101 @@ class BridgeManager:
             except asyncio.CancelledError:
                 raise
 
-    async def _ensure_peer_token(self, row: BridgeConnectionRow) -> str:
+    def _refresher_for(self, row: BridgeConnectionRow) -> TokenRefresher:
+        """One refresher per connection, created on first use.
+
+        Keyed by connection rather than shared globally: two healthy links to
+        the same peer must not serialise behind a single login.
+        """
+        existing = self._refreshers.get(row.connection_id)
+        if existing is not None:
+            return existing
+        created = TokenRefresher(lambda: self._login_peer(row))
+        self._refreshers[row.connection_id] = created
+        return created
+
+    async def _login_peer(self, row: BridgeConnectionRow) -> str:
+        """POST /api/auth/login on the peer and commit the token via CAS.
+
+        The login round trip is slow and happens *outside* any lock, so the
+        version read on ``row`` may be stale by the time we write. Committing
+        only if it is unchanged is what stops a slow writer from clobbering a
+        token a faster writer already installed.
+        """
         from octop.infra.db.repos._base import now_ts
 
-        if row.access_token_blob:
-            data = decrypt_payload(self._secrets, row.access_token_blob)
-            token = str(data.get("access_token") or "").strip()
-            exp = row.token_expires_at
-            if token and (exp is None or exp > now_ts() + 60):
-                return token
         if not row.credential_blob:
-            raise OctopError(ErrorCode.BRIDGE_AUTH_FAILED, "no peer credentials stored")
+            raise RefreshRefused(RefreshFailure.NO_CREDENTIAL, "no peer credentials stored")
         creds = decrypt_payload(self._secrets, row.credential_blob)
         password = str(creds.get("password") or "")
-        login = await login_peer(
-            base_url=row.peer_base_url,
-            username=row.peer_username,
-            password=password,
-        )
+        try:
+            login = await login_peer(
+                base_url=row.peer_base_url,
+                username=row.peer_username,
+                password=password,
+            )
+        except OctopError as exc:
+            raise RefreshRefused(
+                classify_login_failure(_status_of(exc), detail=str(exc)),
+                "peer login failed",
+            ) from exc
         token = str(login["access_token"])
         expires_in = int(login.get("expires_in") or 0)
         expires_at = now_ts() + expires_in if expires_in > 0 else None
-        self._repo.update_credentials(
+        committed = self._repo.update_credentials_if_current(
             row.connection_id,
+            expected_token_version=row.token_version,
             access_token_blob=encrypt_payload(self._secrets, {"access_token": token}),
             token_expires_at=expires_at,
         )
+        if not committed:
+            # Someone else wrote first. Their value is the newer one, so keep
+            # it rather than overwriting a token that may be fresher than ours.
+            logger.info(
+                "bridge %s: skipped a stale token write (version moved during login)",
+                row.connection_id,
+            )
         return token
+
+    async def _ensure_peer_token(self, row: BridgeConnectionRow) -> str:
+        """Return a usable peer token, refreshing only when it is close to expiry.
+
+        Concurrent callers for one connection share a single login
+        (``TokenRefresher``), so a peer restart cannot turn into a login storm.
+        """
+        from octop.infra.db.repos._base import now_ts
+
+        refresher = self._refresher_for(row)
+        if row.access_token_blob:
+            data = decrypt_payload(self._secrets, row.access_token_blob)
+            token = str(data.get("access_token") or "").strip()
+            if token and not should_refresh(expires_at=row.token_expires_at, now=now_ts()):
+                refresher.seed(row.connection_id, token)
+                return token
+        try:
+            return await refresher.acquire(row.connection_id)
+        except RefreshRefused as exc:
+            revoked = exc.failure in (
+                RefreshFailure.CREDENTIAL_REVOKED,
+                RefreshFailure.NO_CREDENTIAL,
+            )
+            if revoked:
+                # The cached token is what the peer just rejected. Keeping it
+                # would re-present the same bad token on every reconnect, so
+                # the link could never recover on its own.
+                refresher.drop(row.connection_id)
+                self._repo.clear_credentials(row.connection_id)
+            # Persist the kind so the UI can say "sign in again" instead of
+            # "check the logs" for a credential that will never work.
+            self._set_state(
+                row.connection_id,
+                BridgeState.REAUTH_REQUIRED if revoked else BridgeState.DEGRADED,
+                detail=exc.detail[:500],
+            )
+            raise OctopError(
+                ErrorCode.BRIDGE_AUTH_FAILED,
+                f"peer authentication failed ({exc.failure})",
+            ) from exc
 
     async def _run_outbound_client(
         self, connection_id: str, peer_base_url: str, token: str
@@ -1117,12 +1300,21 @@ class BridgeManager:
                 "This action is not available through the remote bridge. Manage it on the peer Octop.",
             )
         sess = self.require_session(connection_id)
+        from octop.infra.db.repos._base import now_ts
+
+        audit = new_audit(
+            owner_user_id=owner_user_id,
+            now=now_ts(),
+            hub_instance_id=self._instance_id,
+        )
         result = await sess.tunnel_request(
             method=method,
             path=path,
             query=query,
             headers=headers,
             body=body,
+            timeout=float(audit.deadline_at - now_ts()),
+            audit_fields={"audit": audit},
         )
         if str(result.get("type") or "") == "tunnel.error":
             code_raw = str(result.get("code") or "").strip()
@@ -1163,6 +1355,10 @@ class BridgeManager:
         headers_raw = payload.get("headers")
         headers: dict[str, Any] = headers_raw if isinstance(headers_raw, dict) else {}
         body = decode_body_b64(payload)
+        # Refuse a request that arrives without an accountable actor: an
+        # unattributed write on this instance would be unauditable.
+        audit = audit_from_frame(payload)
+        logger.info("bridge tunnel %s", audit.describe())
         return await execute_local_http(
             app=self._asgi_app,
             method=method,
@@ -1171,6 +1367,7 @@ class BridgeManager:
             headers={str(k): str(v) for k, v in headers.items()},
             body=body,
             access_token=token,
+            audit=audit,
         )
 
     # -- agents via tunnel ---------------------------------------------------

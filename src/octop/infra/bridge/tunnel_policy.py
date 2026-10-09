@@ -12,6 +12,7 @@ Management / auth / bridge control planes stay local-only.
 from __future__ import annotations
 
 import re
+from urllib.parse import unquote
 
 # Only agent-scoped product surfaces may be executed on behalf of the connection
 # owner. Management / auth / bridge control planes stay local-only.
@@ -19,7 +20,7 @@ _AGENT_COLLECTION = re.compile(r"^/api/agents/?$")
 _AGENT_RESOURCE = re.compile(
     r"^/api/agents/"
     r"(?:bridge:[^/]+|[^/]+)"
-    r"(?:/(?:threads|history|uploads|avatar|icon|chat|messages|files|workspace"
+    r"(?:/(?:threads|history|upload|avatar|icon|chat|messages|files|workspace"
     r"|attachments|media|turns|memory|skills|tools|tool-settings|mbti|persona"
     r"|channels|cron|config|state|status|welcome|members|subagents|reload|acp"
     r")(?:/.*)?)?$"
@@ -56,8 +57,8 @@ _UPLOAD_SESSIONS = re.compile(r"^/api/uploads/sessions(?:/[^/]+(?:/(?:parts/[^/]
 _UPLOAD_BLOBS = re.compile(r"^/api/uploads/blobs/[^/]+$")
 
 
-def is_tunnel_path_allowed(method: str, path: str) -> bool:
-    """Return True when ``method`` + ``path`` may run via an inbound tunnel."""
+def _matches(method: str, path: str) -> bool:
+    """The allow-list itself, applied to one concrete path form."""
     verb = (method or "GET").upper()
     raw = (path or "").split("?", 1)[0].strip() or "/"
     if not raw.startswith("/"):
@@ -106,3 +107,48 @@ def is_tunnel_path_allowed(method: str, path: str) -> bool:
         return verb == "GET"
 
     return False
+
+
+def normalize_tunnel_path(path: str) -> str | None:
+    """Canonical form of a tunnel path, or ``None`` if it cannot be trusted.
+
+    Only paths that are *already* canonical are accepted. A path that needs
+    ``.``, ``..``, ``//``, percent-decoding or a backslash to be understood is
+    refused outright rather than resolved, because the component that finally
+    routes it may resolve differently than we did — and which one wins would
+    decide whether the allow-list was honoured at all.
+    """
+    raw = (path or "").split("?", 1)[0].strip()
+    if not raw.startswith("/"):
+        return None
+    if "\\" in raw:
+        return None
+
+    decoded = unquote(raw)
+    if decoded != raw:
+        # Either an escape sequence, or a double-encoded one. Both mean the
+        # literal path and the routed path can differ.
+        return None
+
+    trimmed = decoded.rstrip("/") or "/"
+    if trimmed == "/":
+        return None
+    segments = trimmed.split("/")[1:]
+    if not segments:
+        return None
+    for segment in segments:
+        if segment in ("", ".", ".."):
+            return None
+    return "/" + "/".join(segments)
+
+
+def is_tunnel_path_allowed(method: str, path: str) -> bool:
+    """Allow-list check applied to the canonical form of the path.
+
+    The raw form must already *be* canonical, so there is only ever one path
+    the allow-list has to reason about.
+    """
+    normalized = normalize_tunnel_path(path)
+    if normalized is None:
+        return False
+    return _matches(method, normalized)

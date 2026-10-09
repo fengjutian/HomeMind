@@ -35,6 +35,9 @@ class BridgeConnectionRow:
     peer_instance_id: str | None = None
     connected_since: int | None = None
     reconnect_attempts: int = 0
+    #: Plan phase 14: bumped by every credential write so writers can CAS.
+    token_version: int = 0
+    credentials_updated_at: int | None = None
     created_at: int = 0
     updated_at: int = 0
 
@@ -76,18 +79,20 @@ class BridgeConnectionRow:
             ),
             state_detail=r["state_detail"] if "state_detail" in keys else None,
             peer_protocol=r["peer_protocol"] if "peer_protocol" in keys else None,
-            peer_instance_id=(
-                r["peer_instance_id"] if "peer_instance_id" in keys else None
-            ),
+            peer_instance_id=(r["peer_instance_id"] if "peer_instance_id" in keys else None),
             connected_since=(
                 int(r["connected_since"])
                 if "connected_since" in keys and r["connected_since"] is not None
                 else None
             ),
             reconnect_attempts=(
-                int(r["reconnect_attempts"] or 0)
-                if "reconnect_attempts" in keys
-                else 0
+                int(r["reconnect_attempts"] or 0) if "reconnect_attempts" in keys else 0
+            ),
+            token_version=int(r["token_version"] or 0) if "token_version" in keys else 0,
+            credentials_updated_at=(
+                int(r["credentials_updated_at"])
+                if "credentials_updated_at" in keys and r["credentials_updated_at"] is not None
+                else None
             ),
             created_at=int(r["created_at"]),
             updated_at=int(r["updated_at"]),
@@ -193,7 +198,15 @@ class BridgeConnectionRepo:
         credential_blob: bytes | None = None,
         access_token_blob: bytes | None = None,
         token_expires_at: int | None = None,
-    ) -> None:
+    ) -> int:
+        """Unconditional credential write. Returns the new ``token_version``.
+
+        Use this for a write that is *not* carrying a version it read earlier
+        (an operator edit, a probe). A writer that did slow work against a
+        version it read must use :meth:`update_credentials_if_current` instead.
+        Either way the version moves, so a conditional writer can detect that
+        something else wrote in the meantime.
+        """
         ts = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
@@ -201,9 +214,73 @@ class BridgeConnectionRepo:
                 "credential_blob = COALESCE(?, credential_blob), "
                 "access_token_blob = COALESCE(?, access_token_blob), "
                 "token_expires_at = COALESCE(?, token_expires_at), "
-                "updated_at = ? WHERE connection_id = ?",
-                (credential_blob, access_token_blob, token_expires_at, ts, connection_id),
+                "token_version = token_version + 1, "
+                "credentials_updated_at = ?, updated_at = ? WHERE connection_id = ?",
+                (credential_blob, access_token_blob, token_expires_at, ts, ts, connection_id),
             )
+            row = conn.execute(
+                "SELECT token_version FROM bridge_connections WHERE connection_id = ?",
+                (connection_id,),
+            ).fetchone()
+        return int(row["token_version"]) if row is not None else 0
+
+    def clear_credentials(self, connection_id: str, *, keep_password: bool = False) -> bool:
+        """Drop the stored token, and the password too unless asked otherwise.
+
+        Distinct from ``update_credentials``, which uses COALESCE and therefore
+        *keeps* an existing value when passed ``None``. Revocation needs the
+        opposite: the credential must actually leave the table, or a credential
+        the user revoked is still on disk.
+
+        ``keep_password`` is for the case where only the *token* was rejected —
+        the stored password may still be perfectly good, and re-authenticating
+        with it is how the link recovers without an operator.
+        """
+        ts = now_ts()
+        password_expr = "credential_blob" if keep_password else "credential_blob = NULL"
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                f"UPDATE bridge_connections SET {password_expr}, "
+                "access_token_blob = NULL, token_expires_at = NULL, "
+                "token_version = token_version + 1, "
+                "credentials_updated_at = ?, updated_at = ? WHERE connection_id = ?",
+                (ts, ts, connection_id),
+            )
+        return int(getattr(cursor, "rowcount", 0) or 0) > 0
+
+    def update_credentials_if_current(
+        self,
+        connection_id: str,
+        *,
+        expected_token_version: int,
+        access_token_blob: bytes | None = None,
+        token_expires_at: int | None = None,
+    ) -> bool:
+        """Compare-and-swap credential write.
+
+        Returns ``False`` when another writer moved ``token_version`` while
+        this one was doing its slow work — the caller must re-read and retry
+        rather than clobber the newer value.
+        """
+        ts = now_ts()
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                "UPDATE bridge_connections SET "
+                "access_token_blob = COALESCE(?, access_token_blob), "
+                "token_expires_at = COALESCE(?, token_expires_at), "
+                "token_version = token_version + 1, "
+                "credentials_updated_at = ?, updated_at = ? "
+                "WHERE connection_id = ? AND token_version = ?",
+                (
+                    access_token_blob,
+                    token_expires_at,
+                    ts,
+                    ts,
+                    connection_id,
+                    expected_token_version,
+                ),
+            )
+        return int(getattr(cursor, "rowcount", 0) or 0) > 0
 
     def set_state(
         self,

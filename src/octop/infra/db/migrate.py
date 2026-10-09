@@ -1586,6 +1586,14 @@ _LEGACY_STATE_BACKFILL: tuple[tuple[str, str], ...] = (
 )
 
 
+def _ensure_bridge_token_version_schema(db: DatabasePool) -> None:
+    """Plan phase 14: the compare-and-swap counter for credential writes."""
+    if not _table_exists(db, "bridge_connections"):
+        return
+    _ensure_column(db, "bridge_connections", "token_version", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(db, "bridge_connections", "credentials_updated_at", "INTEGER")
+
+
 def _ensure_bridge_state_schema(db: DatabasePool) -> None:
     """Plan phase 13: the eight-state connection machine on bridge_connections.
 
@@ -1950,6 +1958,11 @@ def _apply_sqlite_migration(db: DatabasePool, version: int, path: Path) -> None:
         with db.connect() as conn:
             conn.execute("UPDATE _schema_version SET version = ?", (version,))
         return
+    if version == 23:
+        _ensure_bridge_token_version_schema(db)
+        with db.connect() as conn:
+            conn.execute("UPDATE _schema_version SET version = ?", (version,))
+        return
     sql = path.read_text(encoding="utf-8")
     with db.connect() as conn:
         conn.executescript(sql)
@@ -2008,3 +2021,4 @@ def run_migrations(db: DatabasePool) -> None:
     _ensure_user_role_schema(db)
     _ensure_bridge_connections_schema(db)
     _ensure_bridge_state_schema(db)
+    _ensure_bridge_token_version_schema(db)

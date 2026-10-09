@@ -283,3 +283,21 @@ $env:PYTHONPATH="src"; .\.venv\Scripts\python.exe -m pytest <paths> -q -p no:cac
 - **确定性 dial 裁决**（`protocol.arbitrate_dial`）。原来是 last-writer-wins（`manager.py` 后到者踢掉先到者），意味着**存活的连接取决于时序**，两个包一交叉结果就可能翻转。改为按 `instance_id` 裁决：两边各自只用两个 id 就能独立算出**同一个**答案，无需额外往返。
   - 老对端没有 `instance_id` 时不驱逐在位会话（`incumbent-keeps`）。
   - 落败方抛 `DialYielded` 并关闭自己的 socket，而不是静默失败。
+
+### 8.4 阶段 14：token 刷新与凭据生命周期（进行中）
+
+- **single-flight**（`infra/bridge/token_refresh.py`）。原先每个重连各自调 `_ensure_peer_token`，对端重启时 N 条链路同时登录 N 次，把**用户自己实例的限流器**打爆。现在同一连接共享一次登录；**不同连接互不阻塞**（两条到同一对端的健康链路不该排在一次慢登录后面）。失败的登录**不缓存**——否则一次抖动会永久毒化这条连接。
+- **抖动**。原先固定 60s 阈值，全世界实例在同一偏移刷新，重连聚集成波。改为提前 5 分钟刷新 + 抖动，**均值不变**（只把窗口摊开）。
+- **错误分类 → 状态机**。原先「不可达 / 凭据撤销 / 对端维护」全是同一个 `BRIDGE_AUTH_FAILED`，运维分不清。现在分 4 类并落到 8 态：凭据撤销/无凭据 → `REAUTH_REQUIRED`（重试无用，运维需重新登录）；不可达/服务端错误 → `DEGRADED`（等会重试）。**这是 8 态状态机第一次产生用户可见价值。**
+- **CAS token 写入**（迁移 `023_bridge_token_version`，水位 22 → 23）。`update_credentials` 原是无条件 `COALESCE` 覆盖，**两条连接可能互相覆盖新 token**。新增 `token_version`，登录（慢操作，在锁外）后仅在版本未变时提交；被拒绝时保留对方的更新值。
+- **立即失效**。`disconnect` 现在清掉缓存 token；新增 `revoke_credentials()` 供改密/注销调用——改密后若旧 token 仍在缓存里，socket 会带着用户以为已撤销的凭据继续活着。
+
+### 8.5 阶段 15：tunnel header 加固（进行中）
+
+- **header 从 denylist 改为 allow-list**（`http_tunnel.py`）。原来的 6 项 denylist 漏一个就漏一个：对端**未来新增的任何 header 都会被默认转发**。现在只转发白名单内的，其余全部丢弃。
+  - 剥离 `X-Forwarded-*` / `X-Real-IP` / `Forwarded` / `Via`：否则调用方可以伪造来源 IP，**让对端的审计日志记录一个从未发生过的地址**。
+  - 剥离 `Authorization` / `Cookie` / `Set-Cookie` / `X-Api-Key`：隧道请求以连接 owner 身份执行，转发 dashboard 的会话 cookie 等于把凭据交给另一个实例。
+  - 保留 `X-Chunk-SHA256` / `X-Octop-Agent-Id` / `Content-Type` / `Range` 等续传与下载需要的头。
+- **代理侧同样加固**（`bridge_proxy._forward_headers`）。原先只剥离 5 个头，**cookie 直接转发到对端**。现在与隧道侧共用同一套判定。
+- **path 必须已是规范形式**（`tunnel_policy.normalize_tunnel_path`）。含 `.` / `..` / `//` / 反斜杠 / 百分号编码的路径**一律拒绝而不是解析**——需要归一化才能理解的路径，其字面形态和最终路由形态可能不同，而「哪个赢」会决定白名单到底有没有被遵守。允许列表因此只需面对一种形态。
+- **修一个既有笔误**：真实路由是 `/api/agents/{id}/upload`（单数），允许列表里写的是 `uploads`（复数）。**通过 Bridge 远程发聊天附件此前被完全拦死**——功能根本不可用。
