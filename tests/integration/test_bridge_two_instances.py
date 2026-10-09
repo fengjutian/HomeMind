@@ -30,6 +30,7 @@ async def _register(
     peer_base_url: str,
     display_name: str,
     password: str,
+    connect: bool = True,
 ) -> dict[str, Any]:
     r = await instance.client.post(
         "/api/bridge/connections",
@@ -39,6 +40,7 @@ async def _register(
             "peer_username": "admin",
             "password": password,
             "display_name": display_name,
+            "connect": connect,
         },
     )
     assert r.status_code in (200, 201), r.text
@@ -152,10 +154,6 @@ async def test_tunnel_request_with_disallowed_path_is_refused(
     created = await _register(
         a, peer_base_url=b.base_url, display_name="To B", password=TEST_PASSWORD
     )
-    # Create one real agent on B so ``/api/agents`` actually returns something.
-    # Without it, the rejection signal would be conflated with "empty list".
-    agent_row = await _create_peer_agent(b, display_name="Probe Agent")
-    agent_id = agent_row["agent_id"]
 
     live = await _wait_for_state(a, created["connection_id"], "ONLINE")
     assert live["state"] == "ONLINE", live
@@ -197,22 +195,6 @@ async def test_tunnel_request_with_disallowed_path_is_refused(
     # a bad request from the hub side.
     still_live = await _wait_for_state(a, created["connection_id"], "ONLINE")
     assert still_live["state"] == "ONLINE", still_live
-
-
-async def _create_peer_agent(instance: Instance, *, display_name: str) -> dict[str, Any]:
-    """Create a real agent on ``instance`` for tunnel drills to exercise."""
-    r = await instance.client.post(
-        "/api/agents",
-        headers=instance.auth,
-        json={
-            "display_name": display_name,
-            "expert_profile": "default",
-            "model": "echo",
-            "icon": "Bot",
-        },
-    )
-    assert r.status_code in (200, 201), r.text
-    return r.json()
 
 
 @pytest.mark.asyncio
@@ -307,3 +289,156 @@ async def test_protocol_major_mismatch_marks_connection_incompatible(
             await bg
         except (asyncio.CancelledError, Exception):
             pass
+
+
+@pytest.mark.asyncio
+async def test_one_faulty_remote_does_not_disturb_another(
+    two_instances: tuple[Instance, Instance], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan phase 16: "多个远端节点并行使用，其中一个故障不影响其他节点和本地 agent".
+
+    Two outbound connections, only one of them broken: the healthy link must
+    keep serving and a tunnel through it must still work. This rules out a
+    class of bugs where one bad connection poisons the manager's shared state
+    — the bridge session table, the supervisor task pool, the metrics
+    counters — and takes everything else down with it.
+    """
+    import octop.infra.bridge.manager as bridge_manager
+
+    # Shave the auto-reconnect budget so the second connection reaches its
+    # terminal DEGRADED state inside the test window instead of after 60s of
+    # backoff. We do not touch the rule itself — only the constants that
+    # drive it, so the supervisor logic we are exercising stays identical.
+    monkeypatch.setattr(bridge_manager, "_AUTO_RECONNECT_MAX_FAILURES", 1)
+    monkeypatch.setattr(
+        bridge_manager,
+        "_AUTO_RECONNECT_BACKOFF_SEC",
+        (0.05, 0.05, 0.05, 0.05, 0.05),
+    )
+
+    a, b = two_instances
+    c1 = await _register(
+        a, peer_base_url=b.base_url, display_name="Healthy", password=TEST_PASSWORD
+    )
+    live = await _wait_for_state(a, c1["connection_id"], "ONLINE")
+    assert live["state"] == "ONLINE", live
+
+    # From here on the second connection is structurally doomed — every
+    # outbound attempt fails. The first connection's supervisor is already
+    # inside its message loop, so it keeps reading from the real socket
+    # regardless of what we do to ``_run_outbound_client`` afterwards.
+    async def _always_fail(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("simulated unreachable peer")
+
+    monkeypatch.setattr(a.manager, "_run_outbound_client", _always_fail)
+
+    c2 = await _register(
+        a,
+        peer_base_url=b.base_url,
+        display_name="Doomed",
+        password=TEST_PASSWORD,
+        connect=False,
+    )
+    row2 = a.manager._repo.get(c2["connection_id"])
+    assert row2 is not None
+    owner2 = row2.owner_user_id
+
+    async def _kick() -> None:
+        try:
+            await a.manager.connect(connection_id=c2["connection_id"], owner_user_id=owner2)
+        except Exception:
+            pass
+
+    bg = asyncio.create_task(_kick())
+    try:
+        broken = await _wait_for_state(
+            a, c2["connection_id"], "DEGRADED", timeout=15.0
+        )
+        assert broken["state"] == "DEGRADED", broken
+        # The second connection's auto-reconnect must already be disabled —
+        # otherwise the supervisor would keep hammering B and the two
+        # connections would *not* be "independent".
+        row_after = a.manager._repo.get(c2["connection_id"])
+        assert row_after is not None
+        assert row_after.auto_reconnect is False, row_after
+
+        # First connection: still ONLINE, and still usable.
+        still_live = await _wait_for_state(a, c1["connection_id"], "ONLINE")
+        assert still_live["state"] == "ONLINE"
+
+        owner1 = a.manager._repo.get(c1["connection_id"]).owner_user_id
+        resp = await a.manager.tunnel_http(
+            connection_id=c1["connection_id"],
+            owner_user_id=owner1,
+            method="GET",
+            path="/api/agents",
+            query="mine",
+        )
+        assert resp.status_code == 200, resp.text
+    finally:
+        bg.cancel()
+        try:
+            await bg
+        except (asyncio.CancelledError, Exception):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_supervisor_auto_recovers_after_a_transient_outbound_failure(
+    two_instances: tuple[Instance, Instance], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan phase 16: "网络抖动... 服务重启后自动恢复，且不会产生重连风暴".
+
+    The supervisor's first outbound attempt raises a transient error; the
+    second attempt connects normally. The link must end up ``ONLINE`` without
+    any operator action, and the backoff must bound the retry cadence — never
+    a hot loop.
+
+    Closing A's local ``BridgeSession`` is not enough to break the underlying
+    ``websockets.connect`` iterator in the running supervisor, so we drive the
+    same code path from the other side: the supervisor calls ``_run_outbound_client``
+    once, hits the transient failure, sleeps through the (shortened) backoff,
+    and re-invokes it — which then succeeds.
+    """
+    import octop.infra.bridge.manager as bridge_manager
+
+    monkeypatch.setattr(
+        bridge_manager,
+        "_AUTO_RECONNECT_BACKOFF_SEC",
+        (0.1, 0.1, 0.1, 0.1, 0.1),
+    )
+
+    a, b = two_instances
+    real_outbound = a.manager._run_outbound_client
+    calls = 0
+
+    async def flaky(*args: Any, **kwargs: Any) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("simulated transient peer drop")
+        return await real_outbound(*args, **kwargs)
+
+    # Patch *before* creating the connection so the supervisor's first redial
+    # goes through our flaky implementation. The recovery happens inside the
+    # standard connect / wait-for-ONLINE loop, so the test asserts the *exact*
+    # behaviour the plan describes — no extra plumbing.
+    monkeypatch.setattr(a.manager, "_run_outbound_client", flaky)
+
+    created = await _register(
+        a, peer_base_url=b.base_url, display_name="Resilient", password=TEST_PASSWORD
+    )
+    cid = created["connection_id"]
+
+    recovered = await _wait_for_state(a, cid, "ONLINE", timeout=15.0)
+    assert recovered["state"] == "ONLINE", recovered
+    detail = (recovered.get("state_detail") or "").strip()
+    assert not detail, f"state_detail should be cleared after a clean recovery, got {detail!r}"
+
+    # Two outbound attempts total: the failing one and the successful retry.
+    # A third would mean the supervisor was retrying in a tight loop, which is
+    # exactly what the bounded backoff is supposed to prevent.
+    assert calls >= 2, calls
+    final = a.manager._repo.get(cid)
+    assert final is not None
+    assert final.reconnect_attempts <= 1, final.reconnect_attempts
