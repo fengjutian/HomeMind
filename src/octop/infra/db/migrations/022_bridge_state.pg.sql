@@ -32,10 +32,11 @@ ALTER TABLE bridge_connections
 CREATE INDEX IF NOT EXISTS idx_bridge_connections_state
   ON bridge_connections(owner_user_id, state);
 
--- Backfill: map the legacy free-text values onto the new vocabulary.
-UPDATE bridge_connections SET state = 'ONLINE'    WHERE status = 'connected';
-UPDATE bridge_connections SET state = 'CONNECTING' WHERE status = 'connecting';
-UPDATE bridge_connections SET state = 'DEGRADED'  WHERE status = 'error';
-UPDATE bridge_connections SET state = 'DISCONNECTED' WHERE status = 'disconnected';
+-- Backfill: map the legacy free-text values onto the new vocabulary. Guarded
+-- so a re-run cannot undo a state the manager has since written.
+UPDATE bridge_connections SET state = 'ONLINE'       WHERE status = 'connected'     AND state = 'DISCONNECTED';
+UPDATE bridge_connections SET state = 'CONNECTING'   WHERE status = 'connecting'    AND state = 'DISCONNECTED';
+UPDATE bridge_connections SET state = 'DEGRADED'     WHERE status = 'error'         AND state = 'DISCONNECTED';
+UPDATE bridge_connections SET state = 'DISCONNECTED' WHERE status = 'disconnected'  AND state = 'DISCONNECTED';
 
 UPDATE _schema_version SET version = 22;

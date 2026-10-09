@@ -209,7 +209,9 @@ async def test_finalize_inbound_offline_keeps_row() -> None:
     sess = BridgeSession(connection_id="cid1", send_text=AsyncMock())
     await mgr._finalize_inbound("cid1", sess)
     mgr._repo.delete.assert_not_called()
-    mgr._repo.update_status.assert_called_once()
+    # State writes go through ``set_state`` (plan phase 13), which keeps the
+    # legacy ``status`` column in step from one mapping.
+    mgr._repo.set_state.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -221,7 +223,7 @@ async def test_finalize_inbound_deleted_drops_row() -> None:
     sess.close_reason = "deleted"
     await mgr._finalize_inbound("cid1", sess)
     mgr._repo.delete.assert_called_once_with("cid1")
-    mgr._repo.update_status.assert_not_called()
+    mgr._repo.set_state.assert_not_called()
 
 
 def test_inbound_default_display_name_skips_url_and_id() -> None:

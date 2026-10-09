@@ -262,3 +262,24 @@ $env:PYTHONPATH="src"; .\.venv\Scripts\python.exe -m pytest <paths> -q -p no:cac
 - **统一能力模型**：`infra/family/smart_home_descriptors.py`。能力按**生态自身的 domain/attribute 映射，映射表里没有任何品牌名**（有测试断言 `xiaomi/huawei/philips/matter` 一个都不出现）。`DeviceState.raw` 按 adapter 命名空间隔离，`agent_view()` 是唯一允许给 Agent 的投影。
 - **设备身份**：迁移 `026_smart_home_health`（`025` 已被资产传输占用）新增 provider 健康字段与 `device_key`；`device_key` 取集成自己的 device id，**改名字不会fork出新设备**，同一物理设备的多个 entity 聚合到一个 key。
 - **不复用 `device.command`（计划偏离，代码为准）**：计划写「命令继续走现有 `device.command` Transaction」，但该 handler 是给**配对设备**（手机/电脑）投递命令并停在 `AWAITING_DEVICE` 等回执的；智能家居实体是**服务端经 adapter 执行**、可立即验证。硬塞会把 HA 的灯挂到没人轮询的设备队列上。故新增独立 action `smart_device.command`，走**同一条** Transaction 流水线（Permission → Approval → Execute → Verify → Audit），并保留「服务端执行 + 立即 verify」。
+- **实体剪枝**（修阶段 0 发现的缺陷）：`sync_entities` 从不删旧行，设备在 HA 移除后 DB 永久留存 → UI 幽灵设备。新增 `prune_missing_entities`，并遵守**空快照 ≠ 全没了**（一次超时不能清空整张设备地图）。
+- **脱敏 HA fixture**（`tests/unit/homemind/ha_fixtures.py`）：计划要求「测试用录制后脱敏的 fixture，CI 不得连真实家庭网络」，此前该仓库没有此基础设施。
+- **WebSocket 订阅**（`infra/family/smart_home_subscription.py`）：增量事件 + 有上限的退避重连 + **每次重连后全量 reconcile**（断线期间的变化增量流永远看不到，跳过这一步会让「已连接」的集成静默提供数小时过期数据）+ 重复事件按指纹去重。
+- **修两个真实缺陷**：`color_temp_kelvin` 未被识别为色温能力（HA 真实字段名是它，不是 `color_temp`）；`vacuum` 不在任何风险分层里 → 兜底判成 BLOCKED，正好用上一直定义却从不返回的 `RISK_MEDIUM`。
+- **阶段 7/8 技术部分**：小米/华为设备**走与任何其他品牌完全相同的代码路径**（65 例断言 capabilities 一致、风险不变、厂商锁/摄像头/安防仍 BLOCKED、区域/账号不进 Agent 视图）。仅新增 fixture + `docs/smart-home-setup.md` + `smartHome` i18n 命名空间，**未做任何厂商直连**（符合 §1.7）。
+
+### 8.3 阶段 13：Bridge 协议与状态机（进行中）
+
+- **协议协商**（`infra/bridge/protocol.py`）。原来 `protocol_version != PROTOCOL_VERSION` 用裸整数全等比较，minor 不同也断连。改为 `major.minor` + 能力位交集：
+  - major 不同 → 拒绝，并说明是哪边什么版本；
+  - minor 不同 → 协商降级；
+  - **老对端发裸整数 `1` 仍然连通**（过渡期保证：升级当天不会断掉已部署的链路）；
+  - 版本字段无法解析 → 按老版本处理而非拒绝（外观改动不该引发全局中断）。
+- **8 态连接状态机**（`infra/bridge/states.py` + 迁移 `022_bridge_state`，水位 21 → 22）。原来 4 个自由字符串把 `REAUTH_REQUIRED` / `INCOMPATIBLE` / `DISABLED` 全压成 `error`，运维分不清「重试会好」和「必须人工介入」。新增 `state` 列，旧 `status` 列由**同一张映射表**同步写入。
+  - **repo 层保持 SQL-only**：`infra/db/repos/` 不得 import 非 DB 的 infra 包，所以新→旧的映射只放在 `bridge/states.py`，由 `persist_state()` 传给 repo。两份映射必然漂移。
+  - **迁移必须幂等**：v22 的列同时由 `migrate._ensure_bridge_state_schema` 追加。只有迁移文件时，水位被 clamp 或从旧物理库恢复会导致 ALTER 执行两次报 `duplicate column`。
+  - `connection_public()` 是**超集**：旧 `status` 一字未改，新增 `state` / `retry_may_help` / 诊断字段。
+  - **陈旧行不伪装在线**：行说 ONLINE 但没有活 socket 时，对外报 `DISCONNECTED`。
+- **确定性 dial 裁决**（`protocol.arbitrate_dial`）。原来是 last-writer-wins（`manager.py` 后到者踢掉先到者），意味着**存活的连接取决于时序**，两个包一交叉结果就可能翻转。改为按 `instance_id` 裁决：两边各自只用两个 id 就能独立算出**同一个**答案，无需额外往返。
+  - 老对端没有 `instance_id` 时不驱逐在位会话（`incumbent-keeps`）。
+  - 落败方抛 `DialYielded` 并关闭自己的 socket，而不是静默失败。

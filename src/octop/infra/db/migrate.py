@@ -1564,6 +1564,46 @@ def _ensure_skill_copy_policy_schema(db: DatabasePool) -> None:
     _ensure_column(db, "skill_packages", "copy_policy", "TEXT NOT NULL DEFAULT 'snapshot'")
 
 
+#: Columns added by v22. Kept here (not only in the migration file) so a
+#: database whose watermark was clamped backwards, or one restored from a
+#: physical pre-v22 schema, converges to the same shape without the ALTER
+#: running twice.
+_BRIDGE_STATE_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("state", "TEXT NOT NULL DEFAULT 'DISCONNECTED'"),
+    ("state_changed_at", "INTEGER"),
+    ("state_detail", "TEXT"),
+    ("peer_protocol", "TEXT"),
+    ("peer_instance_id", "TEXT"),
+    ("connected_since", "INTEGER"),
+    ("reconnect_attempts", "INTEGER NOT NULL DEFAULT 0"),
+)
+
+_LEGACY_STATE_BACKFILL: tuple[tuple[str, str], ...] = (
+    ("connected", "ONLINE"),
+    ("connecting", "CONNECTING"),
+    ("error", "DEGRADED"),
+    ("disconnected", "DISCONNECTED"),
+)
+
+
+def _ensure_bridge_state_schema(db: DatabasePool) -> None:
+    """Plan phase 13: the eight-state connection machine on bridge_connections.
+
+    The legacy ``status`` column is left in place and kept in step by the repo;
+    the backfill maps what it meant onto what the new vocabulary can express.
+    """
+    if not _table_exists(db, "bridge_connections"):
+        return
+    for column, definition in _BRIDGE_STATE_COLUMNS:
+        _ensure_column(db, "bridge_connections", column, definition)
+    with db.connect() as conn:
+        for legacy, state in _LEGACY_STATE_BACKFILL:
+            conn.execute(
+                "UPDATE bridge_connections SET state = ? WHERE status = ? AND state IS NULL",
+                (state, legacy),
+            )
+
+
 def _ensure_bridge_connections_schema(db: DatabasePool) -> None:
     """Fold notes + unique display_name + auto_reconnect into unreleased v19."""
     if not _table_exists(db, "bridge_connections"):
@@ -1903,6 +1943,13 @@ def _apply_sqlite_migration(db: DatabasePool, version: int, path: Path) -> None:
         with db.connect() as conn:
             conn.execute("UPDATE _schema_version SET version = ?", (version,))
         return
+    if version == 22:
+        # Idempotent helper, not the raw file: a clamped watermark or a
+        # restored pre-v22 database would otherwise run the ALTERs twice.
+        _ensure_bridge_state_schema(db)
+        with db.connect() as conn:
+            conn.execute("UPDATE _schema_version SET version = ?", (version,))
+        return
     sql = path.read_text(encoding="utf-8")
     with db.connect() as conn:
         conn.executescript(sql)
@@ -1960,3 +2007,4 @@ def run_migrations(db: DatabasePool) -> None:
     _ensure_sso_provider_kind_schema(db)
     _ensure_user_role_schema(db)
     _ensure_bridge_connections_schema(db)
+    _ensure_bridge_state_schema(db)

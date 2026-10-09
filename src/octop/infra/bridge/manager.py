@@ -35,9 +35,11 @@ from octop.infra.bridge.protocol import (
     PROTOCOL_MINOR,
     Hello,
     ProtocolIncompatible,
+    arbitrate_dial,
     build_hello,
     negotiate,
 )
+from octop.infra.bridge.states import BridgeState, coerce_state, persist_state
 from octop.infra.bridge.transport import BridgeSession
 from octop.infra.db.repos.bridge_connections import BridgeConnectionRepo, BridgeConnectionRow
 from octop.infra.db.repos.secrets import SecretRepo
@@ -141,6 +143,35 @@ def _probe_agent_summary(
     }
 
 
+class DialYielded(Exception):
+    """This instance lost a simultaneous dial and stepped aside.
+
+    Not an error: the peer keeps the connection by the agreed instance-id
+    rule, and the next auto-reconnect attempt is a no-op because the session
+    is already gone. It is raised rather than swallowed so the caller stops
+    treating this socket as live.
+    """
+
+    def __init__(self, connection_id: str, winner: str) -> None:
+        super().__init__(f"dial for {connection_id} yielded to instance {winner}")
+        self.connection_id = connection_id
+        self.winner = winner
+
+
+def _peer_fields(hello: Hello | None) -> dict[str, str | None]:
+    """Keyword arguments for :meth:`BridgeManager._set_state` from a handshake.
+
+    ``None`` fields mean "keep whatever is stored", so an un-negotiated peer
+    does not blank a previously recorded version.
+    """
+    if hello is None or hello.peer_version is None:
+        return {"peer_protocol": None, "peer_instance_id": None}
+    return {
+        "peer_protocol": str(hello.peer_version),
+        "peer_instance_id": hello.peer_instance_id or None,
+    }
+
+
 class BridgeManager:
     def __init__(
         self,
@@ -200,6 +231,38 @@ class BridgeManager:
 
     # -- persistence helpers -------------------------------------------------
 
+    def _set_state(
+        self,
+        connection_id: str,
+        state: BridgeState,
+        *,
+        detail: str | None = None,
+        clear_detail: bool = False,
+        peer_protocol: str | None = None,
+        peer_instance_id: str | None = None,
+    ) -> None:
+        """Record a connection state, keeping the legacy column in step.
+
+        Every state write goes through here so ``state`` and ``status`` can
+        never drift apart.
+        """
+        persist_state(
+            self._repo,
+            connection_id,
+            state,
+            detail=detail,
+            clear_detail=clear_detail,
+            peer_protocol=peer_protocol,
+            peer_instance_id=peer_instance_id,
+        )
+
+    def _touch_seen(self, connection_id: str) -> None:
+        """Bump ``last_seen_at`` without disturbing the state machine."""
+        row = self._repo.get(connection_id)
+        if row is None:
+            return
+        self._repo.update_status(connection_id, status=row.status, touch_seen=True)
+
     def list_connections(self, owner_user_id: int) -> list[BridgeConnectionRow]:
         return self._repo.list_for_owner(owner_user_id)
 
@@ -229,10 +292,16 @@ class BridgeManager:
     def connection_public(self, row: BridgeConnectionRow) -> dict[str, Any]:
         live = self._sessions.get(row.connection_id)
         status = row.status
+        state = coerce_state(row.state)
         if live is not None and not live.closed:
             status = "connected"
+            state = BridgeState.ONLINE
         elif status == "connected":
             status = "disconnected"
+            # A row that claims ONLINE while no socket exists is stale; report
+            # it as such instead of pretending the link is up.
+            if state is BridgeState.ONLINE:
+                state = BridgeState.DISCONNECTED
         return {
             "connection_id": row.connection_id,
             "peer_base_url": row.peer_base_url,
@@ -240,7 +309,15 @@ class BridgeManager:
             "display_name": row.display_name,
             "notes": row.notes,
             "icon_name": row.icon_name,
+            # ``status`` is the legacy two-value field and is unchanged.
             "status": status,
+            "state": state.value,
+            "state_detail": row.state_detail,
+            "retry_may_help": state.retry_may_help,
+            "peer_protocol": row.peer_protocol,
+            "peer_instance_id": row.peer_instance_id,
+            "connected_since": row.connected_since,
+            "reconnect_attempts": row.reconnect_attempts,
             "last_error": row.last_error,
             "last_seen_at": row.last_seen_at,
             "auto_reconnect": bool(row.auto_reconnect),
@@ -451,7 +528,7 @@ class BridgeManager:
                 # Supervisor already running (reconnect wait) — wait for live session.
                 pass
             else:
-                self._repo.update_status(connection_id, status="connecting", last_error=None)
+                self._set_state(connection_id, BridgeState.CONNECTING, clear_detail=True)
                 self._reconnect_failures[connection_id] = 0
                 task = asyncio.create_task(
                     self._outbound_supervisor(connection_id),
@@ -463,9 +540,13 @@ class BridgeManager:
         for _ in range(50):
             sess = self._sessions.get(connection_id)
             if sess is not None and not sess.closed:
-                self._repo.update_status(
-                    connection_id, status="connected", last_error=None, touch_seen=True
+                self._set_state(
+                    connection_id,
+                    BridgeState.ONLINE,
+                    clear_detail=True,
+                    **_peer_fields(self._negotiated.get(connection_id)),
                 )
+                self._touch_seen(connection_id)
                 self._reconnect_failures[connection_id] = 0
                 return self._repo.get(connection_id) or row
             if task.done():
@@ -473,10 +554,10 @@ class BridgeManager:
                 msg = str(exc) if exc else "bridge connect failed"
                 latest = self._repo.get(connection_id)
                 if latest is not None and latest.status != "error":
-                    self._repo.update_status(connection_id, status="error", last_error=msg[:500])
+                    self._set_state(connection_id, BridgeState.DEGRADED, detail=msg[:500])
                 raise OctopError(ErrorCode.BRIDGE_PEER_UNREACHABLE, msg)
             await asyncio.sleep(0.1)
-        self._repo.update_status(connection_id, status="error", last_error="bridge connect timeout")
+        self._set_state(connection_id, BridgeState.DEGRADED, detail="bridge connect timeout")
         raise OctopError(ErrorCode.BRIDGE_PEER_UNREACHABLE, "bridge connect timeout")
 
     async def disconnect(self, connection_id: str) -> None:
@@ -490,7 +571,7 @@ class BridgeManager:
         if sess is not None:
             await sess.close()
         if self._repo.get(connection_id) is not None:
-            self._repo.update_status(connection_id, status="disconnected", last_error=None)
+            self._set_state(connection_id, BridgeState.DISCONNECTED, clear_detail=True)
 
     async def set_auto_reconnect(
         self, connection_id: str, *, owner_user_id: int, enabled: bool
@@ -671,7 +752,7 @@ class BridgeManager:
                 return
             try:
                 token = await self._ensure_peer_token(row)
-                self._repo.update_status(connection_id, status="connecting", last_error=None)
+                self._set_state(connection_id, BridgeState.CONNECTING, clear_detail=True)
                 await self._run_outbound_client(connection_id, row.peer_base_url, token)
                 # Clean close (peer hung up) — reset failure streak.
                 self._reconnect_failures[connection_id] = 0
@@ -688,9 +769,7 @@ class BridgeManager:
                 failures = self._reconnect_failures.get(connection_id, 0) + 1
                 self._reconnect_failures[connection_id] = failures
                 if self._repo.get(connection_id) is not None:
-                    self._repo.update_status(
-                        connection_id, status="disconnected", last_error=detail[:500]
-                    )
+                    self._set_state(connection_id, BridgeState.DISCONNECTED, detail=detail[:500])
                 row = self._repo.get(connection_id)
                 if row is None or connection_id in self._user_stopped:
                     return
@@ -702,7 +781,7 @@ class BridgeManager:
                         f"Last error: {detail[:300]}"
                     )
                     self._repo.set_auto_reconnect(connection_id, False)
-                    self._repo.update_status(connection_id, status="error", last_error=msg[:500])
+                    self._set_state(connection_id, BridgeState.DEGRADED, detail=msg[:500])
                     self._user_stopped.add(connection_id)
                     logger.warning(
                         "bridge auto-reconnect disabled connection=%s after %s failures",
@@ -731,7 +810,7 @@ class BridgeManager:
             row = self._repo.get(connection_id)
             if row is None or not row.auto_reconnect:
                 if self._repo.get(connection_id) is not None:
-                    self._repo.update_status(connection_id, status="disconnected")
+                    self._set_state(connection_id, BridgeState.DISCONNECTED, clear_detail=True)
                 return
             delay = _AUTO_RECONNECT_BACKOFF_SEC[0]
             logger.info(
@@ -825,11 +904,19 @@ class BridgeManager:
                     on_turn_frame=lambda p: self._handle_inbound_turn(connection_id, p),
                     on_browser_frame=lambda p: self._handle_inbound_browser(connection_id, p),
                 )
-                await self._register_session(connection_id, session)
+                await self._register_session(
+                    connection_id,
+                    session,
+                    peer_instance_id=negotiated.peer_instance_id if negotiated else "",
+                )
                 if self._repo.get(connection_id) is not None:
-                    self._repo.update_status(
-                        connection_id, status="connected", last_error=None, touch_seen=True
+                    self._set_state(
+                        connection_id,
+                        BridgeState.ONLINE,
+                        clear_detail=True,
+                        **_peer_fields(self._negotiated.get(connection_id)),
                     )
+                    self._touch_seen(connection_id)
                     self._reconnect_failures[connection_id] = 0
                 async for raw in ws:
                     text = raw if isinstance(raw, str) else raw.decode("utf-8", errors="replace")
@@ -918,7 +1005,11 @@ class BridgeManager:
             on_turn_frame=lambda p: self._handle_inbound_turn(connection_id, p),
             on_browser_frame=lambda p: self._handle_inbound_browser(connection_id, p),
         )
-        await self._register_session(connection_id, session)
+        await self._register_session(
+            connection_id,
+            session,
+            peer_instance_id=negotiated.peer_instance_id if negotiated else "",
+        )
         await session.send_json(
             {
                 "type": "hello_ack",
@@ -947,9 +1038,40 @@ class BridgeManager:
             if connection_id:
                 await self._finalize_inbound(connection_id, session)
 
-    async def _register_session(self, connection_id: str, session: BridgeSession) -> None:
+    async def _register_session(
+        self,
+        connection_id: str,
+        session: BridgeSession,
+        *,
+        peer_instance_id: str = "",
+    ) -> None:
+        """Register a session, resolving a simultaneous dial deterministically.
+
+        When both instances dial each other at once, two sockets exist for one
+        connection. The previous rule was last-writer-wins, so whichever side's
+        packet landed last kept the link — meaning the surviving connection
+        depended on timing, and a single crossing packet could flip it.
+
+        Now the winner is decided by instance id, which both sides can compute
+        independently and identically. The loser closes its own socket.
+        """
         old = self._sessions.get(connection_id)
         if old is not None and old is not session:
+            verdict = arbitrate_dial(
+                incumbent=self._instance_id,
+                challenger=peer_instance_id or "",
+            )
+            if verdict.loser == self._instance_id:
+                # We lost: drop the newcomer and close ours too.
+                self._sessions.pop(connection_id, None)
+                await old.close()
+                await session.close()
+                logger.info(
+                    "bridge %s: yielding to peer instance %s (simultaneous dial)",
+                    connection_id,
+                    peer_instance_id,
+                )
+                raise DialYielded(connection_id, verdict.winner)
             await old.close()
         self._sessions[connection_id] = session
 
@@ -964,7 +1086,7 @@ class BridgeManager:
             self._repo.delete(connection_id)
             return
         if self._repo.get(connection_id) is not None:
-            self._repo.update_status(connection_id, status="disconnected")
+            self._set_state(connection_id, BridgeState.DISCONNECTED, clear_detail=True)
 
     # -- tunnel --------------------------------------------------------------
 

@@ -226,6 +226,35 @@ def effective_max_frame(peers: Iterable[int] = ()) -> int:
     return min([*limits, MAX_FRAME_BYTES])
 
 
+@dataclass(frozen=True)
+class DialVerdict:
+    """Which side keeps the connection when both dial the same peer."""
+
+    winner: str
+    loser: str
+    reason: str
+
+
+def arbitrate_dial(*, incumbent: str, challenger: str) -> DialVerdict:
+    """Decide which of two simultaneous dials survives.
+
+    The rule is the *instance id*, never arrival order. Both instances are
+    running the same code and see the same two ids, so they reach the same
+    answer without extra round trips — and, unlike last-writer-wins, the
+    outcome does not flip when two packets cross.
+
+    The higher id wins. Ties and missing ids fall back to the incumbent so a
+    legacy peer that advertises nothing never displaces a healthy session.
+    """
+    if not challenger or challenger == incumbent:
+        return DialVerdict(incumbent, challenger, "incumbent-keeps")
+    if not incumbent:
+        return DialVerdict(challenger, incumbent, "challenger-has-id")
+    if challenger > incumbent:
+        return DialVerdict(challenger, incumbent, "higher-instance-id")
+    return DialVerdict(incumbent, challenger, "higher-instance-id")
+
+
 __all__ = [
     "LOCAL_CAPABILITIES",
     "LOCAL_VERSION",
@@ -237,6 +266,7 @@ __all__ = [
     "Hello",
     "ProtocolIncompatible",
     "ProtocolVersion",
+    "arbitrate_dial",
     "build_hello",
     "effective_max_frame",
     "negotiate",
