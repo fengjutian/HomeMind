@@ -1028,6 +1028,7 @@ async def test_stream_compacts_and_retries_provider_context_overflow(
         nonlocal attempts
         attempts += 1
         if attempts == 1:
+            yield {"type": "state_update", "node": "memory"}
             raise RuntimeError("invalid params, context window exceeds limit (2013)")
         yield {"type": "token", "content": "recovered"}
 
@@ -1043,7 +1044,10 @@ async def test_stream_compacts_and_retries_provider_context_overflow(
         )
     ]
 
-    assert chunks == [{"type": "token", "content": "recovered"}]
+    assert chunks == [
+        {"type": "state_update", "node": "memory"},
+        {"type": "token", "content": "recovered"},
+    ]
     assert attempts == 2
     agent.acompact_conversation.assert_awaited_once_with(
         "thr1", model="minimax/MiniMax-M3.1-Flash-Preview"

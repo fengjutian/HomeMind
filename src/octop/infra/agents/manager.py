@@ -111,6 +111,16 @@ def _exception_chain(exc: BaseException) -> list[BaseException]:
     return chain
 
 
+def _stream_chunk_has_side_effect(chunk: Any) -> bool:
+    """Return whether replaying a failed stream could duplicate visible work."""
+    if not isinstance(chunk, dict):
+        return True
+    chunk_type = str(chunk.get("type") or "")
+    if chunk_type in {"token", "reasoning"}:
+        return bool(chunk.get("content"))
+    return chunk_type in {"tool_call_chunk", "tool_result", "hitl_required"}
+
+
 def _model_retry_on_failure(exc: Exception) -> str:
     # Feed a specific, model-visible prompt instead of raising. Inbox jobs still
     # mark failed when the reply carries MODEL_RETRY_FAILURE_MARK.
@@ -1321,13 +1331,13 @@ class AgentManager:
             self._apply_pending_bootstrap_graph_refresh(agent_id)
             req = self._prepare_stream_request(agent_id, request)
             with hitl_thread_scope(thread_id_from_request(req)):
-                emitted = False
+                has_side_effect = False
                 try:
                     async for chunk in self._harness_manager.stream(agent_id, cast(Any, req)):
-                        emitted = True
+                        has_side_effect = has_side_effect or _stream_chunk_has_side_effect(chunk)
                         yield chunk
                 except Exception as exc:
-                    if emitted or not await self._compact_after_context_overflow(
+                    if has_side_effect or not await self._compact_after_context_overflow(
                         agent_id,
                         req,
                         exc,
