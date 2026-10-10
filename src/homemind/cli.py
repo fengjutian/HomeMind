@@ -9,7 +9,7 @@ import click
 
 from homemind.compat import prepare_environment
 from homemind.launch import run_foreground_blocking
-from octop.cli.main import _LazyCLI, _ensure_utf8_stdio
+from octop.cli.main import _ensure_utf8_stdio, _LazyCLI
 from octop.cli.registry import COMMANDS
 
 prepare_environment()
@@ -25,7 +25,7 @@ def _version() -> str:
 def _print_version(ctx: click.Context, _param: click.Parameter, value: bool) -> None:
     if not value or ctx.resilient_parsing:
         return
-    click.echo(f"homemind v{_version()}")
+    click.echo(f"HomeMind v{_version()}")
     ctx.exit()
 
 

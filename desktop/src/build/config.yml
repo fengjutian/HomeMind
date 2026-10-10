@@ -5,11 +5,11 @@
 version: "3"
 
 info:
-  companyName: "Octop"
-  productName: "Octop"
+  companyName: "HomeMind"
+  productName: "HomeMind"
   productIdentifier: "com.tencent.octop"
-  description: "Octop desktop shell"
-  copyright: "(c) 2026, Octop"
+  description: "HomeMind desktop shell"
+  copyright: "(c) 2026, HomeMind"
   comments: "Wails v3 + green portable"
   version: "0.9.26"
 
