@@ -337,10 +337,14 @@ func main() {
 	app.Event.On("desktop:close", func(_ *application.CustomEvent) {
 		api.hideToTray()
 	})
-	installDragOverlay := func(_ *application.WindowEvent) { api.scheduleDragOverlay() }
-	win.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, installDragOverlay)
-	win.OnWindowEvent(events.Windows.WebViewNavigationCompleted, installDragOverlay)
-	win.OnWindowEvent(events.Linux.WindowLoadFinished, installDragOverlay)
+	var bootOnce sync.Once
+	onMainWindowLoaded := func(_ *application.WindowEvent) {
+		api.scheduleDragOverlay()
+		bootOnce.Do(func() { go api.boot() })
+	}
+	win.OnWindowEvent(events.Mac.WebViewDidFinishNavigation, onMainWindowLoaded)
+	win.OnWindowEvent(events.Windows.WebViewNavigationCompleted, onMainWindowLoaded)
+	win.OnWindowEvent(events.Linux.WindowLoadFinished, onMainWindowLoaded)
 	settingsWin := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "HomeMind 设置",
 		Width:            settingsWindowWidth,
@@ -397,9 +401,6 @@ func main() {
 	if err := api.sleep.set(store.get().PreventSleep); err != nil {
 		log.Printf("enable sleep prevention: %v", err)
 	}
-
-	api.scheduleDragOverlay()
-	go api.boot()
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
