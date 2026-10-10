@@ -1,14 +1,4 @@
 {
-  "avatarPresets": {
-    "label": "Choose an avatar style",
-    "styles": {
-      "bottts-neutral": "Robot",
-      "notionists-neutral": "Professional",
-      "lorelei-neutral": "Portrait",
-      "pixel-art-neutral": "Pixel art",
-      "shapes": "Abstract shapes"
-    }
-  },
   "app": {
     "pageTitle": "HomeMind - An intelligent partner that understands you, helps you, and grows with you"
   },
@@ -339,15 +329,6 @@
     "SLASH_BAD_ARGS": "Invalid arguments.",
     "ATTACHMENT_UNSUPPORTED_TYPE": "This file type is not supported.",
     "ATTACHMENT_TOO_LARGE": "This attachment exceeds the {{max_mb}} MB size limit.",
-    "UPLOAD_SESSION_NOT_FOUND": "Upload session not found.",
-    "UPLOAD_SESSION_EXPIRED": "Upload session expired. Start a new upload.",
-    "UPLOAD_SESSION_NOT_OPEN": "This upload session is not accepting data right now.",
-    "UPLOAD_PURPOSE_UNSUPPORTED": "Upload purpose {{purpose}} is not available yet.",
-    "UPLOAD_PART_CONFLICT": "Part {{part_number}} already exists with different content.",
-    "UPLOAD_INCOMPLETE": "Upload is incomplete: {{missing_count}} part(s) still missing.",
-    "UPLOAD_CHECKSUM_MISMATCH": "Uploaded content failed checksum verification.",
-    "UPLOAD_QUOTA_EXCEEDED": "Upload storage quota exceeded. Try again later.",
-    "UPLOAD_TOO_MANY_SESSIONS": "Too many upload sessions in progress. Finish or cancel one first.",
     "VOICE_BROWSER_ONLY": "Voice input is only available in the browser.",
     "VOICE_KIND_UNSUPPORTED": "Unsupported voice provider.",
     "VOICE_CAPABILITY_MISMATCH": "Voice capability does not match.",
@@ -371,7 +352,7 @@
     "SSO_UNBIND_REQUIRES_PASSWORD": "Set a password before unlinking single sign-on.",
     "LDAP_BAD_REQUEST": "Invalid LDAP configuration: {{detail}}",
     "LDAP_UNAVAILABLE": "The LDAP directory is unavailable. Check the server address and bind credentials.",
-    "LDAP_USER_NOT_PROVISIONED": "This directory account has no HomeMind account yet. Ask an administrator to create one or enable automatic provisioning.",
+    "LDAP_USER_NOT_PROVISIONED": "This directory account has no Octop account yet. Ask an administrator to create one or enable automatic provisioning.",
     "LDAP_GROUP_NOT_ALLOWED": "This directory account is not in a group allowed to sign in. Ask an administrator to add you to an allowed group.",
     "EXPERT_MARKET_FAILED": "Expert market is temporarily unavailable. Please try again later.",
     "SKILLHUB_SSL_FAILED": "SkillHub request failed: Python SSL error detected — on macOS try `brew reinstall openssl@3`, or check your system CA certificates.",
@@ -1232,9 +1213,9 @@
     "noModelsWarning": "No models configured. Please configure a Provider in the admin panel.",
     "goToAdmin": "Go to Admin",
     "backendLabel": "Storage Backend",
-    "backendRootDir": "Filesystem / Default Project",
+    "backendRootDir": "Storage Root Dir",
     "backendRootDirPlaceholder": "Browse and select a directory",
-    "backendRootDirDesc": "Defaults to the filesystem root (`/` on POSIX, the home drive on Windows). Selecting a non-root folder makes it the project the AI inspects first while keeping the agent system workspace isolated.",
+    "backendRootDirDesc": "Defaults to the filesystem root (`/` on POSIX, the home drive on Windows). You may also browse and pick another directory.",
     "backendRootDirDescContainer": "Running in a container: defaults to the filesystem root `/` (the container is already the isolation boundary). You may still browse and pick another directory.",
     "backendRootDirJailHint": "Saving to a non-root directory enables a sandbox and confines the AI filesystem to that folder. External ACP runners can’t be used with this setup; connecting via IDE / octop acp is unaffected.",
     "backendRootDirPathLimitHint": "Saving to a non-root directory limits the AI’s file access to that folder, but this host provides no OS-level sandbox — the AI process still runs with the service account’s own permissions. External ACP runners can’t be used with this setup; connecting via IDE / octop acp is unaffected.",
@@ -3643,37 +3624,7 @@
       "viewTable": "Table",
       "totalConnections": "{{count}} connection(s)",
       "colStatus": "Status",
-      "colAgents": "Experts",
-      "state": {
-        "ONLINE": "Online",
-        "DEGRADED": "Degraded",
-        "CONNECTING": "Connecting",
-        "AUTHENTICATING": "Authenticating",
-        "DISCONNECTED": "Disconnected",
-        "REAUTH_REQUIRED": "Sign-in required",
-        "INCOMPATIBLE": "Version mismatch",
-        "DISABLED": "Disabled"
-      },
-      "diagnostics": {
-        "refresh": "Refresh",
-        "copy": "Copy diagnostics",
-        "summary": "{{online}} of {{total}} links online",
-        "needsHuman": "{{count}} link(s) need a human — retrying will not fix them.",
-        "incompatibleDetail": "{{count}} link(s) run a Bridge protocol major version that this instance cannot speak. Upgrade one side to match before reconnecting.",
-        "loadFailed": "Could not load bridge diagnostics",
-        "instance": "This instance",
-        "protocol": "Protocol",
-        "peer": "peer",
-        "capabilities": "Local capabilities",
-        "negotiated": "Negotiated",
-        "instanceId": "Instance id",
-        "connection": "Connection",
-        "state": "State",
-        "uptime": "Uptime",
-        "reconnects": "Reconnect attempts",
-        "lastError": "Last error",
-        "empty": "No bridge connections yet."
-      }
+      "colAgents": "Experts"
     },
     "captcha": {
       "title": "Login captcha",
@@ -3893,7 +3844,7 @@
     "activeHoursEndRequired": "Select an end time",
     "activeHoursStart": "Care hours · start",
     "activeHoursStartRequired": "Select a start time",
-    "episodeBannerText": "HomeMind picks a good moment from your episodes to send a caring message. See which entries are referenced in \"Episodes\".",
+    "episodeBannerText": "Octop picks a good moment from your episodes to send a caring message. See which entries are referenced in \"Episodes\".",
     "intervalOrderError": "Minimum interval cannot exceed maximum interval",
     "maxIntervalHours": "Max interval (hours)",
     "maxIntervalRequired": "Enter the maximum interval",
@@ -4356,7 +4307,7 @@
       "episodesShort": "conversation episodes",
       "heroTitle": "User profile",
       "memories": "memories",
-      "profileSubtitle": "A structured summary of what HomeMind currently understands about you — high-value conclusions only, not the full memory store.",
+      "profileSubtitle": "A structured summary of what Octop currently understands about you — high-value conclusions only, not the full memory store.",
       "reviewAction": "Tidy up profile",
       "rowGoLibrary": "Open memory library →",
       "rowHintToLibrary": "Wrong? Discard it in the memory library",
@@ -4464,7 +4415,7 @@
       "tool": "Tool"
     },
     "episodes": {
-      "disclaimer": "This diary keeps the emotions and little stories from your time with HomeMind. It is not quoted in regular chats — it only helps HomeMind care for you better and feeds the weekly / monthly recaps."
+      "disclaimer": "This diary keeps the emotions and little stories from your time with Octop. It is not quoted in regular chats — it only helps Octop care for you better and feeds the weekly / monthly recaps."
     },
     "importance": {
       "high": "Very important",
@@ -4495,13 +4446,13 @@
       "conflictReplace": "Replace (overwrite with new data)",
       "conflictSkip": "Skip (keep existing)",
       "doctorAllPassed": "All checks passed ✓",
-      "doctorDesc": "Run a health check on this HomeMind memory store: schema, indexes, foreign-key integrity and more.",
+      "doctorDesc": "Run a health check on this Octop memory store: schema, indexes, foreign-key integrity and more.",
       "doctorFailed": "Some checks failed — see details",
       "doctorLabel": "Validate migration",
       "doctorTitle": "Validate migration health",
       "dryRunResult": "Dry-run result",
       "exportBtn": "Pack & download",
-      "exportDesc": "Pack all memories of this HomeMind instance into a .hmpkg file and download it. You can import the file on another host (openclaw / hermes) to keep using them.",
+      "exportDesc": "Pack all memories of this Octop into a .hmpkg file and download it. You can import the file on another host (openclaw / hermes) to keep using them.",
       "exportLabel": "Export to file",
       "exportSuccess": "Memory package downloaded",
       "exportTitle": "Export memory to file",
@@ -4526,7 +4477,7 @@
     "terminal": {
       "aboutMe": "About you",
       "currentFocus": "Current focus",
-      "emptyAboutMe": "HomeMind is still getting to know you — chat a bit more and it will fill in",
+      "emptyAboutMe": "Octop is still getting to know you — chat a bit more and it will fill in",
       "emptyEntities": "No frequent people or things yet",
       "emptyFocus": "No tasks in progress",
       "emptyToldMe": "No explicit facts noted yet",
@@ -4534,7 +4485,7 @@
       "entities": "Key people & things",
       "entitiesDesc": "The most frequent topics in your memory",
       "toldMe": "Facts you mentioned",
-      "toldMeDesc": "Key details recently noted by HomeMind",
+      "toldMeDesc": "Key details recently noted by Octop",
       "aboutMeDesc": "Stable preferences and facts",
       "currentFocusDesc": "Tasks in progress and recent decisions"
     },
@@ -5433,6 +5384,9 @@
     "slideHint": "Slide to the end to verify",
     "slideVerified": "Verified",
     "unsupportedCaptcha": "This captcha provider is not supported in this client. Use a supported client to sign in.",
+    "qrTitle": "Scan with your phone",
+    "qrHint": "On the same network, scan with your phone camera or browser to open.",
+    "qrHintFallback": "No LAN address detected — showing the address you are using.",
     "or": "or",
     "oidcWith": "Continue with {{name}}",
     "oidcStartFailed": "Could not start single sign-on",
@@ -5839,7 +5793,7 @@
       "displayNamePlaceholder": "Shown to users on the sign-in page",
       "displayNameRequired": "Enter a display name",
       "sectionServer": "Directory server",
-      "sectionServerHint": "Where HomeMind connects to authenticate users.",
+      "sectionServerHint": "Where Octop connects to authenticate users.",
       "serverUrl": "Server URL",
       "serverUrlPlaceholder": "ldap://ldap.example.com:389",
       "serverUrlHint": "Use ldaps:// for TLS on port 636, or ldap:// together with StartTLS.",
@@ -5850,7 +5804,7 @@
       "verifyTls": "Verify TLS certificate",
       "verifyTlsHint": "Turn off only for a self-signed test server.",
       "sectionBind": "Service account",
-      "sectionBindHint": "The account HomeMind uses to search the directory.",
+      "sectionBindHint": "The account Octop uses to search the directory.",
       "bindDn": "Bind DN",
       "bindDnPlaceholder": "cn=svc-octop,ou=services,dc=example,dc=com",
       "bindDnHint": "Leave empty to search anonymously.",
@@ -5860,7 +5814,7 @@
       "bindPasswordConfiguredTag": "Configured",
       "bindPasswordPlaceholder": "Leave blank to keep the current password",
       "sectionSearch": "User search",
-      "sectionSearchHint": "How HomeMind finds the directory account behind the username typed on the sign-in page.",
+      "sectionSearchHint": "How Octop finds the directory account behind the username typed on the sign-in page.",
       "userBaseDn": "User base DN",
       "userBaseDnPlaceholder": "ou=people,dc=example,dc=com",
       "userBaseDnRequired": "Enter the user search base",
@@ -5870,7 +5824,7 @@
       "userFilterRequired": "Enter a user filter",
       "userFilterPlaceholderRequired": "The filter must contain the literal {username} placeholder",
       "sectionAttributes": "Attribute mapping",
-      "sectionAttributesHint": "Directory attributes mapped onto the HomeMind account.",
+      "sectionAttributesHint": "Directory attributes mapped onto the Octop account.",
       "usernameAttribute": "Username attribute",
       "usernameAttributeRequired": "Enter the username attribute",
       "emailAttribute": "Email attribute",
@@ -5882,7 +5836,7 @@
       "adminGroupsHint": "Members of these groups get the admin role — only when an account is first created. Changing a directory group later never re-templates an existing account. Prefer full DNs: a bare CN also matches a same-named group in any other OU.",
       "adminGroupsPlaceholder": "octop-admins, cn=it,ou=groups,dc=example,dc=com",
       "autoProvision": "Create accounts on first sign-in",
-      "autoProvisionHint": "When off, only existing HomeMind users can sign in through the directory.",
+      "autoProvisionHint": "When off, only existing Octop users can sign in through the directory.",
       "timeout": "Connection timeout (seconds)",
       "timeoutHint": "How long to wait for the directory before failing a request.",
       "timeoutRequired": "Enter a timeout in seconds",
@@ -5915,13 +5869,13 @@
       "allowedGroupsHint": "When set, only members of these groups may sign in through the directory. Others are refused and no account is created. Same CN-vs-DN rule as above.",
       "allowedGroupsPlaceholder": "staff, cn=contractors,ou=groups,dc=example,dc=com",
       "adminGroupsOnceTitle": "The admin group applies only when an account is first created",
-      "adminGroupsOnceBody": "Adding a user to an admin group later does NOT promote them, and removing them does not demote them. Change a role in HomeMind's user list instead.",
+      "adminGroupsOnceBody": "Adding a user to an admin group later does NOT promote them, and removing them does not demote them. Change a role in Octop's user list instead.",
       "warningsTitle": "Configuration notes",
       "warning": {
         "tls_verification_disabled": "TLS certificate verification is off. Only acceptable for a test server with a self-signed certificate.",
-        "no_admin_groups": "No admin group is configured, so no directory user can become a HomeMind admin at first sign-in.",
-        "auto_provision_open": "Automatic account creation is on with no sign-in allow-list: every account the filter matches gets a HomeMind account.",
-        "identity_key_is_dn": "No identity key attribute is set while automatic account creation is on, so new accounts are keyed on their entry DN — renaming or moving a user in the directory creates a second HomeMind account."
+        "no_admin_groups": "No admin group is configured, so no directory user can become an Octop admin at first sign-in.",
+        "auto_provision_open": "Automatic account creation is on with no sign-in allow-list: every account the filter matches gets an Octop account.",
+        "identity_key_is_dn": "No identity key attribute is set while automatic account creation is on, so new accounts are keyed on their entry DN — renaming or moving a user in the directory creates a second Octop account."
       },
       "subjectAttributeDetected": "Detected {{name}} on this directory — set it as the identity key so renames keep the same account."
     }
@@ -6235,7 +6189,7 @@
     "viewGuide": "View guide",
     "weknoraDetectFailed": "Failed to detect local WeKnora",
     "weknoraFound": "Detected local WeKnora and filled in the URL",
-    "weknoraNotFound": "WeKnora not found at 127.0.0.1:8080 on the HomeMind host",
+    "weknoraNotFound": "WeKnora not found at 127.0.0.1:8080 on the Octop host",
     "weknoraStep1": "Open WeKnora and create an API Key",
     "weknoraStep2": "Detect the local service or enter the deployment URL manually"
   },
@@ -6861,29 +6815,5 @@
     "startedAt": "Started",
     "completedAt": "Finished",
     "transaction": "Transaction"
-  },
-  "smartHome": {
-    "title": "Smart home",
-    "connectViaHomeAssistant": "Connect through Home Assistant",
-    "connectViaHomeAssistantHint": "Bring your Xiaomi, Huawei and other vendor devices into Home Assistant first, then connect that instance here. HomeMind never asks for your vendor account password.",
-    "noDirectVendorConnection": "Direct vendor connections are not available in this release.",
-    "learnMore": "Setup guide",
-    "source": "Source",
-    "sourceHomeAssistant": "Home Assistant",
-    "sourceMatter": "Matter",
-    "sourceMqtt": "MQTT",
-    "sourceUnknown": "Unknown",
-    "room": "Room",
-    "model": "Model",
-    "manufacturer": "Manufacturer",
-    "firmware": "Firmware",
-    "capabilities": "Capabilities",
-    "notControllable": "Read-only in this release",
-    "unreachable": "Provider not connected",
-    "commands": "Available commands",
-    "noCommands": "No commands are available for this device.",
-    "deviceCount": "{{count}} device",
-    "deviceCount_other": "{{count}} devices",
-    "requiresApproval": "Requires approval"
   }
 }
