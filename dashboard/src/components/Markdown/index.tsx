@@ -237,19 +237,6 @@ function CodeCopyButton({ code }: { code: string }) {
   );
 }
 
-/* ---- Detect dark mode ---- */
-function useIsDark() {
-  const [dark, setDark] = useState(false);
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    setDark(mql.matches);
-    const handler = (e: MediaQueryListEvent) => setDark(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
-  return dark;
-}
-
 /* ---- Main Markdown component ---- */
 export interface MarkdownProps {
   content: string;
@@ -274,7 +261,6 @@ const Markdown = memo(function Markdown({
   shellCommandDisabledTitle,
   shellCommandLabel,
 }: MarkdownProps) {
-  const isDark = useIsDark();
   const { t } = useTranslation();
   const runLabel = shellCommandLabel ?? t("terminal.ai.execBtn");
   const renderContent = useMemo(
@@ -315,12 +301,7 @@ const Markdown = memo(function Markdown({
                       <span className={styles.codeBlockLang}>mermaid</span>
                       <CodeCopyButton code={codeString} />
                     </div>
-                    <HighlightedCode
-                      language="text"
-                      code={codeString}
-                      isDark={isDark}
-                      plain
-                    />
+                    <HighlightedCode language="text" code={codeString} plain />
                   </div>
                 );
               }
@@ -350,7 +331,6 @@ const Markdown = memo(function Markdown({
                   <HighlightedCode
                     language={match[1]}
                     code={codeString}
-                    isDark={isDark}
                     plain={!!isStreaming}
                   />
                 </div>
@@ -372,7 +352,6 @@ const Markdown = memo(function Markdown({
                   <HighlightedCode
                     language="text"
                     code={codeString}
-                    isDark={isDark}
                     plain={!!isStreaming}
                   />
                 </div>

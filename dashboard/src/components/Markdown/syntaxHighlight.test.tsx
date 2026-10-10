@@ -8,8 +8,18 @@ import {
 } from "./syntaxHighlight";
 
 vi.mock("@monaco-editor/react", () => ({
-  default: ({ language, value }: { language: string; value: string }) => (
-    <code data-language={language}>{value}</code>
+  default: ({
+    language,
+    theme,
+    value,
+  }: {
+    language: string;
+    theme: string;
+    value: string;
+  }) => (
+    <code data-language={language} data-theme={theme}>
+      {value}
+    </code>
   ),
 }));
 
@@ -19,7 +29,6 @@ describe("HighlightedCode", () => {
       <HighlightedCode
         language="vue"
         code={'<div v-if="shipping_type">Example</div>'}
-        isDark={false}
       />,
     );
 
@@ -28,12 +37,16 @@ describe("HighlightedCode", () => {
         "data-language",
         "html",
       );
+      expect(screen.getByText(/shipping_type/)).toHaveAttribute(
+        "data-theme",
+        "vs-dark",
+      );
     });
   });
 
   it("keeps streaming code in a lightweight pre block", () => {
     const { container } = render(
-      <HighlightedCode language="dart" code="final value = 1;" isDark plain />,
+      <HighlightedCode language="dart" code="final value = 1;" plain />,
     );
 
     expect(container.querySelector("pre code")).toHaveTextContent(

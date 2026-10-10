@@ -53,7 +53,6 @@ export function codeEditorHeight(code: string): number {
 interface HighlightedCodeProps {
   language: string;
   code: string;
-  isDark: boolean;
   /** Keep streaming output lightweight; mount Monaco only after completion. */
   plain?: boolean;
 }
@@ -69,7 +68,6 @@ function PlainCode({ code }: { code: string }) {
 export function HighlightedCode({
   language,
   code,
-  isDark,
   plain = false,
 }: HighlightedCodeProps) {
   if (plain) return <PlainCode code={code} />;
@@ -79,7 +77,7 @@ export function HighlightedCode({
       <MonacoEditor
         height={codeEditorHeight(code)}
         language={monacoLanguageFor(language)}
-        theme={isDark ? "vs-dark" : "light"}
+        theme="vs-dark"
         value={code}
         options={{
           readOnly: true,
