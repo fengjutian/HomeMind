@@ -260,14 +260,16 @@ export default function LoginPage() {
           alignItems: "stretch",
           justifyContent: "center",
           gap: 32,
-          // QR panel is a convenience on desktop; drop it on phone-sized screens.
-          flexWrap: "wrap",
+          // No wrapping: the QR panel sits beside the card on wide screens.
+          // The panel hides itself under 900px, so no wrap fallback is needed.
+          flexWrap: "nowrap",
         }}
       >
         <div
           style={{
             width: "100%",
             maxWidth: 360,
+            flexShrink: 0,
             padding: "48px 32px 40px",
             background: "var(--fn-bg-elevated)",
             borderRadius: 16,

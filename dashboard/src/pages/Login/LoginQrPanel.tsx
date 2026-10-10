@@ -4,14 +4,30 @@ import { useTranslation } from "react-i18next";
 import { authApi } from "../../api/modules/auth";
 import styles from "./LoginQrPanel.module.less";
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
 /**
- * QR code showing this server's LAN address, so a phone on the same network can
- * open the login page by scanning instead of typing an IP.
+ * Build the URL a phone should open when scanning this QR code.
  *
- * The browser's own origin is useless when the host opened the page via
- * `localhost` — a phone would resolve that to itself. So we ask the server for
- * its detected LAN address and fall back to the current origin only when that
- * request fails.
+ * The QR always points at the **vite dev server**, injected at build time as
+ * ``DEV_SERVER_PORT``. It deliberately ignores the page's own origin: the
+ * login page is frequently opened through the API on a different port, and
+ * the phone needs the dev server to render the current source.
+ *
+ * The host is the LAN address detected server-side, because ``localhost`` on
+ * a phone resolves to the phone itself. Falls back to the current origin when
+ * no LAN address could be detected.
+ */
+export function buildScanUrl(lanHost: string | null, loc = window.location): string {
+  const onLoopback = LOOPBACK_HOSTS.has(loc.hostname);
+  if (!onLoopback && !lanHost) return loc.origin;
+  const host = lanHost ?? loc.hostname;
+  return `${loc.protocol}//${host}:${DEV_SERVER_PORT}`;
+}
+
+/**
+ * QR code pointing at the frontend dev server, so a phone on the same network
+ * can open the login page by scanning instead of typing an IP.
  */
 export default function LoginQrPanel() {
   const { t } = useTranslation();
@@ -24,13 +40,13 @@ export default function LoginQrPanel() {
       .getServerAddress()
       .then((info) => {
         if (cancelled) return;
-        setUrl(info.url);
+        setUrl(buildScanUrl(info.is_lan ? info.host : null));
         setResolved(info.is_lan);
       })
       .catch(() => {
         if (cancelled) return;
         // Backend unreachable or predating this endpoint — show where we are.
-        setUrl(window.location.origin);
+        setUrl(buildScanUrl(null));
         setResolved(false);
       });
     return () => {

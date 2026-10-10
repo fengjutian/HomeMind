@@ -5386,7 +5386,7 @@
     "unsupportedCaptcha": "This captcha provider is not supported in this client. Use a supported client to sign in.",
     "qrTitle": "Scan with your phone",
     "qrHint": "On the same network, scan with your phone camera or browser to open.",
-    "qrHintFallback": "No LAN address detected — showing the address you are using.",
+    "qrHintFallback": "Showing the current address. If this page was opened via localhost and no LAN address was detected, a phone cannot reach it.",
     "or": "or",
     "oidcWith": "Continue with {{name}}",
     "oidcStartFailed": "Could not start single sign-on",

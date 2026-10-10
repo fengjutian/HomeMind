@@ -5386,7 +5386,7 @@
     "unsupportedCaptcha": "当前客户端不支持此验证码。请使用支持的客户端登录。",
     "qrTitle": "手机扫码访问",
     "qrHint": "同一局域网内，用手机相机或浏览器扫码即可打开。",
-    "qrHintFallback": "未能探测到局域网地址，显示当前访问地址。",
+    "qrHintFallback": "显示当前访问地址。若在本机以 localhost 打开且无法探测到局域网地址，手机扫码将无法访问。",
     "or": "或",
     "oidcWith": "使用 {{name}} 继续",
     "oidcStartFailed": "无法启动单点登录",
