@@ -371,11 +371,6 @@ func main() {
 		e.Cancel()
 		api.hideToTray()
 	})
-	win.OnWindowEvent(events.Common.WindowMinimise, func(_ *application.WindowEvent) {
-		if api.store.get().MinimizeToTray {
-			api.hideToTray()
-		}
-	})
 	settingsWin.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		e.Cancel()
 		settingsWin.Hide()

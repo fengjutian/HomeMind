@@ -533,18 +533,6 @@
           </div>
           <div class="row">
             <div>
-              <div class="label" id="l-tray">最小化到托盘</div>
-              <small id="h-tray"
-                >点击最小化时隐藏窗口并保留在系统托盘</small
-              >
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="tray" />
-              <span></span>
-            </label>
-          </div>
-          <div class="row">
-            <div>
               <div class="label" id="l-sleep">防止系统休眠</div>
               <small id="h-sleep">应用运行期间阻止系统自动休眠</small>
             </div>
@@ -574,8 +562,6 @@
           langH: "选择偏好语言 / Choose your preferred language",
           auto: "开机启动",
           autoH: "登录系统后自动启动",
-          tray: "最小化到托盘",
-          trayH: "点击最小化时隐藏窗口并保留在系统托盘",
           sleep: "防止系统休眠",
           sleepH: "应用运行期间阻止系统自动休眠",
           showMain: "显示 HomeMind",
@@ -594,8 +580,6 @@
           langH: "Choose your preferred language",
           auto: "Launch at login",
           autoH: "Start automatically after you sign in",
-          tray: "Minimize to tray",
-          trayH: "Hide the window on minimize and keep HomeMind in the tray",
           sleep: "Prevent system sleep",
           sleepH: "Keeps the system awake while HomeMind is running",
           showMain: "Show HomeMind",
@@ -628,8 +612,6 @@
         document.getElementById("h-lang").textContent = t.langH;
         document.getElementById("l-auto").textContent = t.auto;
         document.getElementById("h-auto").textContent = t.autoH;
-        document.getElementById("l-tray").textContent = t.tray;
-        document.getElementById("h-tray").textContent = t.trayH;
         document.getElementById("l-sleep").textContent = t.sleep;
         document.getElementById("h-sleep").textContent = t.sleepH;
         document.getElementById("show-main").textContent = t.showMain;
@@ -689,7 +671,6 @@
         return {
           locale: document.getElementById("locale").value,
           autostart: document.getElementById("autostart").checked,
-          minimizeToTray: document.getElementById("tray").checked,
           preventSleep: document.getElementById("sleep").checked,
         };
       }
@@ -736,10 +717,9 @@
         document.getElementById("settings-panel").classList.remove("hidden");
         document.getElementById("locale").value = locale;
         document.getElementById("autostart").checked = !!s.autostart;
-        document.getElementById("tray").checked = s.minimizeToTray !== false;
         document.getElementById("sleep").checked = !!s.preventSleep;
 
-        for (const id of ["locale", "autostart", "tray", "sleep"]) {
+        for (const id of ["locale", "autostart", "sleep"]) {
           document.getElementById(id).addEventListener("change", persist);
         }
         document

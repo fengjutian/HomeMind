@@ -6,12 +6,6 @@ import (
 	"testing"
 )
 
-func TestDefaultSettingsMinimisesToTaskbar(t *testing.T) {
-	if defaultSettings().MinimizeToTray {
-		t.Fatal("minimize to tray should be disabled by default")
-	}
-}
-
 func TestLoadSettingsMigratesLegacyPreventSleepMac(t *testing.T) {
 	temp := t.TempDir()
 	t.Setenv("OCTOP_HOME", temp)

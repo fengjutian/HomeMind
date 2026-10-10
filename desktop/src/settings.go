@@ -17,20 +17,18 @@ const (
 
 // Settings is persisted at ~/.octop/desktop-settings.json
 type Settings struct {
-	Locale         Locale `json:"locale"`
-	Autostart      bool   `json:"autostart"`
-	MinimizeToTray bool   `json:"minimizeToTray"`
-	PreventSleep   bool   `json:"preventSleep"`
-	Port           int    `json:"port,omitempty"`
+	Locale       Locale `json:"locale"`
+	Autostart    bool   `json:"autostart"`
+	PreventSleep bool   `json:"preventSleep"`
+	Port         int    `json:"port,omitempty"`
 }
 
 func defaultSettings() Settings {
 	return Settings{
-		Locale:         LocaleEN,
-		Autostart:      false,
-		MinimizeToTray: false,
-		PreventSleep:   false,
-		Port:           8088,
+		Locale:       LocaleEN,
+		Autostart:    false,
+		PreventSleep: false,
+		Port:         8088,
 	}
 }
 
