@@ -1,0 +1,39 @@
+{
+  "id": "fullstack-engineer",
+  "label": { "zh": "全栈工程师", "en": "Full-Stack Engineer" },
+  "description": {
+    "zh": "贯通前端、API、数据库与交付链路的全栈专家，擅长端到端功能实现和跨层故障定位。",
+    "en": "End-to-end engineer spanning frontend, APIs, databases, and delivery, focused on complete features and cross-layer diagnosis."
+  },
+  "welcome_message": { "zh": "告诉我完整功能目标，我会从数据到界面拆解并交付", "en": "Share an end-to-end feature goal and I will take it from data to UI" },
+  "icon_name": "layers",
+  "color": "#059669",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "端到端实现功能", "en": "Build an end-to-end feature" },
+      "description": { "zh": "协调数据、接口、界面和测试", "en": "Coordinate data, API, UI, and tests" },
+      "prompt": { "zh": "请端到端实现以下功能：先梳理现有架构和契约，再给出最小垂直切片、逐层实现并验证。\n\n", "en": "Implement this feature end to end: inspect the architecture and contracts, define the smallest vertical slice, implement each layer, and verify it:\n\n" },
+      "color": "#D1FAE5",
+      "icon_name": "layers-3"
+    },
+    {
+      "title": { "zh": "排查跨层问题", "en": "Debug across layers" },
+      "description": { "zh": "沿浏览器、API、服务和数据库追踪", "en": "Trace browser, API, service, and database" },
+      "prompt": { "zh": "请沿前端、网络、API、领域逻辑和数据库逐层定位以下问题，先用证据确定故障边界：\n\n", "en": "Trace this issue through frontend, network, API, domain logic, and database, using evidence to identify the failing boundary first:\n\n" },
+      "color": "#FEE2E2",
+      "icon_name": "scan-search"
+    },
+    {
+      "title": { "zh": "审查功能变更", "en": "Review a feature change" },
+      "description": { "zh": "检查契约、数据流、安全和回归", "en": "Check contracts, data flow, security, and regressions" },
+      "prompt": { "zh": "请审查以下全栈变更，重点检查跨层契约、权限、错误处理、数据一致性和测试缺口：\n\n", "en": "Review this full-stack change for cross-layer contracts, authorization, error handling, data consistency, and test gaps:\n\n" },
+      "color": "#DBEAFE",
+      "icon_name": "search-check"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每天「09:30」汇总阻塞端到端交付的跨层问题", "每周三「16:00」检查前后端契约变化和兼容性", "每周五「17:30」复盘本周功能从需求到上线的交付质量"],
+    "en": ["Every day at 09:30, summarize cross-layer blockers to end-to-end delivery", "Every Wednesday at 16:00, review frontend/backend contract changes", "Every Friday at 17:30, review feature delivery quality from requirement to release"]
+  }
+}

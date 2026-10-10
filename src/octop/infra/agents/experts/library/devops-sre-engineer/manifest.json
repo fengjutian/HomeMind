@@ -1,0 +1,39 @@
+{
+  "id": "devops-sre-engineer",
+  "label": { "zh": "DevOps / SRE 专家", "en": "DevOps / SRE Engineer" },
+  "description": {
+    "zh": "面向 CI/CD、基础设施即代码、可观测性、SLO、发布治理与事故响应的可靠性交付专家。",
+    "en": "Reliability and delivery specialist for CI/CD, infrastructure as code, observability, SLOs, release governance, and incident response."
+  },
+  "welcome_message": { "zh": "告诉我交付、稳定性或事故问题，我会用可验证的方式处理", "en": "Share a delivery, reliability, or incident problem and I will approach it with verifiable evidence" },
+  "icon_name": "activity",
+  "color": "#DC2626",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "设计 CI/CD", "en": "Design CI/CD" },
+      "description": { "zh": "构建可重复、可审计、可回滚的流水线", "en": "Build a repeatable, auditable, reversible pipeline" },
+      "prompt": { "zh": "请为以下项目设计 CI/CD 流水线，包含质量门禁、制品、密钥、部署策略、回滚和验证：\n\n", "en": "Design CI/CD for this project, including quality gates, artifacts, secrets, deployment strategy, rollback, and verification:\n\n" },
+      "color": "#FEE2E2",
+      "icon_name": "workflow"
+    },
+    {
+      "title": { "zh": "制定 SLO", "en": "Define an SLO" },
+      "description": { "zh": "建立指标、目标和错误预算", "en": "Establish indicators, targets, and error budgets" },
+      "prompt": { "zh": "请为以下服务制定 SLI/SLO，说明用户旅程、测量方式、目标、错误预算和告警策略：\n\n", "en": "Define SLI/SLOs for this service with user journeys, measurement, targets, error budgets, and alerting:\n\n" },
+      "color": "#DBEAFE",
+      "icon_name": "gauge"
+    },
+    {
+      "title": { "zh": "事故响应与复盘", "en": "Incident response" },
+      "description": { "zh": "止损、取证、恢复并形成改进项", "en": "Mitigate, investigate, recover, and learn" },
+      "prompt": { "zh": "请协助处理以下生产事故：先给出安全止损与沟通步骤，再建立时间线、验证根因并形成无责复盘和改进项。\n\n", "en": "Help handle this production incident: start with safe mitigation and communication, then build a timeline, verify root cause, and produce a blameless review with actions:\n\n" },
+      "color": "#FEF3C7",
+      "icon_name": "siren"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每天「09:00」汇总 SLO、错误预算和高优先级告警", "每周一「10:00」检查流水线失败、依赖风险和待发布变更", "每周五「16:30」复盘事故与可靠性改进项进度"],
+    "en": ["Every day at 09:00, summarize SLOs, error budgets, and high-priority alerts", "Every Monday at 10:00, review pipeline failures, dependency risks, and pending releases", "Every Friday at 16:30, review incidents and reliability action items"]
+  }
+}

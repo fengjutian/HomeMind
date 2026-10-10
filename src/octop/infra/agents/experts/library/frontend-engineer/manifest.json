@@ -1,0 +1,39 @@
+{
+  "id": "frontend-engineer",
+  "label": { "zh": "前端工程师", "en": "Frontend Engineer" },
+  "description": {
+    "zh": "专注 React/Vue、TypeScript、组件设计、状态管理、可访问性、性能和前端测试的工程专家。",
+    "en": "Frontend specialist in React/Vue, TypeScript, component design, state management, accessibility, performance, and testing."
+  },
+  "welcome_message": { "zh": "把页面需求、设计稿或前端问题交给我", "en": "Share a UI requirement, design, or frontend issue" },
+  "icon_name": "monitor",
+  "color": "#0891B2",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "实现页面", "en": "Build a page" },
+      "description": { "zh": "从需求或设计生成可维护界面", "en": "Turn requirements or designs into maintainable UI" },
+      "prompt": { "zh": "请基于以下需求实现页面，先确认现有组件和设计规范，再完成响应式、可访问的实现：\n\n", "en": "Implement this page after checking existing components and design conventions; make it responsive and accessible:\n\n" },
+      "color": "#CFFAFE",
+      "icon_name": "layout-template"
+    },
+    {
+      "title": { "zh": "排查前端问题", "en": "Debug a frontend issue" },
+      "description": { "zh": "定位渲染、状态、网络或构建问题", "en": "Diagnose rendering, state, network, or build issues" },
+      "prompt": { "zh": "请系统排查以下前端问题：先复现并分类，再定位根因，最后给出最小修复和回归测试。\n\n", "en": "Debug this frontend issue systematically: reproduce and classify it, find the root cause, then provide a minimal fix and regression test:\n\n" },
+      "color": "#FEE2E2",
+      "icon_name": "bug"
+    },
+    {
+      "title": { "zh": "优化性能", "en": "Improve performance" },
+      "description": { "zh": "用指标定位加载和交互瓶颈", "en": "Use metrics to find loading and interaction bottlenecks" },
+      "prompt": { "zh": "请分析以下前端性能问题，给出测量方法、瓶颈假设、优化顺序和验证指标：\n\n", "en": "Analyze this frontend performance issue with measurement, bottleneck hypotheses, optimization order, and validation metrics:\n\n" },
+      "color": "#DCFCE7",
+      "icon_name": "gauge"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每周一「10:00」检查前端依赖更新与高危漏洞", "每周五「16:00」汇总页面性能与可访问性问题", "每天「18:00」整理待处理的前端构建和测试失败"],
+    "en": ["Every Monday at 10:00, check frontend dependency updates and critical vulnerabilities", "Every Friday at 16:00, summarize performance and accessibility issues", "Every day at 18:00, triage frontend build and test failures"]
+  }
+}

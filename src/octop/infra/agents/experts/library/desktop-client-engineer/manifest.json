@@ -1,0 +1,39 @@
+{
+  "id": "desktop-client-engineer",
+  "label": { "zh": "桌面客户端工程师", "en": "Desktop Client Engineer" },
+  "description": {
+    "zh": "专注 Windows、macOS、Linux 桌面应用，覆盖 Wails/Electron、系统集成、安装升级与跨平台诊断。",
+    "en": "Desktop specialist for Windows, macOS, and Linux, covering Wails/Electron, OS integration, packaging, updates, and cross-platform diagnostics."
+  },
+  "welcome_message": { "zh": "告诉我桌面端功能、崩溃或打包问题", "en": "Share a desktop feature, crash, or packaging problem" },
+  "icon_name": "laptop",
+  "color": "#DB2777",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "实现桌面功能", "en": "Build a desktop feature" },
+      "description": { "zh": "处理窗口、托盘、文件和系统集成", "en": "Handle windows, tray, files, and OS integration" },
+      "prompt": { "zh": "请设计并实现以下桌面端功能，覆盖三平台差异、权限、生命周期和测试：\n\n", "en": "Design and implement this desktop feature, covering platform differences, permissions, lifecycle, and tests:\n\n" },
+      "color": "#FCE7F3",
+      "icon_name": "app-window"
+    },
+    {
+      "title": { "zh": "诊断崩溃", "en": "Diagnose a crash" },
+      "description": { "zh": "结合日志、事件和进程生命周期定位", "en": "Use logs, events, and process lifecycle evidence" },
+      "prompt": { "zh": "请诊断以下桌面端崩溃或消失问题，先区分退出、隐藏、子进程失败与原生崩溃，再给出取证和修复步骤：\n\n", "en": "Diagnose this desktop crash or disappearance: distinguish exit, hide-to-tray, child failure, and native crash, then provide evidence collection and remediation:\n\n" },
+      "color": "#FEE2E2",
+      "icon_name": "triangle-alert"
+    },
+    {
+      "title": { "zh": "构建安装包", "en": "Package a release" },
+      "description": { "zh": "规划签名、升级和发布验证", "en": "Plan signing, upgrades, and release verification" },
+      "prompt": { "zh": "请为以下桌面应用规划原生安装包，包含构建、签名、升级、卸载、数据保留和冒烟测试：\n\n", "en": "Plan native packaging for this desktop app, including build, signing, upgrade, uninstall, data retention, and smoke tests:\n\n" },
+      "color": "#E0E7FF",
+      "icon_name": "package"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每周一「11:00」检查桌面端依赖和三平台构建状态", "每周五「15:00」汇总崩溃、启动失败和升级问题", "每次发布前一天「14:00」生成桌面端冒烟测试清单"],
+    "en": ["Every Monday at 11:00, check desktop dependencies and builds on all platforms", "Every Friday at 15:00, summarize crashes, startup failures, and update issues", "At 14:00 the day before each release, generate a desktop smoke checklist"]
+  }
+}

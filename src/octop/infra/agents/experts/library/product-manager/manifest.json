@@ -1,0 +1,39 @@
+{
+  "id": "product-manager",
+  "label": { "zh": "软件产品经理", "en": "Software Product Manager" },
+  "description": {
+    "zh": "连接用户价值与工程交付的产品专家，擅长需求澄清、PRD、用户故事、优先级和验收标准。",
+    "en": "Product specialist connecting user value to engineering delivery through discovery, PRDs, stories, prioritization, and acceptance criteria."
+  },
+  "welcome_message": { "zh": "告诉我产品目标或模糊需求，我会把它整理成可验证的交付方案", "en": "Share a product goal or rough idea and I will turn it into a verifiable delivery brief" },
+  "icon_name": "clipboard-list",
+  "color": "#EA580C",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "澄清需求", "en": "Clarify a requirement" },
+      "description": { "zh": "识别用户、场景、价值和边界", "en": "Identify users, scenarios, value, and scope" },
+      "prompt": { "zh": "请把以下想法转成清晰需求：识别目标用户、核心场景、价值、范围与待确认问题。\n\n", "en": "Turn this idea into a clear requirement by identifying users, core scenarios, value, scope, and open questions:\n\n" },
+      "color": "#FFEDD5",
+      "icon_name": "circle-help"
+    },
+    {
+      "title": { "zh": "编写 PRD", "en": "Write a PRD" },
+      "description": { "zh": "形成目标、流程、规则和验收标准", "en": "Define goals, flows, rules, and acceptance" },
+      "prompt": { "zh": "请为以下功能编写精简 PRD，包含背景、目标、非目标、用户流程、业务规则、验收标准和风险：\n\n", "en": "Write a concise PRD for this feature with context, goals, non-goals, user flow, rules, acceptance criteria, and risks:\n\n" },
+      "color": "#FEF3C7",
+      "icon_name": "file-text"
+    },
+    {
+      "title": { "zh": "规划迭代", "en": "Plan an iteration" },
+      "description": { "zh": "按价值、风险和依赖安排工作", "en": "Sequence work by value, risk, and dependencies" },
+      "prompt": { "zh": "请将以下需求拆成可交付的迭代计划，标注优先级、依赖、里程碑和每阶段验收条件：\n\n", "en": "Break these requirements into a deliverable iteration plan with priority, dependencies, milestones, and stage acceptance:\n\n" },
+      "color": "#DBEAFE",
+      "icon_name": "calendar-range"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每周一「09:30」汇总本周产品目标、风险和待决策事项", "每周五「17:00」复盘需求交付与用户反馈", "每月 1 日「10:00」更新产品路线图优先级"],
+    "en": ["Every Monday at 09:30, summarize product goals, risks, and decisions", "Every Friday at 17:00, review delivery and user feedback", "On the 1st of each month at 10:00, refresh roadmap priorities"]
+  }
+}

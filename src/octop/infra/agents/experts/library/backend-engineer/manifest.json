@@ -1,0 +1,39 @@
+{
+  "id": "backend-engineer",
+  "label": { "zh": "后端工程师", "en": "Backend Engineer" },
+  "description": {
+    "zh": "专注 API、领域建模、数据库、异步处理、安全、可观测性和服务可靠性的后端专家。",
+    "en": "Backend specialist in APIs, domain modeling, databases, async processing, security, observability, and service reliability."
+  },
+  "welcome_message": { "zh": "告诉我接口、数据或服务问题，我会从契约到验证完整处理", "en": "Share an API, data, or service problem and I will take it from contract through verification" },
+  "icon_name": "server",
+  "color": "#2563EB",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "设计 API", "en": "Design an API" },
+      "description": { "zh": "定义资源、契约、错误和权限", "en": "Define resources, contracts, errors, and authorization" },
+      "prompt": { "zh": "请为以下能力设计 API，包含资源模型、请求响应、错误语义、权限、幂等性和测试：\n\n", "en": "Design an API for this capability, including resources, requests, responses, errors, authorization, idempotency, and tests:\n\n" },
+      "color": "#DBEAFE",
+      "icon_name": "braces"
+    },
+    {
+      "title": { "zh": "数据库变更", "en": "Plan a database change" },
+      "description": { "zh": "安全设计模式、迁移和回滚", "en": "Safely design schema, migration, and rollback" },
+      "prompt": { "zh": "请设计以下数据库变更，说明模式、约束、迁移步骤、兼容窗口、回滚方案和验证查询：\n\n", "en": "Design this database change with schema, constraints, migration steps, compatibility window, rollback, and verification queries:\n\n" },
+      "color": "#E0E7FF",
+      "icon_name": "database"
+    },
+    {
+      "title": { "zh": "诊断服务故障", "en": "Diagnose a service failure" },
+      "description": { "zh": "从日志、指标和链路定位根因", "en": "Use logs, metrics, and traces to find root cause" },
+      "prompt": { "zh": "请系统诊断以下后端故障：建立复现和时间线，分析日志/指标/链路，验证根因后给出最小修复：\n\n", "en": "Diagnose this backend failure systematically: establish reproduction and timeline, analyze logs/metrics/traces, verify root cause, then propose a minimal fix:\n\n" },
+      "color": "#FEE2E2",
+      "icon_name": "activity"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每天「09:00」汇总后端错误率、慢请求和失败任务", "每周三「15:00」检查数据库容量、慢查询与迁移风险", "每周五「17:00」复盘本周接口变更和兼容性问题"],
+    "en": ["Every day at 09:00, summarize backend errors, slow requests, and failed jobs", "Every Wednesday at 15:00, review database capacity, slow queries, and migration risks", "Every Friday at 17:00, review API changes and compatibility issues"]
+  }
+}

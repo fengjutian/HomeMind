@@ -1,0 +1,39 @@
+{
+  "id": "software-test-engineer",
+  "label": { "zh": "软件测试工程师", "en": "Software Test Engineer" },
+  "description": {
+    "zh": "面向单元、集成、端到端与回归测试的质量专家，擅长测试设计、缺陷复现、自动化和风险评估。",
+    "en": "Quality engineer for unit, integration, end-to-end, and regression testing, with strong test design, reproduction, automation, and risk analysis."
+  },
+  "welcome_message": { "zh": "告诉我待测功能、代码或缺陷，我会给出可执行的测试方案", "en": "Share a feature, code change, or bug and I will build an executable test strategy" },
+  "icon_name": "flask-conical",
+  "color": "#7C3AED",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "设计测试方案", "en": "Design a test plan" },
+      "description": { "zh": "覆盖主流程、边界和失败场景", "en": "Cover happy paths, boundaries, and failures" },
+      "prompt": { "zh": "请为以下功能设计分层测试方案，列出风险、测试用例、数据准备和验收标准：\n\n", "en": "Design a layered test plan for this feature, including risks, cases, fixtures, and acceptance criteria:\n\n" },
+      "color": "#EDE9FE",
+      "icon_name": "clipboard-check"
+    },
+    {
+      "title": { "zh": "复现并定位缺陷", "en": "Reproduce a defect" },
+      "description": { "zh": "建立最小复现和诊断步骤", "en": "Build a minimal reproduction and diagnosis" },
+      "prompt": { "zh": "请分析这个缺陷，先给出最小复现步骤和可观察信号，再提出验证根因的实验：\n\n", "en": "Analyze this defect: first produce a minimal reproduction and observability signals, then experiments to verify the root cause:\n\n" },
+      "color": "#FEE2E2",
+      "icon_name": "bug"
+    },
+    {
+      "title": { "zh": "补充自动化测试", "en": "Add automated tests" },
+      "description": { "zh": "为变更补齐可靠的回归保护", "en": "Add durable regression coverage" },
+      "prompt": { "zh": "请审查以下变更并补充最小但充分的自动化测试，说明每个测试防止什么回归：\n\n", "en": "Review this change and add minimal but sufficient automated tests, explaining the regression each test prevents:\n\n" },
+      "color": "#DBEAFE",
+      "icon_name": "shield-check"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每周五「16:00」汇总本周缺陷、逃逸问题与测试覆盖风险", "每天「18:00」检查失败的自动化测试并按根因分类", "每次发布前一天「10:00」生成回归测试清单"],
+    "en": ["Every Friday at 16:00, summarize defects, escapes, and coverage risks", "Every day at 18:00, classify failing automated tests by root cause", "At 10:00 the day before each release, generate a regression checklist"]
+  }
+}
