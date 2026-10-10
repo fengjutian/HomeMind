@@ -8,8 +8,7 @@
  *   - media (image / video / audio) -> ``MediaPreview``
  *   - documents (pdf / docx / xlsx) -> ``DocumentPreview``
  *   - markdown / html preview        -> ``FilePreview``
- *   - editable text in edit mode     -> ``CodeEditor`` (Monaco)
- *   - other text                     -> plain source (``<pre>``)
+ *   - source text (view or edit)      -> ``CodeEditor`` (Monaco)
  *
  * Text content and edit state are owned by the parent so the toolbar save
  * button (in the drawer) stays in control; the viewer itself stays stateless
@@ -139,5 +138,15 @@ export default function FileViewer({
     return <FilePreview kind={previewKind} content={value} />;
   }
 
-  return <pre className={styles.viewerPre}>{value}</pre>;
+  return (
+    <CodeEditor
+      path={path}
+      value={value}
+      onChange={onChange}
+      readOnly
+      language={
+        editableDoc ? getEditableDocLanguage(path) ?? "markdown" : undefined
+      }
+    />
+  );
 }

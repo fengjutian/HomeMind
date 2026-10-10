@@ -214,6 +214,7 @@ export default function FilePanelContent({
   const bodyFill =
     !fileMissing &&
     (editMode ||
+      (showEditButton && (!previewKind || !previewMode)) ||
       docKind !== null ||
       (previewMode && previewNeedsFillLayout(previewKind)));
 

@@ -1493,7 +1493,8 @@ export default function WorkspaceDrawer({
                   <div
                     className={styles.viewerBody}
                     style={
-                      (showEditButton && editMode) ||
+                      (showEditButton &&
+                        (editMode || !previewKind || !previewMode)) ||
                       docKind !== null ||
                       (previewMode && previewNeedsFillLayout(previewKind))
                         ? {

@@ -22,6 +22,7 @@ const EXT_LANGUAGE: Record<string, string> = {
   scss: "scss",
   html: "html",
   htm: "html",
+  vue: "html",
   xml: "xml",
   svg: "xml",
   yaml: "yaml",
