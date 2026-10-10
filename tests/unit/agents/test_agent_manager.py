@@ -1016,6 +1016,63 @@ async def test_stream_applies_bootstrap_refresh_after_turn(manager: AgentManager
 
 
 @pytest.mark.asyncio
+async def test_stream_compacts_and_retries_provider_context_overflow(
+    manager: AgentManager,
+) -> None:
+    agent = MagicMock()
+    agent.acompact_conversation = AsyncMock(return_value=SimpleNamespace(ok=True))
+    harness_manager = MagicMock()
+    attempts = 0
+
+    async def fake_stream(*_args: Any, **_kwargs: Any) -> AsyncIterator[dict[str, str]]:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("invalid params, context window exceeds limit (2013)")
+        yield {"type": "token", "content": "recovered"}
+
+    harness_manager.stream = fake_stream
+    harness_manager.get_agent.return_value = SimpleNamespace(agent=agent)
+    manager._harness_manager = harness_manager
+
+    chunks = [
+        chunk
+        async for chunk in manager.stream(
+            "AGT_STREAM",
+            {"thread_id": "thr1", "model": "minimax/MiniMax-M3.1-Flash-Preview"},
+        )
+    ]
+
+    assert chunks == [{"type": "token", "content": "recovered"}]
+    assert attempts == 2
+    agent.acompact_conversation.assert_awaited_once_with(
+        "thr1", model="minimax/MiniMax-M3.1-Flash-Preview"
+    )
+
+
+@pytest.mark.asyncio
+async def test_stream_does_not_retry_context_overflow_after_emitting_chunk(
+    manager: AgentManager,
+) -> None:
+    agent = MagicMock()
+    agent.acompact_conversation = AsyncMock(return_value=SimpleNamespace(ok=True))
+    harness_manager = MagicMock()
+
+    async def fake_stream(*_args: Any, **_kwargs: Any) -> AsyncIterator[dict[str, str]]:
+        yield {"type": "token", "content": "partial"}
+        raise RuntimeError("context window exceeds limit")
+
+    harness_manager.stream = fake_stream
+    harness_manager.get_agent.return_value = SimpleNamespace(agent=agent)
+    manager._harness_manager = harness_manager
+
+    with pytest.raises(RuntimeError, match="context window exceeds limit"):
+        await _collect_async(manager.stream("AGT_STREAM", {"thread_id": "thr1"}))
+
+    agent.acompact_conversation.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_history_backfill_refuses_while_agent_stream_is_active(
     manager: AgentManager,
 ) -> None:

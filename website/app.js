@@ -28,8 +28,29 @@ document.querySelector(".copy-button").addEventListener("click", async (event) =
 
 const observer = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
-    if (entry.isIntersecting) entry.target.classList.add("is-visible");
+    if (entry.isIntersecting) {
+      entry.target.classList.add("is-visible");
+      observer.unobserve(entry.target);
+    }
   });
 }, { threshold: 0.12 });
 
-document.querySelectorAll(".manifesto article, .feature, .steps li").forEach((element) => observer.observe(element));
+document.querySelectorAll(".manifesto article, .feature, .steps li, .section-heading, .how-copy").forEach((element) => observer.observe(element));
+
+const header = document.querySelector(".site-header");
+window.addEventListener("scroll", () => header.classList.toggle("is-scrolled", window.scrollY > 24), { passive: true });
+
+const scene = document.querySelector(".home-scene");
+if (window.matchMedia("(pointer: fine) and (prefers-reduced-motion: no-preference)").matches) {
+  scene.addEventListener("pointermove", (event) => {
+    const bounds = scene.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / bounds.width - 0.5;
+    const y = (event.clientY - bounds.top) / bounds.height - 0.5;
+    scene.style.setProperty("--pointer-x", `${x * 10}px`);
+    scene.style.setProperty("--pointer-y", `${y * 10}px`);
+  });
+  scene.addEventListener("pointerleave", () => {
+    scene.style.setProperty("--pointer-x", "0px");
+    scene.style.setProperty("--pointer-y", "0px");
+  });
+}

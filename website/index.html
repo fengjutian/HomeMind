@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <div class="ambient-noise" aria-hidden="true"></div>
     <a class="skip-link" href="#main">跳到正文</a>
     <header class="site-header">
       <a class="brand" href="#top" aria-label="HomeMind 首页">
@@ -48,8 +49,10 @@
 
     <main id="main">
       <section class="hero" id="top">
+        <div class="hero-glow hero-glow-coral" aria-hidden="true"></div>
+        <div class="hero-glow hero-glow-mint" aria-hidden="true"></div>
         <div class="hero-copy reveal">
-          <p class="eyebrow" data-zh="开源 · 自托管 · 为家庭而生" data-en="OPEN SOURCE · SELF-HOSTED · FAMILY FIRST">开源 · 自托管 · 为家庭而生</p>
+          <p class="eyebrow"><span class="eyebrow-spark">✦</span><span data-zh="开源 · 自托管 · 为家庭而生" data-en="OPEN SOURCE · SELF-HOSTED · FAMILY FIRST">开源 · 自托管 · 为家庭而生</span></p>
           <h1 data-zh="家的事，交给真正<br /><em>懂家人</em>的 AI。" data-en="Meet the AI that<br />truly <em>knows your home.</em>">家的事，交给真正<br /><em>懂家人</em>的 AI。</h1>
           <p class="hero-lead" data-zh="HomeMind 运行在你自己的设备上。它记得每个人的习惯，连接家里的信息与设备，也把隐私牢牢留在家中。" data-en="HomeMind runs on your own devices. It remembers each family member, connects household knowledge and devices, and keeps your privacy at home.">HomeMind 运行在你自己的设备上。它记得每个人的习惯，连接家里的信息与设备，也把隐私牢牢留在家中。</p>
           <div class="hero-actions">
@@ -65,6 +68,8 @@
 
         <div class="home-scene reveal" aria-label="HomeMind 家庭面板示意图">
           <div class="sun-orbit"></div>
+          <div class="orbit-dot orbit-dot-one"></div>
+          <div class="orbit-dot orbit-dot-two"></div>
           <div class="scene-card main-card">
             <div class="card-topline">
               <div class="mini-brand"><span>H</span> HomeMind</div>
@@ -75,9 +80,9 @@
               <h2 data-zh="今天，家里一切都好。" data-en="Everything at home is just right.">今天，家里一切都好。</h2>
             </div>
             <div class="family-grid">
-              <div class="family-member coral"><strong>妈妈</strong><small>日程已同步</small></div>
-              <div class="family-member teal"><strong>爸爸</strong><small>通勤提醒 18:20</small></div>
-              <div class="family-member yellow"><strong>小满</strong><small>阅读计划 4/7</small></div>
+              <div class="family-member coral"><span class="avatar">妈</span><strong>妈妈</strong><small>日程已同步</small></div>
+              <div class="family-member teal"><span class="avatar">爸</span><strong>爸爸</strong><small>通勤提醒 18:20</small></div>
+              <div class="family-member yellow"><span class="avatar">满</span><strong>小满</strong><small>阅读计划 4/7</small></div>
             </div>
             <div class="ask-bar"><span>✦</span><span data-zh="问问 HomeMind…" data-en="Ask HomeMind…">问问 HomeMind…</span><button aria-label="发送">↑</button></div>
           </div>
@@ -91,6 +96,12 @@
           </div>
         </div>
       </section>
+
+      <div class="capability-ribbon" aria-label="HomeMind 技术能力">
+        <div class="ribbon-track">
+          <span>多 Agent 协作</span><i>✦</i><span>长期记忆</span><i>✦</i><span>家庭知识库</span><i>✦</i><span>智能家居</span><i>✦</i><span>定时自动化</span><i>✦</i><span>本地优先</span><i>✦</i><span>多 Agent 协作</span><i>✦</i><span>长期记忆</span><i>✦</i><span>家庭知识库</span><i>✦</i><span>智能家居</span><i>✦</i><span>定时自动化</span><i>✦</i><span>本地优先</span><i>✦</i>
+        </div>
+      </div>
 
       <section class="manifesto" id="why">
         <p class="section-label" data-zh="不是另一个聊天机器人" data-en="NOT ANOTHER CHATBOT">不是另一个聊天机器人</p>
@@ -109,8 +120,8 @@
         </div>
         <div class="feature-grid">
           <article class="feature feature-wide coral-block"><span class="feature-number">01</span><div><h3 data-zh="每个人，都有自己的专属助手" data-en="A personal assistant for everyone">每个人，都有自己的专属助手</h3><p data-zh="为家人配置不同性格、专长与权限。学习辅导、生活规划、工作协作，各有所长，也能一起完成复杂任务。" data-en="Give each family member a distinct personality, expertise, and permissions. Specialized agents can also collaborate on complex tasks.">为家人配置不同性格、专长与权限。学习辅导、生活规划、工作协作，各有所长，也能一起完成复杂任务。</p></div><div class="agent-stack"><span>生活管家</span><span>学习搭子</span><span>健康助手</span><span>+ 自定义</span></div></article>
-          <article class="feature cream-block"><span class="feature-number">02</span><div class="feature-icon brain">⌁</div><h3 data-zh="越相处，越懂你" data-en="Gets to know you over time">越相处，越懂你</h3><p data-zh="可迁移的长期记忆，把重要偏好、故事和家庭知识留在你掌控的空间里。" data-en="Portable long-term memory keeps preferences, stories and household knowledge in a space you control.">可迁移的长期记忆，把重要偏好、故事和家庭知识留在你掌控的空间里。</p></article>
-          <article class="feature dark-block"><span class="feature-number">03</span><div class="feature-icon">⌂</div><h3 data-zh="连接真实的家" data-en="Connected to real life">连接真实的家</h3><p data-zh="通过 Home Assistant 连接智能家居，通过 Connector、插件和知识库连接你的数字生活。" data-en="Connect smart-home devices through Home Assistant, and your digital life through connectors, plugins and knowledge bases.">通过 Home Assistant 连接智能家居，通过 Connector、插件和知识库连接你的数字生活。</p></article>
+          <article class="feature cream-block"><span class="feature-number">02</span><div class="feature-icon brain"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 50V15M32 20c-8-12-23-2-16 9-9 6-3 20 8 17M32 20c8-12 23-2 16 9 9 6 3 20-8 17M16 29c5-1 9 2 10 7M48 29c-5-1-9 2-10 7"/></svg></div><h3 data-zh="越相处，越懂你" data-en="Gets to know you over time">越相处，越懂你</h3><p data-zh="可迁移的长期记忆，把重要偏好、故事和家庭知识留在你掌控的空间里。" data-en="Portable long-term memory keeps preferences, stories and household knowledge in a space you control.">可迁移的长期记忆，把重要偏好、故事和家庭知识留在你掌控的空间里。</p><div class="memory-chips"><span>偏好</span><span>故事</span><span>重要时刻</span></div></article>
+          <article class="feature dark-block"><span class="feature-number">03</span><div class="feature-icon home-icon">⌂<span class="signal-wave"></span></div><h3 data-zh="连接真实的家" data-en="Connected to real life">连接真实的家</h3><p data-zh="通过 Home Assistant 连接智能家居，通过 Connector、插件和知识库连接你的数字生活。" data-en="Connect smart-home devices through Home Assistant, and your digital life through connectors, plugins and knowledge bases.">通过 Home Assistant 连接智能家居，通过 Connector、插件和知识库连接你的数字生活。</p><div class="device-row"><span>灯光</span><span>温控</span><span>安防</span><span>更多 +</span></div></article>
           <article class="feature feature-wide mint-block"><span class="feature-number">04</span><div><h3 data-zh="不被云端绑住的 AI" data-en="AI without cloud lock-in">不被云端绑住的 AI</h3><p data-zh="本地运行，自选模型。SQLite 开箱即用，也支持 PostgreSQL 与远程工作区。你的部署方式，由你决定。" data-en="Run locally and choose your models. Start with SQLite, or use PostgreSQL and remote workspaces. You decide how it runs.">本地运行，自选模型。SQLite 开箱即用，也支持 PostgreSQL 与远程工作区。你的部署方式，由你决定。</p></div><div class="privacy-visual"><span>你的设备</span><div class="pulse-lock">⌾</div><small>对话 · 文件 · 凭据</small></div></article>
         </div>
       </section>
