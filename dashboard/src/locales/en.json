@@ -1,4 +1,14 @@
 {
+  "avatarPresets": {
+    "label": "Choose an avatar style",
+    "styles": {
+      "bottts-neutral": "Robot",
+      "notionists-neutral": "Professional",
+      "lorelei-neutral": "Portrait",
+      "pixel-art-neutral": "Pixel art",
+      "shapes": "Abstract shapes"
+    }
+  },
   "app": {
     "pageTitle": "HomeMind - An intelligent partner that understands you, helps you, and grows with you"
   },

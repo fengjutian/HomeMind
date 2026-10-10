@@ -731,6 +731,7 @@ export default function CreateFromExpertDrawer({
 
         <Form.Item label={t("experts.avatar")}>
           <ExpertAvatarPicker
+            avatarSeed={sourceKey || "homemind-agent"}
             iconUrl={avatarPreview ?? sourceIcon(source).iconUrl}
             iconName={sourceIcon(source).iconName}
             color={

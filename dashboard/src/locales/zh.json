@@ -1,4 +1,14 @@
 {
+  "avatarPresets": {
+    "label": "选择头像风格",
+    "styles": {
+      "bottts-neutral": "机器人",
+      "notionists-neutral": "专业人物",
+      "lorelei-neutral": "人物肖像",
+      "pixel-art-neutral": "像素风",
+      "shapes": "抽象图形"
+    }
+  },
   "app": {
     "pageTitle": "HomeMind - 懂你、帮你、陪你成长的智能伙伴"
   },

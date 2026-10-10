@@ -17,7 +17,10 @@ const PRESETS = [
   { id: "shapes", definition: shapes },
 ] as const;
 
-function createSvg(definition: (typeof PRESETS)[number]["definition"], seed: string) {
+function createSvg(
+  definition: (typeof PRESETS)[number]["definition"],
+  seed: string,
+) {
   return new Avatar(definition, { seed, size: 128 }).toString();
 }
 
