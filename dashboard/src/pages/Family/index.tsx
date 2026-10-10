@@ -102,11 +102,13 @@ export default function FamilyPage() {
     try {
       const rows = await homeMindFamilyApi.listFamilies();
       setFamilies(rows);
-      setFamilyId((current) =>
-        current && rows.some((row) => row.id === current)
-          ? current
-          : rows[0]?.id ?? "",
-      );
+      setFamilyId((current) => {
+        if (current && rows.some((row) => row.id === current)) return current;
+        const first = rows[0]?.id;
+        if (first) return first;
+        // No families at all — leave familyId empty; the UI will prompt to create one
+        return "";
+      });
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
     } finally {
@@ -165,7 +167,7 @@ export default function FamilyPage() {
   }, [familyId]);
 
   useEffect(() => void loadFamilies(), [loadFamilies]);
-  useEffect(() => void loadFamilyData(), [loadFamilyData]);
+  useEffect(() => void loadFamilyData(), [loadFamilyData, familyId]);
 
   const activeFamily = useMemo(
     () => families.find((family) => family.id === familyId),

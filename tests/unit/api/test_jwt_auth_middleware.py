@@ -36,6 +36,7 @@ def test_exempt_paths() -> None:
     assert is_jwt_exempt_path("/api/auth/oauth/exchange")
     assert is_jwt_exempt_path("/api/auth/invite/validate")
     assert is_jwt_exempt_path("/api/auth/invite/redeem")
+    assert is_jwt_exempt_path("/api/settings/server-address")
     assert is_jwt_exempt_path("/api/docs")
     assert is_jwt_exempt_path("/api/openapi.json")
     assert not is_jwt_exempt_path("/api/auth/oidc/config")
@@ -45,6 +46,9 @@ def test_exempt_paths() -> None:
     assert not is_jwt_exempt_path("/api/auth/oidc/config/test")
     assert not is_jwt_exempt_path("/api/auth/me")
     assert not is_jwt_exempt_path("/api/agents")
+    # Sibling settings routes must stay authenticated.
+    assert not is_jwt_exempt_path("/api/settings/timezone")
+    assert not is_jwt_exempt_path("/api/settings/server-address-extra")
 
 
 @pytest.fixture

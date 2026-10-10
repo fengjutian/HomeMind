@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends
@@ -12,6 +13,7 @@ from octop.config import OctopConfig
 from octop.infra.agents.security import tool_execution_may_pause
 from octop.infra.auth.captcha import current_env, load_view, save_settings
 from octop.infra.users.identity import User
+from octop.infra.utils.lan_address import detect_lan_ipv4
 
 router = APIRouter()
 
@@ -32,6 +34,47 @@ class HitlSettingsResponse(BaseModel):
     )
     show_approval_ui: bool = Field(
         description="Whether composer, slash help, and CLI should show tool-approval surfaces."
+    )
+
+
+class ServerAddressResponse(BaseModel):
+    """LAN-reachable base URLs of this HomeMind server.
+
+    Unauthenticated by design: the login page renders the QR code before any
+    session exists, so a phone on the same LAN can scan it and sign in.
+    """
+
+    url: str = Field(
+        description="Preferred LAN URL, e.g. ``http://192.168.1.23:8088``.",
+    )
+    port: int = Field(description="Port the server is listening on.")
+    host: str = Field(description="Detected LAN IPv4 address of this host.")
+    is_lan: bool = Field(
+        description="False when detection fell back to loopback (no routable IPv4).",
+    )
+
+
+@router.get(
+    "/settings/server-address",
+    summary="LAN address for login QR code",
+    response_model=ServerAddressResponse,
+)
+async def get_server_address(server: Any = Depends(get_server)) -> ServerAddressResponse:
+    """Return this host's LAN address so the login page can render a scannable QR code.
+
+    No authentication required — the login screen itself is unauthenticated.
+    Address detection performs no network I/O and blocks for microseconds, but
+    it still runs in an executor to keep the event loop free per the project's
+    "no blocking I/O in async functions" rule.
+    """
+    cfg: OctopConfig = server.services.config
+    loop = asyncio.get_running_loop()
+    host = await loop.run_in_executor(None, detect_lan_ipv4)
+    return ServerAddressResponse(
+        url=f"http://{host}:{cfg.port}",
+        port=cfg.port,
+        host=host,
+        is_lan=host not in ("127.0.0.1", "::1"),
     )
 
 

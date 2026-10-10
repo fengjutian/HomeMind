@@ -1,0 +1,74 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px;
+  background: var(--fn-bg-elevated);
+  border: 1px solid var(--fn-border-primary);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 220px;
+}
+
+.frame {
+  padding: 10px;
+  background: #ffffff;
+  border-radius: 12px;
+  line-height: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fn-text-primary);
+  text-align: center;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fn-text-tertiary);
+  text-align: center;
+}
+
+.url {
+  display: inline-block;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--fn-bg-layout);
+  color: var(--fn-text-secondary);
+  font-size: 12px;
+  font-family: var(--fn-font-mono, monospace);
+  word-break: break-all;
+  text-align: center;
+  user-select: all;
+}
+
+.warn {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fn-text-tertiary);
+  text-align: center;
+}
+
+/*
+ * Slot for the QR panel next to the login card. Hidden on narrow screens:
+ * the panel is a desktop convenience and would push the form out of view.
+ */
+.slot {
+  display: flex;
+  align-items: center;
+  margin: 0 16px;
+}
+
+@media (max-width: 900px) {
+  .slot {
+    display: none;
+  }
+}
