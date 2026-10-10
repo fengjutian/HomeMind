@@ -7,6 +7,7 @@ from collections.abc import Callable
 from typing import Any
 
 from homemind.infra.active_family import ActiveFamilyResolver
+from homemind.infra.agents.action_checklist_middleware import ActionChecklistMiddleware
 from homemind.infra.agents.family_context_middleware import FamilyContextMiddleware
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.repos.memory_candidates import (
@@ -93,6 +94,7 @@ class HomeMindServer(OctopServer):
             MemoryEvidenceRepo(self.services.db),
         )
         return [
+            ActionChecklistMiddleware(),
             FamilyContextMiddleware(
                 user_repo=self.services.user_repo,
                 active_family_resolver=ActiveFamilyResolver(
