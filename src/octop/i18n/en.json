@@ -693,7 +693,8 @@
       "error": "Error",
       "unknown": "Unknown"
     },
-    "project_context": "A default project directory is configured at `{project_dir}`. For requests to analyze, inspect, understand, review, or modify the project, inspect `{project_dir}` first (including its source tree, dependency/build files, README, and version-control metadata when available). Do not mistake the agent workspace `{workspace_dir}` for the user project. After inspecting the project, read the agent workspace only when its memory, skills, configuration, or generated artifacts are relevant."
+    "project_context": "A default project directory is configured at `{project_dir}`. For requests to analyze, inspect, understand, review, or modify the project, inspect `{project_dir}` first (including its source tree, dependency/build files, README, and version-control metadata when available). Do not mistake the agent workspace `{workspace_dir}` for the user project. After inspecting the project, read the agent workspace only when its memory, skills, configuration, or generated artifacts are relevant.",
+    "response_format": "The chat interface renders Mermaid diagrams. When a flowchart, sequence diagram, architecture diagram, state diagram, or other diagram would make the answer materially clearer, emit valid Mermaid in a fenced code block whose language is `mermaid`. Do not use ASCII-art diagrams, and do not put Mermaid syntax in a `text` code block."
   },
   "agent_errors": {
     "no_models_configured": "No models are configured. Go to Admin → Model Management to add a provider, then enable this expert again.",

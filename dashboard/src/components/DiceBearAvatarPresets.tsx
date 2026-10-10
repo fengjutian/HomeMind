@@ -1,4 +1,4 @@
-import { Avatar } from "@dicebear/core";
+import { Avatar, Style } from "@dicebear/core";
 import botttsNeutral from "@dicebear/styles/bottts-neutral.json";
 import loreleiNeutral from "@dicebear/styles/lorelei-neutral.json";
 import notionistsNeutral from "@dicebear/styles/notionists-neutral.json";
@@ -10,18 +10,15 @@ import { useTranslation } from "react-i18next";
 import styles from "./DiceBearAvatarPresets.module.less";
 
 const PRESETS = [
-  { id: "bottts-neutral", definition: botttsNeutral },
-  { id: "notionists-neutral", definition: notionistsNeutral },
-  { id: "lorelei-neutral", definition: loreleiNeutral },
-  { id: "pixel-art-neutral", definition: pixelArtNeutral },
-  { id: "shapes", definition: shapes },
+  { id: "bottts-neutral", style: new Style(botttsNeutral) },
+  { id: "notionists-neutral", style: new Style(notionistsNeutral) },
+  { id: "lorelei-neutral", style: new Style(loreleiNeutral) },
+  { id: "pixel-art-neutral", style: new Style(pixelArtNeutral) },
+  { id: "shapes", style: new Style(shapes) },
 ] as const;
 
-function createSvg(
-  definition: (typeof PRESETS)[number]["definition"],
-  seed: string,
-) {
-  return new Avatar(definition, { seed, size: 128 }).toString();
+function createSvg(style: (typeof PRESETS)[number]["style"], seed: string) {
+  return new Avatar(style, { seed, size: 128 }).toString();
 }
 
 function svgDataUri(svg: string): string {
@@ -70,7 +67,7 @@ export default function DiceBearAvatarPresets({
   const previews = useMemo(
     () =>
       PRESETS.map((preset) => {
-        const svg = createSvg(preset.definition, normalizedSeed);
+        const svg = createSvg(preset.style, normalizedSeed);
         return { ...preset, svg, src: svgDataUri(svg) };
       }),
     [normalizedSeed],

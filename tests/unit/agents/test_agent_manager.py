@@ -845,7 +845,10 @@ def test_build_harness_config_keeps_system_prompt_after_bootstrap(
         config_json=json.dumps({"backend": _fs_backend(ws)}),
     )
     cfg = manager._build_harness_config(row)
-    assert cfg.system_prompt == "MBTI persona prompt"
+    assert cfg.system_prompt is not None
+    assert cfg.system_prompt.startswith("MBTI persona prompt\n\n")
+    assert "Mermaid" in cfg.system_prompt
+    assert "ASCII" in cfg.system_prompt
 
 
 def test_build_harness_config_prioritizes_configured_project(

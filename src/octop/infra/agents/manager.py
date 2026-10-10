@@ -24,6 +24,7 @@ from octop.i18n.domains.agents import (
     NO_MODELS_CONFIGURED,
     format_agent_start_error,
     project_context_prompt,
+    response_format_prompt,
 )
 from octop.infra.agents.memory.backend import memory_backend_from_agent_config
 from octop.infra.agents.memory.slim import MemorySlimCoordinator
@@ -3291,21 +3292,25 @@ class AgentManager:
             )
 
             project_dir = project_dir_from_config(cfg)
-            if project_dir is not None:
-                locale = (
-                    resolve_user_locale(
-                        user_repo=self._repos.user_repo,
-                        user_id=row.user_id,
-                    )
-                    if row.user_id is not None
-                    else DEFAULT_LOCALE
+            locale = (
+                resolve_user_locale(
+                    user_repo=self._repos.user_repo,
+                    user_id=row.user_id,
                 )
+                if row.user_id is not None
+                else DEFAULT_LOCALE
+            )
+            if project_dir is not None:
                 guidance = project_context_prompt(
                     project_dir,
                     agent_facing_workspace_dir_from_config(cfg),
                     locale,
                 )
                 system_prompt = f"{system_prompt}\n\n{guidance}" if system_prompt else guidance
+            format_guidance = response_format_prompt(locale)
+            system_prompt = (
+                f"{system_prompt}\n\n{format_guidance}" if system_prompt else format_guidance
+            )
 
         mcp_server_configs: dict[str, Any] = {}
         if not team_host:

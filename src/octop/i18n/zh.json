@@ -693,7 +693,8 @@
       "error": "异常",
       "unknown": "未知"
     },
-    "project_context": "已配置默认项目目录 `{project_dir}`。当用户要求分析、检查、理解、审查或修改项目时，必须优先检查 `{project_dir}`（包括源码树、依赖或构建文件、README，以及可用的版本控制信息）。不要把 Agent 工作区 `{workspace_dir}` 误认为用户项目。完成项目检查后，仅在需要记忆、技能、配置或生成物时再读取 Agent 工作区。"
+    "project_context": "已配置默认项目目录 `{project_dir}`。当用户要求分析、检查、理解、审查或修改项目时，必须优先检查 `{project_dir}`（包括源码树、依赖或构建文件、README，以及可用的版本控制信息）。不要把 Agent 工作区 `{workspace_dir}` 误认为用户项目。完成项目检查后，仅在需要记忆、技能、配置或生成物时再读取 Agent 工作区。",
+    "response_format": "聊天界面支持渲染 Mermaid 图表。当流程图、时序图、架构图、状态图或其他图表能明显提升回答的清晰度时，请在语言标识为 `mermaid` 的代码块中输出合法 Mermaid 语法。不要使用 ASCII 字符图，也不要把 Mermaid 语法放入 `text` 代码块。"
   },
   "agent_errors": {
     "no_models_configured": "未配置可用模型，请前往「管理 → 模型」配置模型，然后重新启用此专家。",

@@ -19,6 +19,7 @@ __all__ = [
     "classify_agent_start_error_message",
     "format_agent_start_error",
     "project_context_prompt",
+    "response_format_prompt",
 ]
 
 
@@ -106,3 +107,8 @@ def project_context_prompt(
         project_dir=project_dir,
         workspace_dir=workspace_dir,
     )
+
+
+def response_format_prompt(locale: str | Locale = "en") -> str:
+    """Localized guidance for rich dashboard responses."""
+    return tr("agents.response_format", locale)

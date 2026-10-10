@@ -8,6 +8,7 @@ from octop.i18n.domains.agents import (
     NO_MODELS_CONFIGURED,
     agent_error_message,
     agent_state_label,
+    response_format_prompt,
 )
 
 
@@ -21,6 +22,11 @@ def test_agent_state_label_failed_en() -> None:
 
 def test_agent_state_label_unknown_state_passthrough() -> None:
     assert agent_state_label("custom", "en") == "custom"
+
+
+def test_response_format_prompt_localized() -> None:
+    assert "Mermaid" in response_format_prompt("en")
+    assert "ASCII 字符图" in response_format_prompt("zh")
 
 
 def test_agent_error_message_octop_key_zh() -> None:
