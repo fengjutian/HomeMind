@@ -116,9 +116,9 @@ def test_fetch_pypi_info_loads_prerelease_description(
     def fake_urlopen(req: object, timeout: int = 10) -> _JsonResp:
         url = getattr(req, "full_url", "")
         urls.append(url)
-        if url.endswith("/octop/json"):
+        if url.endswith("/homemind/json"):
             return _JsonResp(catalog)
-        if url.endswith("/octop/1.0.2b5/json"):
+        if url.endswith("/homemind/1.0.2b5/json"):
             return _JsonResp(beta)
         raise AssertionError(url)
 
@@ -129,7 +129,7 @@ def test_fetch_pypi_info_loads_prerelease_description(
     assert info.latest_stable == "1.0.1"
     assert info.description is not None
     assert "remote bridge" in info.description
-    assert any(url.endswith("/octop/1.0.2b5/json") for url in urls)
+    assert any(url.endswith("/homemind/1.0.2b5/json") for url in urls)
 
 
 def test_fetch_pypi_info_skips_versioned_fetch_when_stable_is_latest(
@@ -144,7 +144,7 @@ def test_fetch_pypi_info_skips_versioned_fetch_when_stable_is_latest(
     def fake_urlopen(req: object, timeout: int = 10) -> _JsonResp:
         url = getattr(req, "full_url", "")
         urls.append(url)
-        if url.endswith("/octop/json"):
+        if url.endswith("/homemind/json"):
             return _JsonResp(catalog)
         raise AssertionError(url)
 
@@ -154,7 +154,7 @@ def test_fetch_pypi_info_skips_versioned_fetch_when_stable_is_latest(
     assert info.version == "1.0.1"
     assert info.description is not None
     assert "stable" in info.description
-    assert urls == ["https://pypi.org/pypi/octop/json"]
+    assert urls == ["https://pypi.org/pypi/homemind/json"]
 
 
 def test_build_upgrade_command_prerelease_flags(
@@ -164,12 +164,12 @@ def test_build_upgrade_command_prerelease_flags(
     uv_cmd = build_upgrade_command("uv", python, allow_prerelease=True, version="0.9.34b1")
     assert uv_cmd is not None
     assert uv_cmd[uv_cmd.index("--prerelease") + 1] == "allow"
-    assert "octop==0.9.34b1" in uv_cmd
+    assert "homemind==0.9.34b1" in uv_cmd
     monkeypatch.setattr("octop.infra.setup.self_update.has_pip", lambda _: True)
     pip_cmd = build_upgrade_command("pip", python, allow_prerelease=True, version="0.9.34b1")
     assert pip_cmd is not None
     assert "--pre" in pip_cmd
-    assert "octop==0.9.34b1" in pip_cmd
+    assert "homemind==0.9.34b1" in pip_cmd
 
 
 def test_build_upgrade_command_pins_stable_without_pre(
@@ -178,12 +178,12 @@ def test_build_upgrade_command_pins_stable_without_pre(
     python = "/home/user/.octop/venv/bin/python"
     uv_cmd = build_upgrade_command("uv", python, version="0.9.33")
     assert uv_cmd is not None
-    assert "octop==0.9.33" in uv_cmd
+    assert "homemind==0.9.33" in uv_cmd
     assert "--prerelease" not in uv_cmd
     monkeypatch.setattr("octop.infra.setup.self_update.has_pip", lambda _: True)
     pip_cmd = build_upgrade_command("pip", python, version="0.9.33")
     assert pip_cmd is not None
-    assert "octop==0.9.33" in pip_cmd
+    assert "homemind==0.9.33" in pip_cmd
     assert "--pre" not in pip_cmd
 
 
@@ -270,11 +270,11 @@ def test_run_upgrade_restores_launcher_only_on_failure(
 
 
 def test_page_has_package_version_matches_wheel_and_sdist() -> None:
-    body = '<a href="octop-1.0.1-py3-none-any.whl">octop-1.0.1-py3-none-any.whl</a>'
+    body = '<a href="homemind-1.0.1-py3-none-any.whl">homemind-1.0.1-py3-none-any.whl</a>'
     assert page_has_package_version(body, "1.0.1")
     assert not page_has_package_version(body, "1.0.10")
     assert page_has_package_version(
-        '<a href="octop-1.0.2.tar.gz">octop-1.0.2.tar.gz</a>',
+        '<a href="homemind-1.0.2.tar.gz">homemind-1.0.2.tar.gz</a>',
         "1.0.2",
     )
     assert page_has_package_version("any non-empty body", None)
@@ -304,7 +304,7 @@ def test_probe_index_classifies_missing_and_unreachable(
             return None
 
         def read(self) -> bytes:
-            return b'<a href="octop-0.9.0-py3-none-any.whl">x</a>'
+            return b'<a href="homemind-0.9.0-py3-none-any.whl">x</a>'
 
     monkeypatch.setattr(
         "octop.infra.setup.self_update.urllib.request.urlopen",

@@ -7,11 +7,11 @@ import click
 
 @click.command("version")
 def version() -> None:
-    """Show the installed octop version."""
+    """Show the installed HomeMind version."""
     try:
         from importlib.metadata import version as _v
 
-        v = _v("octop")
+        v = _v("homemind")
     except Exception:
         v = "unknown"
-    click.echo(f"octop v{v}")
+    click.echo(f"HomeMind v{v}")

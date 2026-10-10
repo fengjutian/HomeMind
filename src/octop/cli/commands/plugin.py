@@ -14,7 +14,7 @@ from octop.infra.utils.paths import PathLayout
 
 @click.group()
 def plugin() -> None:
-    """Install and manage Octop plugins."""
+    """Install and manage HomeMind plugins."""
 
 
 def _manager() -> PluginManager:

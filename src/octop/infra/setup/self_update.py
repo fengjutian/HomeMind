@@ -22,7 +22,8 @@ from octop.infra.utils.paths import PathLayout
 
 logger = logging.getLogger(__name__)
 
-_PACKAGE_NAME = "octop"
+_PACKAGE_NAME = "homemind"
+_CONSOLE_SCRIPT_NAMES = ("homemind", "octop")
 _PYPI_URL = f"https://pypi.org/pypi/{_PACKAGE_NAME}/json"
 _PYPI_SIMPLE = "https://pypi.org/simple"
 _PYPI_UA = {"User-Agent": f"{_PACKAGE_NAME}-updater/1.0"}
@@ -411,7 +412,7 @@ def find_pip_in_venv(python_exe: str) -> str | None:
 
 
 def package_requirement(version: str | None = None) -> str:
-    """Return ``octop`` or a pinned ``octop==<version>`` spec."""
+    """Return ``homemind`` or a pinned ``homemind==<version>`` spec."""
     if version:
         return f"{_PACKAGE_NAME}=={version}"
     return _PACKAGE_NAME
@@ -487,7 +488,7 @@ def _is_windows() -> bool:
 
 
 def stash_console_scripts(python_exe: str) -> list[tuple[Path, Path]]:
-    """Rename the ``octop`` launchers next to *python_exe* out of the way.
+    """Rename the HomeMind launchers next to *python_exe* out of the way.
 
     Windows refuses to delete or overwrite the executable backing a running
     process (``os error 32``), which makes pip and uv fail while rewriting
@@ -500,14 +501,15 @@ def stash_console_scripts(python_exe: str) -> list[tuple[Path, Path]]:
     script_dir = Path(python_exe).parent
     _purge_stale_stashes(script_dir)
     moved: list[tuple[Path, Path]] = []
-    for script in sorted(script_dir.glob(f"{_PACKAGE_NAME}*.exe")):
-        stash = script.with_name(script.name + _STASH_SUFFIX)
-        try:
-            script.replace(stash)
-        except OSError as exc:
-            logger.warning("could not move %s aside: %s", script, exc)
-            continue
-        moved.append((script, stash))
+    for name in _CONSOLE_SCRIPT_NAMES:
+        for script in sorted(script_dir.glob(f"{name}*.exe")):
+            stash = script.with_name(script.name + _STASH_SUFFIX)
+            try:
+                script.replace(stash)
+            except OSError as exc:
+                logger.warning("could not move %s aside: %s", script, exc)
+                continue
+            moved.append((script, stash))
     return moved
 
 
@@ -563,11 +565,11 @@ def get_installed_version(python_exe: str) -> str | None:
 
 
 def get_version_in_dir(python_exe: str, target: str) -> str | None:
-    """Return the octop version installed in *target* (a ``pip --target`` dir)."""
+    """Return the HomeMind version installed in *target* (a ``pip --target`` dir)."""
     try:
         code = (
             "import sys; sys.path.insert(0, sys.argv[1]); "
-            "from importlib.metadata import version; print(version('octop'))"
+            f"from importlib.metadata import version; print(version({_PACKAGE_NAME!r}))"
         )
         result = subprocess.run(
             [python_exe, "-c", code, target],
@@ -598,7 +600,7 @@ def page_has_package_version(body: str, version: str | None) -> bool:
     """True when a PEP 503 simple page lists *version* (or any file when unpinned)."""
     if not version:
         return bool(body.strip())
-    # Wheel / sdist names: octop-1.0.1-py3-none-any.whl, octop-1.0.1.tar.gz
+    # Wheel / sdist names: homemind-1.0.1-py3-none-any.whl, homemind-1.0.1.tar.gz
     return f"{_PACKAGE_NAME}-{version}-" in body or f"{_PACKAGE_NAME}-{version}." in body
 
 
@@ -904,7 +906,7 @@ def _run_managed_upgrade(
         if cmd is None:
             return UpgradeResult(
                 success=False,
-                error="pip is not available for the Octop virtual environment.",
+                error="pip is not available for the HomeMind virtual environment.",
                 mirror_errors=mirror_errors,
             )
         rc, err_snippet = _run_install_cmd(

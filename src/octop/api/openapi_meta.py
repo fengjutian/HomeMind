@@ -10,7 +10,7 @@ from fastapi.openapi.utils import get_openapi
 from octop.api.deps import is_jwt_exempt_path
 
 API_DESCRIPTION = """\
-**Octop** is a smarter, self-hosted AI assistant for multiple users and agents. All routes are served under `/api`.
+**HomeMind** is a smarter, self-hosted AI assistant for multiple users and agents. All routes are served under `/api`.
 
 ## Authentication
 
@@ -51,7 +51,7 @@ missing. Sessions are owner-scoped: another user's session reads as `404`.
 
 Files at or below `max_upload_bytes` land in the agent workspace `inbound/` like
 the legacy multipart route. Larger ones cannot — `octop-harness` writes workspace
-files from bytes — so they are moved into Octop's own blob store and streamed
+files from bytes — so they are moved into HomeMind's own blob store and streamed
 back from `GET /api/uploads/blobs/{upload_id}`. The completion response's
 `storage` field reports which path was taken.
 
@@ -100,7 +100,7 @@ OPENAPI_TAGS: list[dict[str, str]] = [
     },
     {
         "name": "bridge",
-        "description": "Link this Octop to remote Octop instances (HTTP tunnel + remote chat).",
+        "description": "Link this HomeMind instance to remote HomeMind instances (HTTP tunnel + remote chat).",
     },
     {
         "name": "knowledge",

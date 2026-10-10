@@ -75,7 +75,7 @@ def init(
                 from octop.cli.support import prompts as _prompts
 
                 if not _prompts.confirm(
-                    f"Wipe {home}? This deletes ALL Octop state.", default=False
+                    f"Wipe {home}? This deletes ALL HomeMind state.", default=False
                 ):
                     click.echo("aborted", err=True)
                     raise SystemExit(1)
@@ -121,6 +121,6 @@ def init(
     finally:
         db.close()
 
-    click.echo(f"\u2705 Octop bootstrapped at {home}")
+    click.echo(f"\u2705 HomeMind bootstrapped at {home}")
     click.echo(f"   admin user: {username}")
     click.echo("   next: `octop run` (optional: `octop agent use <id>` to pin default agent)")
