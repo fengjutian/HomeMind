@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="HomeMind 是运行在你自己设备上的开源家庭 AI 助手，让记忆、协作与自动化真正属于家人。"
+    />
+    <meta name="theme-color" content="#f8f5ee" />
+    <meta property="og:title" content="HomeMind — 懂每一位家人的 AI" />
+    <meta
+      property="og:description"
+      content="开源、自托管的家庭 AI 助手。一个家，共享智能，各自拥有专属空间。"
+    />
+    <meta property="og:type" content="website" />
+    <title>HomeMind — 懂每一位家人的 AI</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到正文</a>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="HomeMind 首页">
+        <svg class="brand-mark" viewBox="0 0 42 42" aria-hidden="true">
+          <path d="M7 19.5 21 7l14 12.5V35H25v-9h-8v9H7Z" />
+          <path class="brand-heart" d="M21 19.6c-3.4-4-8.3 1.2 0 7 8.3-5.8 3.4-11 0-7Z" />
+        </svg>
+        <span>HomeMind</span>
+      </a>
+      <nav class="desktop-nav" aria-label="主导航">
+        <a href="#why">为什么是 HomeMind</a>
+        <a href="#features">能力</a>
+        <a href="#how">开始使用</a>
+        <a href="https://github.com/fengjutian/HomeMind" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+      <div class="header-actions">
+        <button class="lang-toggle" type="button" aria-label="切换语言">EN</button>
+        <a class="button button-small" href="https://github.com/fengjutian/HomeMind/releases/latest">免费下载</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top">
+        <div class="hero-copy reveal">
+          <p class="eyebrow" data-zh="开源 · 自托管 · 为家庭而生" data-en="OPEN SOURCE · SELF-HOSTED · FAMILY FIRST">开源 · 自托管 · 为家庭而生</p>
+          <h1 data-zh="家的事，交给真正<br /><em>懂家人</em>的 AI。" data-en="Meet the AI that<br />truly <em>knows your home.</em>">家的事，交给真正<br /><em>懂家人</em>的 AI。</h1>
+          <p class="hero-lead" data-zh="HomeMind 运行在你自己的设备上。它记得每个人的习惯，连接家里的信息与设备，也把隐私牢牢留在家中。" data-en="HomeMind runs on your own devices. It remembers each family member, connects household knowledge and devices, and keeps your privacy at home.">HomeMind 运行在你自己的设备上。它记得每个人的习惯，连接家里的信息与设备，也把隐私牢牢留在家中。</p>
+          <div class="hero-actions">
+            <a class="button" href="https://github.com/fengjutian/HomeMind/releases/latest" data-zh="下载 HomeMind" data-en="Download HomeMind">下载 HomeMind</a>
+            <a class="text-link" href="https://github.com/fengjutian/HomeMind#-quick-start" data-zh="查看安装指南 ↗" data-en="Read the setup guide ↗">查看安装指南 ↗</a>
+          </div>
+          <div class="trust-row" aria-label="产品特性">
+            <span><i></i><b data-zh="本地优先" data-en="Local first">本地优先</b></span>
+            <span><i></i><b data-zh="多用户隔离" data-en="Multi-user">多用户隔离</b></span>
+            <span><i></i><b data-zh="MIT 开源" data-en="MIT licensed">MIT 开源</b></span>
+          </div>
+        </div>
+
+        <div class="home-scene reveal" aria-label="HomeMind 家庭面板示意图">
+          <div class="sun-orbit"></div>
+          <div class="scene-card main-card">
+            <div class="card-topline">
+              <div class="mini-brand"><span>H</span> HomeMind</div>
+              <span class="live-dot" data-zh="家中在线" data-en="Home online">家中在线</span>
+            </div>
+            <div class="greeting">
+              <p data-zh="下午好，小满一家" data-en="Good afternoon, family">下午好，小满一家</p>
+              <h2 data-zh="今天，家里一切都好。" data-en="Everything at home is just right.">今天，家里一切都好。</h2>
+            </div>
+            <div class="family-grid">
+              <div class="family-member coral"><strong>妈妈</strong><small>日程已同步</small></div>
+              <div class="family-member teal"><strong>爸爸</strong><small>通勤提醒 18:20</small></div>
+              <div class="family-member yellow"><strong>小满</strong><small>阅读计划 4/7</small></div>
+            </div>
+            <div class="ask-bar"><span>✦</span><span data-zh="问问 HomeMind…" data-en="Ask HomeMind…">问问 HomeMind…</span><button aria-label="发送">↑</button></div>
+          </div>
+          <div class="float-card memory-card">
+            <span class="float-icon">✦</span>
+            <div><small data-zh="家庭记忆" data-en="Family memory">家庭记忆</small><strong data-zh="周六要给外婆打电话" data-en="Call grandma on Saturday">周六要给外婆打电话</strong></div>
+          </div>
+          <div class="float-card privacy-card">
+            <span class="shield">✓</span>
+            <div><small data-zh="隐私状态" data-en="Privacy">隐私状态</small><strong data-zh="数据留在家中" data-en="Data stays at home">数据留在家中</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="manifesto" id="why">
+        <p class="section-label" data-zh="不是另一个聊天机器人" data-en="NOT ANOTHER CHATBOT">不是另一个聊天机器人</p>
+        <h2 data-zh="AI 应该融入家庭，<br />而不是侵入家庭。" data-en="AI should belong in your home,<br />not intrude on it.">AI 应该融入家庭，<br />而不是侵入家庭。</h2>
+        <div class="manifesto-grid">
+          <article><span>01</span><h3 data-zh="记住，但不窥探" data-en="Remembers, never pries">记住，但不窥探</h3><p data-zh="长期记忆跟随你的工作区保存。你知道数据在哪里，也决定它何时离开。" data-en="Long-term memory stays with your workspace. You know where it is and decide when it leaves.">长期记忆跟随你的工作区保存。你知道数据在哪里，也决定它何时离开。</p></article>
+          <article><span>02</span><h3 data-zh="共享，但有边界" data-en="Shared, with boundaries">共享，但有边界</h3><p data-zh="全家共用一个智能中枢，每位成员仍拥有独立账号、助手与私人空间。" data-en="One intelligent hub for the household, with separate accounts, assistants and private spaces.">全家共用一个智能中枢，每位成员仍拥有独立账号、助手与私人空间。</p></article>
+          <article><span>03</span><h3 data-zh="主动，但不打扰" data-en="Proactive, not pushy">主动，但不打扰</h3><p data-zh="自然语言定时任务和贴心提醒，在正确的时间出现，其余时间安静待命。" data-en="Natural-language routines and thoughtful reminders appear at the right time, then step aside.">自然语言定时任务和贴心提醒，在正确的时间出现，其余时间安静待命。</p></article>
+        </div>
+      </section>
+
+      <section class="features" id="features">
+        <div class="section-heading">
+          <div><p class="section-label" data-zh="一个家庭智能中枢" data-en="ONE INTELLIGENT HOME HUB">一个家庭智能中枢</p><h2 data-zh="从对话，到把事情做好。" data-en="From conversation to getting things done.">从对话，到把事情做好。</h2></div>
+          <p data-zh="在网页、桌面和常用聊天工具里，随时找到同一个 HomeMind。" data-en="Reach the same HomeMind from the web, desktop, and the chat apps you already use.">在网页、桌面和常用聊天工具里，随时找到同一个 HomeMind。</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature feature-wide coral-block"><span class="feature-number">01</span><div><h3 data-zh="每个人，都有自己的专属助手" data-en="A personal assistant for everyone">每个人，都有自己的专属助手</h3><p data-zh="为家人配置不同性格、专长与权限。学习辅导、生活规划、工作协作，各有所长，也能一起完成复杂任务。" data-en="Give each family member a distinct personality, expertise, and permissions. Specialized agents can also collaborate on complex tasks.">为家人配置不同性格、专长与权限。学习辅导、生活规划、工作协作，各有所长，也能一起完成复杂任务。</p></div><div class="agent-stack"><span>生活管家</span><span>学习搭子</span><span>健康助手</span><span>+ 自定义</span></div></article>
+          <article class="feature cream-block"><span class="feature-number">02</span><div class="feature-icon brain">⌁</div><h3 data-zh="越相处，越懂你" data-en="Gets to know you over time">越相处，越懂你</h3><p data-zh="可迁移的长期记忆，把重要偏好、故事和家庭知识留在你掌控的空间里。" data-en="Portable long-term memory keeps preferences, stories and household knowledge in a space you control.">可迁移的长期记忆，把重要偏好、故事和家庭知识留在你掌控的空间里。</p></article>
+          <article class="feature dark-block"><span class="feature-number">03</span><div class="feature-icon">⌂</div><h3 data-zh="连接真实的家" data-en="Connected to real life">连接真实的家</h3><p data-zh="通过 Home Assistant 连接智能家居，通过 Connector、插件和知识库连接你的数字生活。" data-en="Connect smart-home devices through Home Assistant, and your digital life through connectors, plugins and knowledge bases.">通过 Home Assistant 连接智能家居，通过 Connector、插件和知识库连接你的数字生活。</p></article>
+          <article class="feature feature-wide mint-block"><span class="feature-number">04</span><div><h3 data-zh="不被云端绑住的 AI" data-en="AI without cloud lock-in">不被云端绑住的 AI</h3><p data-zh="本地运行，自选模型。SQLite 开箱即用，也支持 PostgreSQL 与远程工作区。你的部署方式，由你决定。" data-en="Run locally and choose your models. Start with SQLite, or use PostgreSQL and remote workspaces. You decide how it runs.">本地运行，自选模型。SQLite 开箱即用，也支持 PostgreSQL 与远程工作区。你的部署方式，由你决定。</p></div><div class="privacy-visual"><span>你的设备</span><div class="pulse-lock">⌾</div><small>对话 · 文件 · 凭据</small></div></article>
+        </div>
+      </section>
+
+      <section class="how" id="how">
+        <div class="how-copy"><p class="section-label" data-zh="十分钟，回到自己的主场" data-en="YOUR HOME, IN TEN MINUTES">十分钟，回到自己的主场</p><h2 data-zh="从下载安装到第一次对话，只需三步。" data-en="Three steps from download to your first conversation.">从下载安装到第一次对话，只需三步。</h2></div>
+        <ol class="steps">
+          <li><span>1</span><div><h3 data-zh="下载并运行" data-en="Download and run">下载并运行</h3><p data-zh="选择桌面客户端，或用一条命令部署。" data-en="Choose the desktop app or deploy with one command.">选择桌面客户端，或用一条命令部署。</p></div></li>
+          <li><span>2</span><div><h3 data-zh="接入你的模型" data-en="Connect your model">接入你的模型</h3><p data-zh="支持主流 LLM 服务，也可连接本地 Ollama。" data-en="Use leading LLM providers or a local Ollama instance.">支持主流 LLM 服务，也可连接本地 Ollama。</p></div></li>
+          <li><span>3</span><div><h3 data-zh="邀请家人" data-en="Invite your family">邀请家人</h3><p data-zh="创建独立账号与助手，开始积累共同记忆。" data-en="Create separate accounts and assistants, and start building shared memories.">创建独立账号与助手，开始积累共同记忆。</p></div></li>
+        </ol>
+        <div class="install-box"><div><span>TERMINAL</span><code>uvx homemind run</code></div><button class="copy-button" type="button" data-copy="uvx homemind run" data-zh="复制" data-en="Copy">复制</button></div>
+      </section>
+
+      <section class="closing">
+        <div class="closing-mark" aria-hidden="true">H</div>
+        <p class="section-label" data-zh="欢迎回家" data-en="WELCOME HOME">欢迎回家</p>
+        <h2 data-zh="让 AI 真正成为<br />家里的一员。" data-en="Make AI feel<br />at home.">让 AI 真正成为<br />家里的一员。</h2>
+        <p data-zh="开源、透明、由你掌控。今天就开始构建属于家人的智能空间。" data-en="Open, transparent, and under your control. Build an intelligent space for your family today.">开源、透明、由你掌控。今天就开始构建属于家人的智能空间。</p>
+        <div class="closing-actions"><a class="button button-light" href="https://github.com/fengjutian/HomeMind/releases/latest" data-zh="免费下载" data-en="Download free">免费下载</a><a href="https://github.com/fengjutian/HomeMind" class="button button-outline">GitHub ↗</a></div>
+      </section>
+    </main>
+
+    <footer><a class="brand footer-brand" href="#top"><svg class="brand-mark" viewBox="0 0 42 42" aria-hidden="true"><path d="M7 19.5 21 7l14 12.5V35H25v-9h-8v9H7Z" /><path class="brand-heart" d="M21 19.6c-3.4-4-8.3 1.2 0 7 8.3-5.8 3.4-11 0-7Z" /></svg><span>HomeMind</span></a><p data-zh="给家一个真正懂你的 AI。" data-en="AI that truly knows your home.">给家一个真正懂你的 AI。</p><div><a href="https://github.com/fengjutian/HomeMind">GitHub</a><a href="https://github.com/fengjutian/HomeMind/blob/main/README_CN.md" data-zh="文档" data-en="Docs">文档</a><a href="https://github.com/fengjutian/HomeMind/blob/main/LICENSE">MIT License</a></div><small>© <span id="year"></span> HomeMind Contributors</small></footer>
+    <script src="/app.js"></script>
+  </body>
+</html>
