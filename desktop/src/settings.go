@@ -28,7 +28,7 @@ func defaultSettings() Settings {
 	return Settings{
 		Locale:         LocaleEN,
 		Autostart:      false,
-		MinimizeToTray: true,
+		MinimizeToTray: false,
 		PreventSleep:   false,
 		Port:           8088,
 	}
