@@ -848,6 +848,47 @@ def test_build_harness_config_keeps_system_prompt_after_bootstrap(
     assert cfg.system_prompt == "MBTI persona prompt"
 
 
+def test_build_harness_config_prioritizes_configured_project(
+    manager: AgentManager,
+    tmp_path: Path,
+) -> None:
+    agent_id = "AGT_PROJECT"
+    project = tmp_path / "project"
+    project.mkdir()
+    config = {
+        "backend": {
+            "type": "local_shell",
+            "root_dir": str(project),
+            "virtual_mode": True,
+        },
+        "project_dir": "/",
+        "workspace_dir": f"/.octop/workspaces/{agent_id}",
+        "system_files_path": ".octop",
+    }
+    manager._repos.agent_repo.create(
+        agent_id=agent_id,
+        user_id=None,
+        name="project-agent",
+        system_prompt="Persona prompt",
+        config_json=json.dumps(config),
+    )
+    row = manager._repos.agent_repo.get(agent_id)
+    assert row is not None
+    workspace = manager.resolve_workspace_dir(agent_id)
+    backend_workspace = manager._backend_workspace_for_row(
+        row,
+        cfg=config,
+        workspace_dir=workspace,
+    )
+    backend_workspace.write_text(".bootstrapped", "")
+    harness_cfg = manager._build_harness_config(row)
+
+    assert harness_cfg.system_prompt is not None
+    assert harness_cfg.system_prompt.startswith("Persona prompt\n\n")
+    assert "默认项目目录 `/`" in harness_cfg.system_prompt
+    assert f"/.octop/workspaces/{agent_id}" in harness_cfg.system_prompt
+
+
 def test_bootstrap_complete_defers_graph_refresh(manager: AgentManager) -> None:
     agent_id = "AGT_BOOT"
     manager._repos.agent_repo.create(agent_id=agent_id, user_id=None, name="boot")

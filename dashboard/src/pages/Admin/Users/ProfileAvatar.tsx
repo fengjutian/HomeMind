@@ -28,6 +28,7 @@ import supportPortrait from "../../../assets/avatars/support.png";
 import teacherPortrait from "../../../assets/avatars/teacher.png";
 import { useAuthImageSrc } from "../../../hooks/useAuthImageSrc";
 import { validateAvatarFile } from "../../Experts/components/ExpertAvatarPicker";
+import DiceBearAvatarPresets from "../../../components/DiceBearAvatarPresets";
 import styles from "./index.module.less";
 
 const AVATAR_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
@@ -287,6 +288,7 @@ export function ProfileAvatarPicker({
   icon,
   kind = "user",
   disabled = false,
+  avatarSeed = "homemind-user",
   onPick,
   onSelectIcon,
   onRemove,
@@ -295,6 +297,7 @@ export function ProfileAvatarPicker({
   icon?: string | null;
   kind?: AvatarKind;
   disabled?: boolean;
+  avatarSeed?: string;
   onPick: (file: File) => void | Promise<void>;
   onSelectIcon?: (icon: string | null) => void | Promise<void>;
   onRemove?: () => void | Promise<void>;
@@ -422,6 +425,20 @@ export function ProfileAvatarPicker({
           );
         })}
       </div>
+      {kind === "user" ? (
+        <DiceBearAvatarPresets
+          seed={avatarSeed}
+          disabled={disabled}
+          onPick={async (file) => {
+            replaceLocalPreview(URL.createObjectURL(file));
+            try {
+              await onPick(file);
+            } catch {
+              replaceLocalPreview(null);
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

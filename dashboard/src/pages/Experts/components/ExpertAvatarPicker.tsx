@@ -5,6 +5,7 @@ import { ImagePlus } from "lucide-react";
 import { message } from "@/utils/antdMessage";
 
 import ExpertAgentAvatar from "../../Chat/components/ExpertAgentAvatar";
+import DiceBearAvatarPresets from "../../../components/DiceBearAvatarPresets";
 import styles from "../index.module.less";
 
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
@@ -49,6 +50,7 @@ interface ExpertAvatarPickerProps {
   iconName?: string | null;
   color?: string | null;
   disabled?: boolean;
+  avatarSeed?: string;
   onPick: (file: File) => void | Promise<void>;
   onRemove?: () => void | Promise<void>;
 }
@@ -58,6 +60,7 @@ export default function ExpertAvatarPicker({
   iconName,
   color,
   disabled = false,
+  avatarSeed = "homemind-agent",
   onPick,
   onRemove,
 }: ExpertAvatarPickerProps) {
@@ -158,6 +161,18 @@ export default function ExpertAvatarPicker({
           {t("experts.avatarHint")}
         </span>
       </div>
+      <DiceBearAvatarPresets
+        seed={avatarSeed}
+        disabled={disabled}
+        onPick={async (file) => {
+          replaceLocalPreview(URL.createObjectURL(file));
+          try {
+            await onPick(file);
+          } catch {
+            replaceLocalPreview(null);
+          }
+        }}
+      />
     </div>
   );
 }

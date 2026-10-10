@@ -88,6 +88,28 @@ def uses_scoped_workspace_default(cfg: dict[str, Any] | None) -> bool:
     return root_raw is not None and not _is_host_root_sentinel(root_raw)
 
 
+def project_dir_from_config(cfg: dict[str, Any] | None) -> str | None:
+    """Return the agent-facing default project directory, when configured.
+
+    A scoped local backend exposes its selected host directory as virtual ``/``.
+    Keep that project root distinct from ``workspace_dir`` so agent-owned files
+    remain under ``/.octop/workspaces/<id>``.
+    """
+    raw = (cfg or {}).get("project_dir")
+    if isinstance(raw, str) and raw.strip():
+        normalized = "/" + raw.strip().replace("\\", "/").strip("/")
+        if ".." not in normalized.split("/"):
+            return normalized
+    workspace_raw = (cfg or {}).get("workspace_dir")
+    if (
+        uses_scoped_workspace_default(cfg)
+        and isinstance(workspace_raw, str)
+        and workspace_raw.strip().replace("\\", "/").startswith("/.octop/workspaces/")
+    ):
+        return "/"
+    return None
+
+
 def _ensure_dir(path: Path) -> bool:
     try:
         path.mkdir(parents=True, exist_ok=True)
@@ -174,6 +196,7 @@ def seed_workspace_dir_on_create(
 
     host = default_agent_workspace_dir(paths, agent_id, cfg=config).resolve()
     if uses_scoped_workspace_default(config):
+        config.setdefault("project_dir", "/")
         config["workspace_dir"] = scoped_workspace_dir_str(agent_id)
     else:
         config["workspace_dir"] = str(host)
@@ -422,6 +445,7 @@ __all__ = [
     "host_system_dir",
     "join_agent_facing",
     "local_backend_root_dir",
+    "project_dir_from_config",
     "neutralize_unwritable_local_root",
     "resolve_workspace_host_path",
     "scoped_workspace_dir_str",

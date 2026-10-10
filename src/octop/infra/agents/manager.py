@@ -23,6 +23,7 @@ from octop.i18n.domains.agents import (
     AGENT_START_TIMEOUT,
     NO_MODELS_CONFIGURED,
     format_agent_start_error,
+    project_context_prompt,
 )
 from octop.infra.agents.memory.backend import memory_backend_from_agent_config
 from octop.infra.agents.memory.slim import MemorySlimCoordinator
@@ -3279,6 +3280,32 @@ class AgentManager:
         if not team_host and not bootstrap_marker_exists(ws):
             system_prompt = None
             memory = ()
+        elif not team_host:
+            from octop.infra.agents.workspace.dir import (  # noqa: PLC0415
+                agent_facing_workspace_dir_from_config,
+                project_dir_from_config,
+            )
+            from octop.infra.utils.locale import (  # noqa: PLC0415
+                DEFAULT_LOCALE,
+                resolve_user_locale,
+            )
+
+            project_dir = project_dir_from_config(cfg)
+            if project_dir is not None:
+                locale = (
+                    resolve_user_locale(
+                        user_repo=self._repos.user_repo,
+                        user_id=row.user_id,
+                    )
+                    if row.user_id is not None
+                    else DEFAULT_LOCALE
+                )
+                guidance = project_context_prompt(
+                    project_dir,
+                    agent_facing_workspace_dir_from_config(cfg),
+                    locale,
+                )
+                system_prompt = f"{system_prompt}\n\n{guidance}" if system_prompt else guidance
 
         mcp_server_configs: dict[str, Any] = {}
         if not team_host:

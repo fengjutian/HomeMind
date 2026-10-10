@@ -12,6 +12,7 @@ from octop.infra.agents.workspace.dir import (
     default_agent_workspace_dir,
     harness_workspace_path,
     join_agent_facing,
+    project_dir_from_config,
     resolve_workspace_host_path,
     scoped_workspace_dir_str,
     seed_workspace_dir_on_create,
@@ -38,6 +39,8 @@ def test_scoped_default_persists_agent_facing_path(tmp_path: Path) -> None:
     cfg = _scoped_cfg(root)
     host = seed_workspace_dir_on_create(cfg, paths=paths, agent_id="J1BT2X")
     assert cfg["workspace_dir"] == "/.octop/workspaces/J1BT2X"
+    assert cfg["project_dir"] == "/"
+    assert project_dir_from_config(cfg) == "/"
     # On-disk tree still lands under the jail root_dir.
     assert host == (root / ".octop" / "workspaces" / "J1BT2X").resolve()
     assert host.is_dir()
@@ -75,6 +78,16 @@ def test_user_assigned_workspace_wins(tmp_path: Path) -> None:
     host = seed_workspace_dir_on_create(cfg, paths=paths, agent_id="USR1")
     assert cfg["workspace_dir"] == str(custom)
     assert host == custom.resolve()
+
+
+def test_project_dir_infers_legacy_scoped_workspace(tmp_path: Path) -> None:
+    cfg = _scoped_cfg(tmp_path, workspace_dir="/.octop/workspaces/OLD1")
+    assert project_dir_from_config(cfg) == "/"
+
+
+def test_project_dir_not_inferred_for_unrelated_workspace(tmp_path: Path) -> None:
+    cfg = _scoped_cfg(tmp_path, workspace_dir=str(tmp_path / "workspace"))
+    assert project_dir_from_config(cfg) is None
 
 
 def test_host_rooted_default_uses_octop_home(tmp_path: Path) -> None:

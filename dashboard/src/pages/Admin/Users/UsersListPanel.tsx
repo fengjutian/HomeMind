@@ -2308,6 +2308,7 @@ export default function UsersListPanel() {
             </div>
             <ProfileAvatarPicker
               kind="user"
+              avatarSeed="new-user"
               icon={pendingUserIcon}
               onPick={async (file) => {
                 setPendingUserAvatar(file);
@@ -2497,6 +2498,7 @@ export default function UsersListPanel() {
             {editTarget ? (
               <ProfileAvatarPicker
                 kind="user"
+                avatarSeed={editTarget.username}
                 avatarUrl={editTarget.avatar_url}
                 icon={editTarget.avatar_icon}
                 onSelectIcon={async (icon) => {

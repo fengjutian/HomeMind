@@ -751,6 +751,7 @@ function EditAgentDrawerBody({
               </Form.Item>
               <Form.Item label={t("experts.avatar")}>
                 <ExpertAvatarPicker
+                  avatarSeed={agent.agent_id}
                   iconUrl={iconUrl}
                   iconName={agent.icon_name}
                   color={

@@ -507,6 +507,7 @@ export default function AvatarDropdown({
           <div className={styles.settingsAvatarPicker}>
             <ProfileAvatarPicker
               kind="user"
+              avatarSeed={user.username}
               avatarUrl={user.avatar_url}
               icon={user.avatar_icon}
               onSelectIcon={async (icon) => {

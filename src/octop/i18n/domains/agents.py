@@ -18,6 +18,7 @@ __all__ = [
     "agent_state_label",
     "classify_agent_start_error_message",
     "format_agent_start_error",
+    "project_context_prompt",
 ]
 
 
@@ -91,3 +92,17 @@ def agent_error_message(error: str | None, locale: str | Locale = "en") -> str:
     if classified is not None:
         return tr(classified.removeprefix("octop:"), locale)
     return error
+
+
+def project_context_prompt(
+    project_dir: str,
+    workspace_dir: str,
+    locale: str | Locale = "en",
+) -> str:
+    """Localized runtime guidance for project-first workspace inspection."""
+    return tr(
+        "agents.project_context",
+        locale,
+        project_dir=project_dir,
+        workspace_dir=workspace_dir,
+    )
