@@ -1,166 +1,70 @@
-import {
-  useEffect,
-  useState,
-  type ComponentType,
-  type CSSProperties,
-} from "react";
-import type { SyntaxHighlighterProps } from "react-syntax-highlighter";
+import { lazy, Suspense, type CSSProperties } from "react";
 
-type HighlightStyle = { [key: string]: CSSProperties };
+const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 
-type PrismLight = ComponentType<SyntaxHighlighterProps>;
+const LINE_HEIGHT = 20;
+const VERTICAL_PADDING = 20;
+const MIN_HEIGHT = 60;
+const MAX_HEIGHT = 520;
 
-type HighlighterModule = PrismLight & {
-  registerLanguage: (name: string, lang: unknown) => void;
+const plainCodeStyle: CSSProperties = {
+  margin: 0,
+  borderRadius: "0 0 8px 8px",
+  fontSize: 13,
+  lineHeight: `${LINE_HEIGHT}px`,
+  padding: "10px 16px",
+  overflow: "auto",
 };
 
-const registeredLanguages = new Set<string>();
-let highlighterPromise: Promise<HighlighterModule> | null = null;
-let stylePromise: Promise<{
-  light: HighlightStyle;
-  dark: HighlightStyle;
-}> | null = null;
-
-async function getSyntaxHighlighter(): Promise<HighlighterModule> {
-  if (!highlighterPromise) {
-    highlighterPromise = import(
-      "react-syntax-highlighter/dist/esm/prism-light"
-    ).then((mod) => mod.default as unknown as HighlighterModule);
-  }
-  return highlighterPromise;
-}
-
-async function getHighlightStyles() {
-  if (!stylePromise) {
-    stylePromise = Promise.all([
-      import("react-syntax-highlighter/dist/esm/styles/prism/one-light"),
-      import("react-syntax-highlighter/dist/esm/styles/prism/one-dark"),
-    ]).then(([lightMod, darkMod]) => ({
-      light: lightMod.default,
-      dark: darkMod.default,
-    }));
-  }
-  return stylePromise;
-}
-
-async function loadLanguageModule(language: string): Promise<unknown | null> {
+export function monacoLanguageFor(language: string): string {
   switch (language.toLowerCase()) {
+    case "vue":
+      return "html";
     case "tsx":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/tsx")
-      ).default;
-    case "typescript":
-      return (
-        await import(
-          "react-syntax-highlighter/dist/esm/languages/prism/typescript"
-        )
-      ).default;
-    case "javascript":
-      return (
-        await import(
-          "react-syntax-highlighter/dist/esm/languages/prism/javascript"
-        )
-      ).default;
-    case "python":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/python")
-      ).default;
+      return "typescript";
+    case "jsx":
+      return "javascript";
     case "bash":
-    case "shell":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/bash")
-      ).default;
-    case "json":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/json")
-      ).default;
-    case "css":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/css")
-      ).default;
-    case "sql":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/sql")
-      ).default;
-    case "yaml":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/yaml")
-      ).default;
-    case "markdown":
-      return (
-        await import(
-          "react-syntax-highlighter/dist/esm/languages/prism/markdown"
-        )
-      ).default;
-    case "go":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/go")
-      ).default;
-    case "rust":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/rust")
-      ).default;
-    case "java":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/java")
-      ).default;
-    case "c":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/c")
-      ).default;
-    case "cpp":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/cpp")
-      ).default;
+    case "sh":
+    case "zsh":
+      return "shell";
     case "docker":
-    case "dockerfile":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/docker")
-      ).default;
-    case "diff":
-      return (
-        await import("react-syntax-highlighter/dist/esm/languages/prism/diff")
-      ).default;
+      return "dockerfile";
+    case "md":
+      return "markdown";
+    case "yml":
+      return "yaml";
+    case "text":
+    case "txt":
+      return "plaintext";
     default:
-      return null;
+      return language.toLowerCase();
   }
 }
 
-async function ensureLanguage(
-  highlighter: HighlighterModule,
-  language: string,
-) {
-  const normalized = language.toLowerCase();
-  if (registeredLanguages.has(normalized)) return;
-
-  const langModule = await loadLanguageModule(normalized);
-  if (langModule) {
-    highlighter.registerLanguage(normalized, langModule);
-    if (normalized === "bash") {
-      highlighter.registerLanguage("shell", langModule);
-    }
-    if (normalized === "docker") {
-      highlighter.registerLanguage("dockerfile", langModule);
-    }
-  }
-  registeredLanguages.add(normalized);
+export function codeEditorHeight(code: string): number {
+  const lines = code.split("\n").length;
+  return Math.min(
+    MAX_HEIGHT,
+    Math.max(MIN_HEIGHT, lines * LINE_HEIGHT + VERTICAL_PADDING),
+  );
 }
 
 interface HighlightedCodeProps {
   language: string;
   code: string;
   isDark: boolean;
-  /** Prefer plain `<pre>` while streaming; highlighter still preloads in the background. */
+  /** Keep streaming output lightweight; mount Monaco only after completion. */
   plain?: boolean;
 }
 
-const plainCodeStyle: CSSProperties = {
-  margin: 0,
-  borderRadius: "0 0 8px 8px",
-  fontSize: 13,
-  padding: "12px 16px",
-  overflow: "auto",
-};
+function PlainCode({ code }: { code: string }) {
+  return (
+    <pre style={plainCodeStyle}>
+      <code>{code}</code>
+    </pre>
+  );
+}
 
 export function HighlightedCode({
   language,
@@ -168,54 +72,46 @@ export function HighlightedCode({
   isDark,
   plain = false,
 }: HighlightedCodeProps) {
-  const [SyntaxHighlighter, setSyntaxHighlighter] = useState<PrismLight | null>(
-    null,
-  );
-  const [highlightStyle, setHighlightStyle] = useState<HighlightStyle | null>(
-    null,
-  );
-
-  // Preload highlighter during streaming so the plain→colored switch is one paint,
-  // not a delayed second jump after the stream ends.
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const [highlighter, styles] = await Promise.all([
-        getSyntaxHighlighter(),
-        getHighlightStyles(),
-      ]);
-      await ensureLanguage(highlighter, language);
-      if (!cancelled) {
-        setSyntaxHighlighter(() => highlighter);
-        setHighlightStyle(isDark ? styles.dark : styles.light);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [language, isDark]);
-
-  if (plain || !SyntaxHighlighter || !highlightStyle) {
-    return (
-      <pre style={plainCodeStyle}>
-        <code>{code}</code>
-      </pre>
-    );
-  }
+  if (plain) return <PlainCode code={code} />;
 
   return (
-    <SyntaxHighlighter
-      style={highlightStyle}
-      language={language.toLowerCase()}
-      PreTag="div"
-      customStyle={{
-        margin: 0,
-        borderRadius: "0 0 8px 8px",
-        fontSize: 13,
-        padding: "12px 16px",
-      }}
-    >
-      {code}
-    </SyntaxHighlighter>
+    <Suspense fallback={<PlainCode code={code} />}>
+      <MonacoEditor
+        height={codeEditorHeight(code)}
+        language={monacoLanguageFor(language)}
+        theme={isDark ? "vs-dark" : "light"}
+        value={code}
+        options={{
+          readOnly: true,
+          domReadOnly: true,
+          minimap: { enabled: false },
+          lineNumbers: "on",
+          lineNumbersMinChars: 3,
+          glyphMargin: false,
+          folding: false,
+          lineDecorationsWidth: 8,
+          overviewRulerLanes: 0,
+          overviewRulerBorder: false,
+          hideCursorInOverviewRuler: true,
+          scrollBeyondLastLine: false,
+          automaticLayout: true,
+          wordWrap: "off",
+          renderLineHighlight: "none",
+          renderWhitespace: "selection",
+          selectionHighlight: false,
+          occurrencesHighlight: "off",
+          contextmenu: false,
+          links: false,
+          fontSize: 13,
+          lineHeight: LINE_HEIGHT,
+          padding: { top: 10, bottom: 10 },
+          scrollbar: {
+            verticalScrollbarSize: 8,
+            horizontalScrollbarSize: 8,
+            alwaysConsumeMouseWheel: false,
+          },
+        }}
+      />
+    </Suspense>
   );
 }
