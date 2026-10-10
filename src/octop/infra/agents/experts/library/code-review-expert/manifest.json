@@ -1,0 +1,39 @@
+{
+  "id": "code-review-expert",
+  "label": { "zh": "代码审查专家", "en": "Code Review Expert" },
+  "description": {
+    "zh": "基于变更意图、系统上下文与可验证证据进行代码审查，聚焦正确性、安全性、兼容性和测试缺口。",
+    "en": "Evidence-based code reviewer focused on correctness, security, compatibility, maintainability, and test gaps in the context of the intended change."
+  },
+  "welcome_message": { "zh": "请提供变更、需求和测试信息，我会按风险等级给出可操作的审查意见", "en": "Share the change, requirements, and test evidence for an actionable risk-ranked review" },
+  "icon_name": "search-check",
+  "color": "#0F766E",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "审查代码变更", "en": "Review a code change" },
+      "description": { "zh": "定位真实缺陷与回归风险", "en": "Find concrete defects and regression risks" },
+      "prompt": { "zh": "请审查以下代码变更。先理解需求和调用链，只报告可证明的问题，并按严重程度给出位置、触发条件、影响和最小修复建议：\n\n", "en": "Review this code change. Understand the requirement and call chain first; report only demonstrable issues with severity, location, trigger, impact, and minimal remediation:\n\n" },
+      "color": "#CCFBF1",
+      "icon_name": "git-pull-request"
+    },
+    {
+      "title": { "zh": "评估测试充分性", "en": "Assess test adequacy" },
+      "description": { "zh": "从风险反推测试缺口", "en": "Derive test gaps from risk" },
+      "prompt": { "zh": "请根据以下变更评估测试是否充分，指出未覆盖的行为、边界、失败路径和兼容性风险，并给出最小回归测试集：\n\n", "en": "Assess whether tests adequately cover this change. Identify uncovered behavior, boundaries, failure paths, and compatibility risks, then propose a minimal regression set:\n\n" },
+      "color": "#DBEAFE",
+      "icon_name": "shield-check"
+    },
+    {
+      "title": { "zh": "审查重构方案", "en": "Review a refactor" },
+      "description": { "zh": "验证行为保持与复杂度收益", "en": "Verify behavior preservation and complexity reduction" },
+      "prompt": { "zh": "请审查以下重构，重点验证外部行为、数据兼容、错误语义、并发行为和测试保护是否保持，并判断复杂度是否真实下降：\n\n", "en": "Review this refactor for preserved external behavior, data compatibility, error semantics, concurrency, and test protection, and determine whether complexity actually decreases:\n\n" },
+      "color": "#FEF3C7",
+      "icon_name": "split"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每天「17:30」汇总待审查变更中的高风险问题", "每周三「15:00」复盘重复出现的代码缺陷模式", "每周五「16:00」检查关键模块的测试与审查欠账"],
+    "en": ["Every day at 17:30, summarize high-risk findings in pending reviews", "Every Wednesday at 15:00, review recurring defect patterns", "Every Friday at 16:00, inspect review and test debt in critical modules"]
+  }
+}

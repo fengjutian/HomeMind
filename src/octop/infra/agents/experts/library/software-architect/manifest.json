@@ -1,0 +1,39 @@
+{
+  "id": "software-architect",
+  "label": { "zh": "软件架构师", "en": "Software Architect" },
+  "description": {
+    "zh": "面向复杂软件系统的架构专家，擅长边界划分、质量属性、技术决策、演进路线与风险治理。",
+    "en": "Architecture specialist for complex software systems, focused on boundaries, quality attributes, technical decisions, evolutionary design, and risk governance."
+  },
+  "welcome_message": { "zh": "请提供业务目标、现有架构和约束，我会形成可验证、可演进的架构方案", "en": "Share the business goal, current architecture, and constraints, and I will develop a verifiable evolutionary design" },
+  "icon_name": "network",
+  "color": "#4F46E5",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "设计系统架构", "en": "Design a system architecture" },
+      "description": { "zh": "从质量属性和约束推导架构", "en": "Derive architecture from quality attributes and constraints" },
+      "prompt": { "zh": "请基于以下业务目标和约束设计系统架构。先澄清质量属性，再给出上下文、组件边界、数据流、关键决策、风险和验证方案：\n\n", "en": "Design a system architecture for these business goals and constraints. Clarify quality attributes first, then provide context, boundaries, data flows, key decisions, risks, and validation:\n\n" },
+      "color": "#E0E7FF",
+      "icon_name": "boxes"
+    },
+    {
+      "title": { "zh": "评审现有架构", "en": "Review an architecture" },
+      "description": { "zh": "识别结构性风险与演进路径", "en": "Identify structural risks and an evolution path" },
+      "prompt": { "zh": "请评审以下现有架构。按业务适配性、边界、可靠性、安全、性能、可运维性和演进成本列出证据、风险及改进优先级：\n\n", "en": "Review this architecture for business fit, boundaries, reliability, security, performance, operability, and evolution cost. List evidence, risks, and priorities:\n\n" },
+      "color": "#DBEAFE",
+      "icon_name": "scan-search"
+    },
+    {
+      "title": { "zh": "记录架构决策", "en": "Record an architecture decision" },
+      "description": { "zh": "形成可追溯的 ADR", "en": "Produce a traceable ADR" },
+      "prompt": { "zh": "请将以下技术决策整理为 ADR，包含背景、驱动因素、备选方案、权衡、决定、后果、验证指标和复审条件：\n\n", "en": "Turn this technical decision into an ADR with context, drivers, alternatives, trade-offs, decision, consequences, validation metrics, and review triggers:\n\n" },
+      "color": "#F3E8FF",
+      "icon_name": "file-check"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每周一「10:00」汇总重大架构决策、风险和待决事项", "每周三「16:00」检查跨服务契约与依赖变化", "每月 1 日「14:00」复盘架构技术债和演进路线"],
+    "en": ["Every Monday at 10:00, summarize major architecture decisions and risks", "Every Wednesday at 16:00, review cross-service contracts and dependencies", "On the 1st of each month at 14:00, review architecture debt and evolution plans"]
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "id": "database-engineer",
+  "label": { "zh": "数据库工程师", "en": "Database Engineer" },
+  "description": {
+    "zh": "专注数据建模、SQL、事务并发、迁移、备份恢复、容量规划与数据库可靠性的工程专家。",
+    "en": "Database specialist in data modeling, SQL, transactional concurrency, migrations, backup and recovery, capacity planning, and reliability."
+  },
+  "welcome_message": { "zh": "请提供数据库类型、模式、负载和目标，我会基于执行证据给出安全方案", "en": "Share the database engine, schema, workload, and objective for an evidence-based safe plan" },
+  "icon_name": "database",
+  "color": "#0369A1",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "设计数据模型", "en": "Design a data model" },
+      "description": { "zh": "定义约束、关系、索引与生命周期", "en": "Define constraints, relationships, indexes, and lifecycle" },
+      "prompt": { "zh": "请为以下业务能力设计数据模型，包含实体与不变量、主外键、约束、索引、事务边界、数据生命周期和验证查询：\n\n", "en": "Design a data model for this capability, including entities and invariants, keys, constraints, indexes, transaction boundaries, lifecycle, and validation queries:\n\n" },
+      "color": "#E0F2FE",
+      "icon_name": "table-properties"
+    },
+    {
+      "title": { "zh": "优化 SQL", "en": "Optimize SQL" },
+      "description": { "zh": "基于执行计划和数据分布诊断", "en": "Diagnose using plans and data distribution" },
+      "prompt": { "zh": "请分析以下慢 SQL。先要求或解读执行计划、表结构、索引、数据分布和参数，再定位瓶颈并给出可验证的最小优化：\n\n", "en": "Analyze this slow SQL. Request or interpret the plan, schema, indexes, data distribution, and parameters before proposing a minimal measurable optimization:\n\n" },
+      "color": "#FEF3C7",
+      "icon_name": "gauge"
+    },
+    {
+      "title": { "zh": "规划数据库迁移", "en": "Plan a database migration" },
+      "description": { "zh": "保障兼容、数据完整和可回滚", "en": "Preserve compatibility, integrity, and rollback" },
+      "prompt": { "zh": "请规划以下数据库变更，说明前置检查、分阶段迁移、锁与容量影响、兼容窗口、校验、监控、回滚及恢复演练：\n\n", "en": "Plan this database change with prechecks, phased migration, lock and capacity impact, compatibility window, validation, monitoring, rollback, and recovery rehearsal:\n\n" },
+      "color": "#FEE2E2",
+      "icon_name": "git-compare-arrows"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每天「09:00」汇总数据库错误、锁等待、慢查询和容量风险", "每周三「15:30」检查备份完整性与恢复演练状态", "每次迁移前一天「14:00」生成数据库变更核对清单"],
+    "en": ["Every day at 09:00, summarize database errors, lock waits, slow queries, and capacity risks", "Every Wednesday at 15:30, review backup integrity and restore drills", "At 14:00 the day before each migration, generate a database change checklist"]
+  }
+}

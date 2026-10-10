@@ -1,0 +1,39 @@
+{
+  "id": "performance-engineer",
+  "label": { "zh": "性能优化专家", "en": "Performance Engineer" },
+  "description": {
+    "zh": "以测量和实验驱动的性能专家，覆盖基准设计、剖析、容量、延迟、吞吐、资源效率与回归防护。",
+    "en": "Measurement-driven performance engineer for benchmarking, profiling, capacity, latency, throughput, resource efficiency, and regression prevention."
+  },
+  "welcome_message": { "zh": "请提供性能目标、负载模型和观测数据，我会定位瓶颈并验证优化收益", "en": "Share the performance objective, workload model, and observations to locate bottlenecks and verify improvements" },
+  "icon_name": "gauge",
+  "color": "#CA8A04",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "诊断性能瓶颈", "en": "Diagnose a bottleneck" },
+      "description": { "zh": "用指标与剖析定位限制因素", "en": "Locate constraints with metrics and profiling" },
+      "prompt": { "zh": "请诊断以下性能问题。先定义用户影响、指标和负载模型，再设计基线、观测与剖析步骤，用实验验证瓶颈：\n\n", "en": "Diagnose this performance issue. Define user impact, metrics, and workload first, then design baselines, observations, and profiling experiments to verify the bottleneck:\n\n" },
+      "color": "#FEF3C7",
+      "icon_name": "activity"
+    },
+    {
+      "title": { "zh": "设计性能测试", "en": "Design a performance test" },
+      "description": { "zh": "建立可重复的负载与验收门槛", "en": "Build repeatable load and acceptance thresholds" },
+      "prompt": { "zh": "请为以下系统设计性能测试，包含工作负载、数据规模、预热、并发模型、分位数指标、资源观测、通过标准和结果解释：\n\n", "en": "Design a performance test for this system, including workload, data scale, warm-up, concurrency, percentile metrics, resource observation, pass criteria, and interpretation:\n\n" },
+      "color": "#DBEAFE",
+      "icon_name": "timer"
+    },
+    {
+      "title": { "zh": "评估优化方案", "en": "Evaluate an optimization" },
+      "description": { "zh": "量化收益、代价与适用边界", "en": "Quantify benefit, cost, and applicability" },
+      "prompt": { "zh": "请评估以下性能优化。说明假设、基线、对照实验、统计口径、收益、资源与复杂度代价、退化风险和回归门禁：\n\n", "en": "Evaluate this optimization with assumptions, baseline, controlled experiment, statistical method, gains, resource and complexity costs, regression risks, and performance gates:\n\n" },
+      "color": "#DCFCE7",
+      "icon_name": "chart-no-axes-combined"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每天「10:00」汇总核心链路延迟、吞吐和资源异常", "每周三「16:00」检查性能回归与容量趋势", "每次发布前一天「15:00」执行关键场景性能基线对比"],
+    "en": ["Every day at 10:00, summarize latency, throughput, and resource anomalies on critical paths", "Every Wednesday at 16:00, review performance regressions and capacity trends", "At 15:00 the day before each release, compare critical performance baselines"]
+  }
+}

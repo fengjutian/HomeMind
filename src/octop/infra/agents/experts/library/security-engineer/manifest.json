@@ -1,0 +1,39 @@
+{
+  "id": "security-engineer",
+  "label": { "zh": "安全工程师", "en": "Security Engineer" },
+  "description": {
+    "zh": "覆盖威胁建模、应用安全、身份权限、供应链安全、漏洞验证与安全响应的工程专家。",
+    "en": "Security engineer for threat modeling, application security, identity and access, supply-chain security, vulnerability validation, and incident response."
+  },
+  "welcome_message": { "zh": "请提供系统边界、资产和安全问题，我会基于威胁与证据给出修复方案", "en": "Share the system boundary, assets, and security concern for threat- and evidence-based remediation" },
+  "icon_name": "shield",
+  "color": "#B91C1C",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "开展威胁建模", "en": "Build a threat model" },
+      "description": { "zh": "识别资产、边界、攻击路径与控制", "en": "Identify assets, boundaries, attack paths, and controls" },
+      "prompt": { "zh": "请为以下系统开展威胁建模，列出资产、主体、信任边界、数据流、滥用场景、现有控制、残余风险和验证计划：\n\n", "en": "Threat-model this system, covering assets, actors, trust boundaries, data flows, abuse cases, existing controls, residual risk, and validation:\n\n" },
+      "color": "#FEE2E2",
+      "icon_name": "shield-alert"
+    },
+    {
+      "title": { "zh": "审查安全设计", "en": "Review a security design" },
+      "description": { "zh": "检查认证、授权、数据与密钥安全", "en": "Review authentication, authorization, data, and secrets" },
+      "prompt": { "zh": "请审查以下设计或代码的安全性，基于实际数据流检查认证、授权、输入处理、密钥、隐私、审计和供应链风险：\n\n", "en": "Review this design or code using its actual data flow, focusing on authentication, authorization, input handling, secrets, privacy, auditability, and supply-chain risk:\n\n" },
+      "color": "#FFEDD5",
+      "icon_name": "lock-keyhole"
+    },
+    {
+      "title": { "zh": "分析并修复漏洞", "en": "Analyze a vulnerability" },
+      "description": { "zh": "安全验证影响并制定修复", "en": "Safely validate impact and plan remediation" },
+      "prompt": { "zh": "请分析以下潜在漏洞。在授权范围内给出非破坏性验证方法、影响与可利用条件、严重程度依据、修复方案和回归测试：\n\n", "en": "Analyze this potential vulnerability. Within authorized scope, provide non-destructive validation, impact and exploit prerequisites, severity rationale, remediation, and regression tests:\n\n" },
+      "color": "#FEF3C7",
+      "icon_name": "bug-off"
+    }
+  ],
+  "task_examples": {
+    "zh": ["每天「09:30」汇总新增高危漏洞与暴露资产", "每周三「14:00」检查身份权限、密钥和供应链风险", "每周五「16:30」跟踪安全修复与验证进度"],
+    "en": ["Every day at 09:30, summarize new critical vulnerabilities and exposed assets", "Every Wednesday at 14:00, review IAM, secrets, and supply-chain risks", "Every Friday at 16:30, track security remediation and validation"]
+  }
+}
