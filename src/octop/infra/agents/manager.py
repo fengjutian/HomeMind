@@ -99,6 +99,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _exception_chain(exc: BaseException) -> list[BaseException]:
+    """Return an exception plus its explicit/implicit causes without looping."""
+    chain: list[BaseException] = []
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        chain.append(current)
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return chain
+
+
 def _model_retry_on_failure(exc: Exception) -> str:
     # Feed a specific, model-visible prompt instead of raising. Inbox jobs still
     # mark failed when the reply carries MODEL_RETRY_FAILURE_MARK.
@@ -1309,8 +1321,20 @@ class AgentManager:
             self._apply_pending_bootstrap_graph_refresh(agent_id)
             req = self._prepare_stream_request(agent_id, request)
             with hitl_thread_scope(thread_id_from_request(req)):
-                async for chunk in self._harness_manager.stream(agent_id, cast(Any, req)):
-                    yield chunk
+                emitted = False
+                try:
+                    async for chunk in self._harness_manager.stream(agent_id, cast(Any, req)):
+                        emitted = True
+                        yield chunk
+                except Exception as exc:
+                    if emitted or not await self._compact_after_context_overflow(
+                        agent_id,
+                        req,
+                        exc,
+                    ):
+                        raise
+                    async for chunk in self._harness_manager.stream(agent_id, cast(Any, req)):
+                        yield chunk
             self._apply_pending_bootstrap_graph_refresh(agent_id)
 
     async def call(self, agent_id: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -1321,11 +1345,59 @@ class AgentManager:
             self._apply_pending_bootstrap_graph_refresh(agent_id)
             req = self._prepare_stream_request(agent_id, request)
             with hitl_thread_scope(thread_id_from_request(req)):
-                result = await self._harness_manager.call(agent_id, cast(Any, req))
+                try:
+                    result = await self._harness_manager.call(agent_id, cast(Any, req))
+                except Exception as exc:
+                    if not await self._compact_after_context_overflow(agent_id, req, exc):
+                        raise
+                    result = await self._harness_manager.call(agent_id, cast(Any, req))
             self._apply_pending_bootstrap_graph_refresh(agent_id)
         if not isinstance(result, dict):
             return {"result": result}
         return result
+
+    async def _compact_after_context_overflow(
+        self,
+        agent_id: str,
+        request: dict[str, Any],
+        exc: Exception,
+    ) -> bool:
+        """Compact once when a provider reports context overflow as a plain 400."""
+        text = " ".join(str(item) for item in _exception_chain(exc)).lower()
+        overflow_markers = (
+            "context window exceeds limit",
+            "context length exceeded",
+            "maximum context length",
+            "maximum context window",
+            "too many tokens",
+        )
+        if not any(marker in text for marker in overflow_markers):
+            return False
+
+        thread_id = thread_id_from_request(request)
+        if not thread_id:
+            return False
+        try:
+            agent = self.get_agent(agent_id)
+            compact = getattr(agent, "acompact_conversation", None)
+            if compact is None:
+                return False
+            result = await compact(thread_id, model=request.get("model"))
+        except Exception:
+            logger.exception(
+                "automatic context-overflow compaction failed agent=%s thread=%s",
+                agent_id,
+                thread_id,
+            )
+            return False
+        if not bool(getattr(result, "ok", False)):
+            return False
+        logger.info(
+            "automatically compacted context after provider overflow agent=%s thread=%s",
+            agent_id,
+            thread_id,
+        )
+        return True
 
     async def resume_hitl(
         self,
