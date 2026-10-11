@@ -9,16 +9,14 @@ created an unintended duplicate is removed.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.filesystem import FamilyFilesystemManager
 from homemind.infra.family.transaction_actions.base import (
     ActionContext,
-    FamilyActionHandler,
 )
-from octop.infra.errors import ErrorCode, OctopError
 
 
 class _BaseFilesystemHandler:
@@ -26,8 +24,8 @@ class _BaseFilesystemHandler:
 
     def _validate_payload(self, payload: dict[str, Any]) -> None:
         if not payload.get("source_id") or not payload.get("path"):
-            raise OctopError(
-                ErrorCode.BAD_REQUEST,
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
                 "filesystem mutations require source_id and path",
             )
 
@@ -48,7 +46,10 @@ class FilesystemCopyHandler(_BaseFilesystemHandler):
     def validate(self, context: ActionContext, payload: dict[str, Any]) -> None:
         self._validate_payload(payload)
         if not payload.get("destination"):
-            raise OctopError(ErrorCode.BAD_REQUEST, "filesystem.copy requires destination")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "filesystem.copy requires destination",
+            )
 
     def preview(self, context: ActionContext, payload: dict[str, Any]) -> dict[str, Any]:
         return self._preview_common(payload)
@@ -59,8 +60,11 @@ class FilesystemCopyHandler(_BaseFilesystemHandler):
             context.requester,
             action="filesystem.copy",
             transaction_id=context.transaction.id,
-            payload={"source_id": payload["source_id"], "path": payload["path"],
-                     "destination": payload["destination"]},
+            payload={
+                "source_id": payload["source_id"],
+                "path": payload["path"],
+                "destination": payload["destination"],
+            },
         )
         return {
             "destination_path": result.destination_path,
@@ -68,7 +72,10 @@ class FilesystemCopyHandler(_BaseFilesystemHandler):
         }
 
     def verify(self, context: ActionContext, result: dict[str, Any]) -> dict[str, Any]:
-        return {"destination_path": result.get("destination_path"), "verified": result.get("verified")}
+        return {
+            "destination_path": result.get("destination_path"),
+            "verified": result.get("verified"),
+        }
 
     def compensate(self, context: ActionContext, result: dict[str, Any]) -> dict[str, Any]:
         dest = result.get("destination_path")
@@ -90,7 +97,10 @@ class FilesystemMoveHandler(_BaseFilesystemHandler):
     def validate(self, context: ActionContext, payload: dict[str, Any]) -> None:
         self._validate_payload(payload)
         if not payload.get("destination"):
-            raise OctopError(ErrorCode.BAD_REQUEST, "filesystem.move requires destination")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "filesystem.move requires destination",
+            )
 
     def preview(self, context: ActionContext, payload: dict[str, Any]) -> dict[str, Any]:
         return self._preview_common(payload)
@@ -101,8 +111,11 @@ class FilesystemMoveHandler(_BaseFilesystemHandler):
             context.requester,
             action="filesystem.move",
             transaction_id=context.transaction.id,
-            payload={"source_id": payload["source_id"], "path": payload["path"],
-                     "destination": payload["destination"]},
+            payload={
+                "source_id": payload["source_id"],
+                "path": payload["path"],
+                "destination": payload["destination"],
+            },
         )
         return {
             "destination_path": result.destination_path,
@@ -110,7 +123,10 @@ class FilesystemMoveHandler(_BaseFilesystemHandler):
         }
 
     def verify(self, context: ActionContext, result: dict[str, Any]) -> dict[str, Any]:
-        return {"destination_path": result.get("destination_path"), "verified": result.get("verified")}
+        return {
+            "destination_path": result.get("destination_path"),
+            "verified": result.get("verified"),
+        }
 
     def compensate(self, context: ActionContext, result: dict[str, Any]) -> dict[str, Any]:
         # Move back: caller must persist the original path on

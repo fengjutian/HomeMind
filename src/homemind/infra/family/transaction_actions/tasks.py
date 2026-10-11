@@ -5,12 +5,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.tasks import FamilyTaskManager
 from homemind.infra.family.transaction_actions.base import (
     ActionContext,
 )
-from octop.infra.errors import ErrorCode, OctopError
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class TaskCreateHandler:
     def validate(self, context: ActionContext, payload: dict[str, Any]) -> None:
         title = payload.get("title")
         if not isinstance(title, str) or not title.strip():
-            raise OctopError(ErrorCode.BAD_REQUEST, "task title is required")
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "task title is required")
 
     def preview(self, context: ActionContext, payload: dict[str, Any]) -> dict[str, Any]:
         return {

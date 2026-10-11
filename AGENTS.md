@@ -66,6 +66,15 @@ Octop (`octop/` workspace directory)     Python package root (`src/octop/`)
   cli/                        Click commands
   dashboard/                  built SPA artifact — do NOT edit
 
+HomeMind (`homemind/` workspace dir)     Python package root (`src/homemind/`)
+  api/                        family HTTP surface, mounts onto the Octop app
+  infra/family/               family domain (devices, assets, memories, calendar, …)
+  infra/db/                   family migrations (own watermark, separate from octop)
+  infra/agents/               family-side agent helpers
+  device_runtime/             on-device runtime surface
+  skills/                     family skill packages
+  tools/                      family MCP tools
+
 dashboard/                    frontend source (Vite) — edit here
 docs/                         human-written reference (e.g. `api.md`)
 tests/                        pytest (`unit/`, `integration/`)
@@ -120,6 +129,39 @@ cli/ ──► launch.py ──► api/ + infra/
 | `infra/errors.py` | `OctopError`, `ErrorCode` — shared exception types | everywhere in `infra/` and `api/` |
 | `infra/metrics.py` | In-process counters (`METRICS`) | lazy-import inside hot paths |
 | `infra/server.py` | `OctopServer.start()` — wires infra singletons | `launch.py`, `api/app.py` |
+
+### `src/homemind/` (HomeMind family layer)
+
+HomeMind is a **separate top-level package**, a sibling of `src/octop/` — not a
+subpackage of it. The layering rules in this section apply to it unchanged:
+
+| Path | Owns | Must NOT |
+|------|------|----------|
+| `homemind/api/` | Family HTTP surface; `app.py` composes onto `octop.api.app.build_app` | `octop.cli`, `launch.py`; cross-layer domain rules |
+| `homemind/infra/family/` | Family domain — devices, assets, memories, calendar, tasks, smart home, permissions | `homemind.api`, `homemind.tools` |
+| `homemind/infra/db/` | Family migrations + repos | importing non-DB `homemind.infra.*` (same rule as `octop.infra.db`) |
+| `homemind/infra/errors.py` | `HomeMindError`, `HomeMindErrorCode` | — |
+| `homemind/tools/` | Family MCP tools | `homemind.api` |
+
+**Errors:** family code raises `HomeMindError(HomeMindErrorCode.…)`, which
+`homemind/api/app.py` maps to a status via `_STATUS` + `to_envelope()`. It is
+deliberately kept out of Octop's `ErrorCode` catalogue (see the module
+docstring) so HomeMind codes cannot collide with the stable API contract.
+**`ErrorCode` is a closed enum** — referencing a member it does not define
+raises `AttributeError` at first use, not at import.
+`tests/unit/homemind/test_error_code_references.py` walks the tree and fails
+the build on any such reference; keep it green.
+
+**Migrations:** `homemind/infra/db/migrations/00N_*.sql` **and** `*.pg.sql`,
+tracked by their own `_homemind_schema_version` watermark (not Octop's). The
+watermark test derives the expected value from the highest file on disk, so a
+new migration needs no literal edit. Current highest is `026`. Unreleased
+schema work folds into the current `00N` — `026` is **not yet released** (last
+release `1.0.2b6`, 2026-10-04), so fold into `026`, do not open `027`.
+
+**Typecheck:** `make typecheck` must cover `src/homemind` alongside
+`src/octop`. Both are `mypy --strict`; a change that leaves either red does not
+ship.
 
 ### `launch.py`
 
@@ -223,7 +265,7 @@ New agents additionally keep system-scoped files under `{workspace}/.octop/` (e.
 
 **Database:** SQLite and PostgreSQL share one schema. Add or change tables via a numbered pair
 `infra/db/migrations/00N_description.sql` **and** `00N_description.pg.sql`, then bump the
-version assertion in `tests/unit/db/test_db_pool.py` (currently `v == 20`). Rebuilds that SQLite
+version assertion in `tests/unit/db/test_db_pool.py` (currently `v == 23`). Rebuilds that SQLite
 cannot express as `ALTER` live in `infra/db/migrate.py` helpers and must stay idempotent.
 
 Unreleased schema work on `develop` **folds into the current unreleased `00N`**, not a new

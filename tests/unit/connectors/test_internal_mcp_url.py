@@ -6,9 +6,11 @@ import asyncio
 import json
 
 import httpx
+import pytest
 
 from octop.config import OctopConfig, TlsConfig
 from octop.infra.connectors.builder import (
+    _is_loopback_host,
     _redact_mcp_configs_for_log,
     build_http_mcp_spec,
     internal_mcp_url,
@@ -83,3 +85,55 @@ def test_tls_internal_mcp_spec_is_json_loggable() -> None:
     assert "https://" in payload
     assert "httpx_client_factory" in payload
     assert "<callable" in payload
+
+
+@pytest.mark.parametrize(
+    "host",
+    ["127.0.0.1", "127.1.2.3", "::1", "localhost", "LOCALHOST", "api.localhost"],
+)
+def test_is_loopback_host_accepts_loopback_hosts(host: str) -> None:
+    assert _is_loopback_host(host) is True
+
+
+@pytest.mark.parametrize(
+    "host",
+    ["192.168.1.50", "10.0.0.7", "172.16.3.4", "example.com", "nas.local", "0.0.0.0", "::"],
+)
+def test_is_loopback_host_rejects_non_loopback_hosts(host: str) -> None:
+    assert _is_loopback_host(host) is False
+
+
+def _captured_verify(
+    monkeypatch: pytest.MonkeyPatch,
+    bind_host: str,
+) -> object:
+    """Build the gateway client for ``bind_host`` and capture the ``verify`` kwarg."""
+    captured: dict[str, object] = {}
+
+    class _FakeClient:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeClient)
+    config = OctopConfig(
+        bind_host=bind_host,
+        port=443,
+        tls=TlsConfig(enabled=True, cert_file="ssl/fullchain.pem", key_file="ssl/privkey.pem"),
+    )
+    factory = _qcc_spec(config)["httpx_client_factory"]
+    assert callable(factory)
+    factory()
+    return captured.get("verify")
+
+
+def test_lan_bind_host_keeps_tls_verification(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A LAN bind_host dials a remote peer, so the cert must still be verified."""
+    assert _captured_verify(monkeypatch, "192.168.1.50") is True
+
+
+def test_wildcard_bind_host_dials_loopback_and_may_skip_verification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """0.0.0.0 resolves to 127.0.0.1, where a public-name cert is expected."""
+    assert _captured_verify(monkeypatch, "0.0.0.0") is False
+    assert _captured_verify(monkeypatch, "::") is False

@@ -9,12 +9,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.context import FamilyContextManager, MemoryType
 from homemind.infra.family.transaction_actions.base import (
     ActionContext,
-    FamilyActionHandler,
 )
-from octop.infra.errors import ErrorCode, OctopError
 
 
 class MemoryCreateHandler:
@@ -25,7 +24,7 @@ class MemoryCreateHandler:
 
     def validate(self, context: ActionContext, payload: dict[str, Any]) -> None:
         if not isinstance(payload.get("content"), str) or not payload["content"].strip():
-            raise OctopError(ErrorCode.BAD_REQUEST, "memory content is required")
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "memory content is required")
 
     def preview(self, context: ActionContext, payload: dict[str, Any]) -> dict[str, Any]:
         return {

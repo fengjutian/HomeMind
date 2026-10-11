@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.context import FamilyContextManager
-from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.transaction_actions.base import (
     ActionContext,
-    FamilyActionHandler,
 )
-from octop.infra.errors import ErrorCode, OctopError
 
 
 class EventCreateHandler:
@@ -22,14 +19,17 @@ class EventCreateHandler:
 
     def validate(self, context: ActionContext, payload: dict[str, Any]) -> None:
         if not isinstance(payload.get("title"), str):
-            raise OctopError(ErrorCode.BAD_REQUEST, "event title is required")
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "event title is required")
         if not isinstance(payload.get("start_at"), int) or not isinstance(
             payload.get("end_at"), int
         ):
-            raise OctopError(ErrorCode.BAD_REQUEST, "event start_at / end_at must be integers")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "event start_at / end_at must be integers",
+            )
         if payload["end_at"] < payload["start_at"]:
-            raise OctopError(
-                ErrorCode.BAD_REQUEST,
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
                 "event end_at must not precede start_at",
             )
 

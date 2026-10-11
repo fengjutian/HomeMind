@@ -19,7 +19,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from homemind.infra.db.repos.family_context import FamilyMemoryRow
+from homemind.infra.db.repos.families import FamilyMemberRow
 from homemind.infra.family.memory_lifecycle import CandidateSpec, is_sensitive
 from homemind.infra.family.resolvers.relationship import RelationshipResolver
 
@@ -117,7 +117,7 @@ class ExtractionResult:
 def extract_candidates(
     user_message: str,
     *,
-    members: Iterable[FamilyMemoryRow] = (),
+    members: Iterable[FamilyMemberRow] = (),
     relationship_resolver: RelationshipResolver | None = None,
     current_member_id: str | None = None,
 ) -> ExtractionResult:
@@ -177,7 +177,7 @@ def extract_candidates(
                 content = f"{subject_alias}的{memory_type.lower()}信息待补充"
                 confidence = base_confidence * 0.5
             else:
-                content = f"{subject_alias}{match.group(0)[len(subject_alias):]}".strip()
+                content = f"{subject_alias}{match.group(0)[len(subject_alias) :]}".strip()
                 # Tighten the content to just the fact so the UI
                 # shows a clean sentence instead of the full chat
                 # line.

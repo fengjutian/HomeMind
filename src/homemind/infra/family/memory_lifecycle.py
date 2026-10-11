@@ -15,16 +15,13 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Iterable
+from datetime import UTC, datetime
 
 from homemind.infra.db.repos.family_context import (
-    FamilyContextRepo,
     FamilyMemoryRow,
 )
 from homemind.infra.db.repos.memory_candidates import (
     CANDIDATE_STATUS_APPROVED,
-    CANDIDATE_STATUS_EXPIRED,
     CANDIDATE_STATUS_MERGED,
     CANDIDATE_STATUS_PENDING,
     CANDIDATE_STATUS_REJECTED,
@@ -32,12 +29,12 @@ from homemind.infra.db.repos.memory_candidates import (
     MemoryCandidateRow,
     MemoryEvidenceRepo,
 )
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.context import FamilyContextManager, MemoryType
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.metrics import inc as _hm_inc
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.identity import User
-
 
 # Sensitive topics that MUST NOT be auto-approved. They are still
 # produced as Candidates but always require manual review.
@@ -107,7 +104,9 @@ class MemoryLifecycleManager:
             raise OctopError(ErrorCode.FORBIDDEN, "family membership required")
         content = spec.content.strip()
         if not content:
-            raise OctopError(ErrorCode.BAD_REQUEST, "candidate content cannot be empty")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "candidate content cannot be empty"
+            )
         candidate = self.candidates.create(
             spec.family_id,
             subject_type=spec.subject_type,
@@ -310,7 +309,7 @@ class MemoryLifecycleManager:
     ) -> int:
         """Mark every expired active memory as ARCHIVED. ``now`` is
         injected to avoid relying on the system clock at test time."""
-        timestamp = int(datetime.now(tz=timezone.utc).timestamp()) if now is None else now
+        timestamp = int(datetime.now(tz=UTC).timestamp()) if now is None else now
         count = 0
         for memory in self.context.repo.list_all_memories(family_id):
             if (
@@ -364,8 +363,8 @@ class MemoryLifecycleManager:
         if candidate is None or candidate.family_id != family_id:
             raise OctopError(ErrorCode.NOT_FOUND, "memory candidate not found")
         if candidate.status not in {CANDIDATE_STATUS_PENDING}:
-            raise OctopError(
-                ErrorCode.CONFLICT,
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
                 f"memory candidate is already {candidate.status.lower()}",
             )
         return candidate

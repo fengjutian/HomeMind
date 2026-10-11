@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import re
 import secrets
 from typing import Any
@@ -64,15 +65,38 @@ def _internal_mcp_uses_https(config: OctopConfig) -> bool:
     return bool(config.tls.enabled and config.tls.cert_file and config.tls.key_file)
 
 
-def _internal_mcp_https_client_factory(
-    headers: dict[str, str] | None = None,
-    timeout: Any = None,
-    auth: Any = None,
-) -> Any:
-    """Loopback HTTPS often uses a public-name cert; skip hostname verification."""
-    import httpx
+def _internal_mcp_host(config: OctopConfig) -> str:
+    """Host the internal MCP gateway dials back on (mirrors the listener bind)."""
+    return config.bind_host if config.bind_host not in ("0.0.0.0", "::") else "127.0.0.1"
 
-    return httpx.AsyncClient(headers=headers, timeout=timeout, auth=auth, verify=False)
+
+def _is_loopback_host(host: str) -> bool:
+    """True when the dial stays on this machine (loopback literal or localhost name)."""
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host.lower() == "localhost" or host.lower().endswith(".localhost")
+
+
+def _internal_mcp_https_client_factory(*, verify: bool) -> Any:
+    """Return the gateway client factory for the internal MCP HTTPS listener.
+
+    ``verify=False`` is only sound on loopback, where a cert issued for a public
+    name fails the hostname check. A non-loopback ``bind_host`` must stay
+    verified: an unverified dial to a LAN peer lets whoever answers present any
+    certificate and read the internal token off the URL.
+    """
+
+    def _factory(
+        headers: dict[str, str] | None = None,
+        timeout: Any = None,
+        auth: Any = None,
+    ) -> Any:
+        import httpx
+
+        return httpx.AsyncClient(headers=headers, timeout=timeout, auth=auth, verify=verify)
+
+    return _factory
 
 
 def internal_mcp_url(
@@ -82,7 +106,7 @@ def internal_mcp_url(
     instance_id: str,
     internal_token: str,
 ) -> str:
-    host = config.bind_host if config.bind_host not in ("0.0.0.0", "::") else "127.0.0.1"
+    host = _internal_mcp_host(config)
     token_q = quote(internal_token, safe="")
     scheme = "https" if _internal_mcp_uses_https(config) else "http"
     return f"{scheme}://{host}:{config.port}/api/internal/mcp/{gateway_kind}/{instance_id}?token={token_q}"
@@ -225,7 +249,11 @@ def _build_gateway_spec(
     )
     spec: dict[str, Any] = {"transport": "http", "url": url}
     if url.startswith("https://"):
-        spec["httpx_client_factory"] = _internal_mcp_https_client_factory
+        # Skip verification only when the dial stays on loopback; a non-loopback
+        # bind_host must present a cert we actually check.
+        spec["httpx_client_factory"] = _internal_mcp_https_client_factory(
+            verify=not _is_loopback_host(_internal_mcp_host(config))
+        )
     return spec
 
 
