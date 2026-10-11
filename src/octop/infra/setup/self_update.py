@@ -909,12 +909,92 @@ def _run_managed_upgrade(
                 error="pip is not available for the HomeMind virtual environment.",
                 mirror_errors=mirror_errors,
             )
+<<<<<<< HEAD
         rc, err_snippet = _run_install_cmd(
             cmd,
             label,
             verbose=verbose,
             timeout=_INSTALL_TIMEOUT_S,
         )
+=======
+        fast_path = installer == "pip" and target is not None
+        if fast_path and target is not None:
+            pip_cmd = cmd[: cmd.index("install")]
+            with tempfile.TemporaryDirectory(prefix="octop-upgrade-") as download_dir:
+                download_timeout = float(_INSTALL_TIMEOUT_S)
+                if fallback_deadline is not None:
+                    download_timeout = min(download_timeout, fallback_deadline - time.monotonic())
+                if download_timeout <= 0:
+                    break
+                download_cmd = [
+                    *pip_cmd,
+                    "download",
+                    "--no-deps",
+                    "--only-binary=:all:",
+                    "--dest",
+                    download_dir,
+                    "-i",
+                    index_url,
+                ]
+                append_prerelease_flags(download_cmd, installer, allow_prerelease=allow_prerelease)
+                download_cmd.append(package_requirement(version))
+                rc, err_snippet = _run_install_cmd(
+                    download_cmd, label, verbose=verbose, timeout=download_timeout
+                )
+                if rc != 0:
+                    # The fast path requires a prebuilt wheel. A download failure leaves
+                    # the target untouched; try another mirror instead of a cold install.
+                    mirror_errors.append(f"{label}: {err_snippet or 'unknown error'}")
+                    continue
+                wheels = list(Path(download_dir).glob("*.whl"))
+                if len(wheels) == 1 and _target_dependencies_satisfied(
+                    target, wheels[0], version=version
+                ):
+                    install_timeout = float(_INSTALL_TIMEOUT_S)
+                    if fallback_deadline is not None:
+                        install_timeout = min(install_timeout, fallback_deadline - time.monotonic())
+                    if install_timeout <= 0:
+                        break
+                    rc, err_snippet = _run_install_cmd(
+                        [
+                            *pip_cmd,
+                            "install",
+                            "--no-index",
+                            "--no-deps",
+                            "--upgrade",
+                            "--target",
+                            str(target),
+                            str(wheels[0]),
+                        ],
+                        label,
+                        verbose=verbose,
+                        timeout=install_timeout,
+                    )
+                    if rc == 0:
+                        result = _verify_upgrade(
+                            local_ver, venv_python, mirror_errors, version=version, locale=locale
+                        )
+                        if result.success:
+                            return result
+                logger.debug(
+                    "%s: application-only upgrade unavailable; installing dependencies", label
+                )
+
+        timeout = float(_INSTALL_TIMEOUT_S)
+        if fast_path:
+            now = time.monotonic()
+            if fallback_deadline is None:
+                # One window starts at the first cold install, never once per mirror.
+                # Use the constant itself: ``(now + budget) - now`` is not always
+                # exactly ``budget`` for large monotonic clock values.
+                fallback_deadline = now + _TARGET_INSTALL_TIMEOUT_S
+                timeout = float(_TARGET_INSTALL_TIMEOUT_S)
+            else:
+                timeout = fallback_deadline - now
+            if timeout <= 0:
+                break
+        rc, err_snippet = _run_install_cmd(cmd, label, verbose=verbose, timeout=timeout)
+>>>>>>> 97d6e7ff (feat(connectors): add Obsidian CLI as a built-in connector (#1856))
         if rc == 0:
             return _verify_upgrade(local_ver, venv_python, mirror_errors)
         mirror_errors.append(f"{label}: {err_snippet or 'unknown error'}")

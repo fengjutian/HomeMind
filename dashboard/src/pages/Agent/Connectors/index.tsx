@@ -301,7 +301,9 @@ function configuredExtra(
 }
 
 function isHostCliConnector(kind: string): boolean {
-  return ["feishu-cli", "wecom-cli", "agently-cli"].includes(kind);
+  return ["feishu-cli", "wecom-cli", "agently-cli", "obsidian-cli"].includes(
+    kind,
+  );
 }
 
 function ConnectorConfigDrawer({
@@ -1539,6 +1541,21 @@ function ConnectorConfigDrawer({
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {entry?.kind === "obsidian-cli" && (
+          <div className={styles.cliInstallHint}>
+            <a
+              href="https://obsidian.md/zh/cli"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t(
+                "connectors.obsidianCliGuide",
+                "Obsidian-cli官方安装指引：https://obsidian.md/zh/cli",
+              )}
+            </a>
           </div>
         )}
 
