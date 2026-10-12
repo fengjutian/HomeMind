@@ -71,21 +71,19 @@ describe("ChatInputActionsRow plus menu", () => {
     expect(screen.getByLabelText("快捷指令")).toBeInTheDocument();
   });
 
-  it("shows the selected model on the bottom toolbar and clears it", () => {
+  it("switches models from the bottom toolbar", async () => {
     const onModelChange = vi.fn();
     render(
       <MemoryRouter>
-        <ChatInputActionsRow
-          {...baseProps}
-          selectedModel="Provider/compact-model"
-          onModelChange={onModelChange}
-        />
+        <ChatInputActionsRow {...baseProps} onModelChange={onModelChange} />
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "compact-model" }));
+    fireEvent.click(screen.getByTestId("composer-model-picker"));
+    const modelLabels = await screen.findAllByText(/Compact Model/);
+    fireEvent.click(modelLabels[modelLabels.length - 1]);
 
-    expect(onModelChange).toHaveBeenCalledWith(null);
+    expect(onModelChange).toHaveBeenCalledWith("Provider/compact-model");
   });
 
   it("opens a flyout beside the plus menu instead of a window drawer", async () => {

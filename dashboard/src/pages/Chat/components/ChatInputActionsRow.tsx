@@ -36,11 +36,9 @@ import type { AgentSubagentSummary } from "../../../api/modules/subagents";
 import {
   modelOptionLabel,
   modelOptionValue,
-  modelShortLabel,
 } from "../../../utils/modelOptions";
 import { customProviderLogo, getProviderLogo } from "../../../assets/providers";
 import ContextWindowRing from "./ContextWindowRing";
-import ContextChip from "./ContextChip";
 import SkillPickerPopover from "./SkillPickerPopover";
 import ExpertPickerPopover from "./ExpertPickerPopover";
 import SubagentPickerPopover from "./SubagentPickerPopover";
@@ -218,6 +216,7 @@ export default function ChatInputActionsRow({
   const [plusMenuHeight, setPlusMenuHeight] = useState<number | null>(null);
   const [isCompact, setIsCompact] = useState(false);
   const [shortcutOpen, setShortcutOpen] = useState(false);
+  const [modelPopoverOpen, setModelPopoverOpen] = useState(false);
   const [reasoningModelRef, setReasoningModelRef] = useState<string | null>(
     null,
   );
@@ -327,6 +326,11 @@ export default function ChatInputActionsRow({
   const closePlusMenu = () => {
     setOverflowPopoverOpen(false);
     closeCompactPicker();
+  };
+
+  const closeModelMenus = () => {
+    setModelPopoverOpen(false);
+    closePlusMenu();
   };
 
   const openCompactPicker = (key: CompactPickerKey) => {
@@ -480,7 +484,7 @@ export default function ChatInputActionsRow({
               }`}
               onClick={() => {
                 onModelChange?.(null);
-                closePlusMenu();
+                closeModelMenus();
               }}
             >
               <span className={styles.modelMenuTitle}>
@@ -510,7 +514,7 @@ export default function ChatInputActionsRow({
                     className={styles.modelMenuSelect}
                     onClick={() => {
                       onModelChange?.(active ? null : value);
-                      closePlusMenu();
+                      closeModelMenus();
                     }}
                   >
                     <img
@@ -554,7 +558,7 @@ export default function ChatInputActionsRow({
                 message.info(t("chat.remoteExpert.manageToast"));
                 return;
               }
-              closePlusMenu();
+              closeModelMenus();
               navigate("/admin/models");
             }}
           >
@@ -956,13 +960,27 @@ export default function ChatInputActionsRow({
             <Paperclip size={16} />
           </button>
         </Tooltip>
-        {selectedModel && onModelChange ? (
-          <ContextChip
-            variant="model"
-            icon={<Cpu size={12} strokeWidth={2.2} aria-hidden />}
-            label={modelShortLabel(selectedModel)}
-            onRemove={() => onModelChange(null)}
-          />
+        {showModelPicker ? (
+          <Popover
+            trigger="click"
+            placement="topLeft"
+            arrow={false}
+            open={modelPopoverOpen}
+            onOpenChange={setModelPopoverOpen}
+            overlayClassName={styles.skillPickerPopover}
+            content={modelMenu}
+          >
+            <button
+              type="button"
+              className={styles.composerModelPicker}
+              data-testid="composer-model-picker"
+              aria-label={t("chat.selectModel", "Model")}
+            >
+              <Cpu size={14} strokeWidth={2} aria-hidden />
+              <span>{selectedModelTriggerLabel}</span>
+              <ChevronRight size={14} aria-hidden />
+            </button>
+          </Popover>
         ) : null}
       </>
     );

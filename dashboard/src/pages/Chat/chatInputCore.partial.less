@@ -125,6 +125,37 @@
   padding-right: 2px;
 }
 
+.composerModelPicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 220px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--fn-color-brand) 28%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--fn-color-brand) 10%, transparent);
+  color: var(--fn-color-brand);
+  cursor: pointer;
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: color-mix(in srgb, var(--fn-color-brand) 15%, transparent);
+  }
+}
+
 @media (max-width: 767px) {
   .actionsRow {
     gap: 4px;
