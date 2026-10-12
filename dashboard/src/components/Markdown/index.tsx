@@ -39,6 +39,7 @@ function MermaidBlock({
   const blockRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>("");
+  const [aspectRatio, setAspectRatio] = useState<string>();
   const [error, setError] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -64,16 +65,18 @@ function MermaidBlock({
 
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement === blockRef.current) {
-      void document.exitFullscreen();
+      void document.exitFullscreen().catch(() => undefined);
       return;
     }
-    void blockRef.current?.requestFullscreen();
+    void blockRef.current?.requestFullscreen().catch(() => undefined);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     const trimmed = code.trim();
     if (!trimmed) return;
+    setSvg("");
+    setAspectRatio(undefined);
 
     const id = `mermaid-${Date.now()}-${Math.random()
       .toString(36)
@@ -110,7 +113,23 @@ function MermaidBlock({
 
         const { svg: rendered } = await mermaid.render(id, trimmed);
         if (!cancelled) {
+          const document = new DOMParser().parseFromString(
+            rendered,
+            "image/svg+xml",
+          );
+          const viewBox = document.documentElement
+            .getAttribute("viewBox")
+            ?.trim()
+            .split(/[ ,]+/)
+            .map(Number);
+          const width = viewBox?.[2];
+          const height = viewBox?.[3];
           setSvg(rendered);
+          setAspectRatio(
+            width && height && width > 0 && height > 0
+              ? `${width} / ${height}`
+              : undefined,
+          );
           setError(false);
         }
       } catch {
@@ -208,7 +227,7 @@ function MermaidBlock({
         <div
           ref={containerRef}
           className={styles.mermaidCanvas}
-          style={{ width: `${zoom * 100}%` }}
+          style={{ width: `${zoom * 100}%`, aspectRatio }}
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       </div>

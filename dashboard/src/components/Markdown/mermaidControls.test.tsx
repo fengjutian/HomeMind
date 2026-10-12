@@ -6,12 +6,30 @@ vi.mock("./mermaidLoader", () => ({
   loadMermaid: vi.fn(async () => ({
     parse: vi.fn(async () => true),
     render: vi.fn(async () => ({
-      svg: '<svg><text data-testid="diagram-label">Diagram</text></svg>',
+      svg: '<svg viewBox="0 0 800 400"><text data-testid="diagram-label">Diagram</text></svg>',
     })),
   })),
 }));
 
 describe("Mermaid controls", () => {
+  it("restores the diagram height after leaving and re-entering", async () => {
+    const content = "```mermaid\nflowchart TD\nA-->B\n```";
+    const first = render(<Markdown content={content} />);
+
+    await screen.findByText("Diagram");
+    expect(screen.getByText("Diagram").closest("div")).toHaveStyle({
+      aspectRatio: "800 / 400",
+    });
+
+    first.unmount();
+    render(<Markdown content={content} />);
+
+    await screen.findByText("Diagram");
+    expect(screen.getByText("Diagram").closest("div")).toHaveStyle({
+      aspectRatio: "800 / 400",
+    });
+  });
+
   it("zooms the rendered diagram within its limits", async () => {
     render(<Markdown content={"```mermaid\nflowchart TD\nA-->B\n```"} />);
 
