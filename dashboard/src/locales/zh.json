@@ -3,6 +3,12 @@
     "pageTitle": "HomeMind - 懂你、帮你、陪你成长的智能伙伴"
   },
   "smartHome": {
+    "subscriptionStatus": "订阅状态",
+    "reconnectCount": "重连次数",
+    "lastEvent": "最后事件",
+    "lastCommand": "最后命令",
+    "failureReason": "失败原因",
+    "never": "从未",
     "title": "智能家居",
     "subtitle": "通过 Home Assistant 接入小米及其他品牌设备",
     "pairedDevices": "设备",

@@ -123,8 +123,38 @@ def _reapply_unreleased_v26(db: DatabasePool) -> None:
             "idempotency_key TEXT PRIMARY KEY, provider_id TEXT NOT NULL, "
             "entity_id TEXT NOT NULL, command_name TEXT NOT NULL, "
             "status TEXT NOT NULL DEFAULT 'STARTED', result_json TEXT, "
+            "duration_ms INTEGER, error_code TEXT, completed_at "
+            f"{timestamp_type}, "
             f"created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL)"
         )
+    provider_columns = {
+        "subscription_status": "TEXT NOT NULL DEFAULT 'idle'",
+        "subscription_reconnect_count": "INTEGER NOT NULL DEFAULT 0",
+        "subscription_last_event_at": timestamp_type,
+        "subscription_error_code": "TEXT",
+        "last_command_at": timestamp_type,
+        "last_command_duration_ms": "INTEGER",
+        "last_command_status": "TEXT",
+        "last_command_error_code": "TEXT",
+    }
+    execution_columns = {
+        "duration_ms": "INTEGER",
+        "error_code": "TEXT",
+        "completed_at": timestamp_type,
+    }
+    for column, ddl in provider_columns.items():
+        if not _has_column(db, "homemind_family_smart_providers", column):
+            with db.connect() as conn:
+                conn.execute(
+                    f"ALTER TABLE homemind_family_smart_providers ADD COLUMN {column} {ddl}"
+                )
+    for column, ddl in execution_columns.items():
+        if not _has_column(db, "homemind_family_smart_command_executions", column):
+            with db.connect() as conn:
+                conn.execute(
+                    "ALTER TABLE homemind_family_smart_command_executions "
+                    f"ADD COLUMN {column} {ddl}"
+                )
 
 
 def _has_column(db: DatabasePool, table: str, column: str) -> bool:

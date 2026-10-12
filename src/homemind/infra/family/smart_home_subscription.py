@@ -126,12 +126,14 @@ class HomeAssistantSubscriber:
         on_change: Callable[[StateChange], Awaitable[None]],
         sleep: Callable[[float], Awaitable[None]] | None = None,
         jitter: Callable[[float], float] | None = None,
+        on_status: Callable[[str, int, str | None], Awaitable[None]] | None = None,
     ) -> None:
         self._connect = connect
         self._reconcile = reconcile
         self._on_change = on_change
         self._sleep = sleep or asyncio.sleep
         self._jitter = jitter or (lambda s: s)
+        self._on_status = on_status
         self.state = SubscriptionState.IDLE
         self.attempt = 0
         self.reconciles = 0
@@ -148,9 +150,12 @@ class HomeAssistantSubscriber:
         self._stop.clear()
         while not self._stop.is_set():
             handle: StreamHandle | None = None
+            error_code: str | None = None
             try:
-                self.state = (
-                    SubscriptionState.RECONNECTING if self.attempt else SubscriptionState.CONNECTING
+                await self._set_state(
+                    SubscriptionState.RECONNECTING
+                    if self.attempt
+                    else SubscriptionState.CONNECTING
                 )
                 handle = await self._connect()
                 self.attempt = 0
@@ -162,11 +167,12 @@ class HomeAssistantSubscriber:
                 await self._reconcile()
                 self.reconciles += 1
                 self._seen.clear()
-                self.state = SubscriptionState.SUBSCRIBED
+                await self._set_state(SubscriptionState.SUBSCRIBED)
                 await self._pump(handle)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001 - a dead socket is normal
+                error_code = type(exc).__name__
                 logger.info(
                     "HomeAssistant: subscription dropped (%s); reconnecting",
                     type(exc).__name__,
@@ -179,6 +185,10 @@ class HomeAssistantSubscriber:
             self.attempt += 1
             if self.attempt == 1:
                 self.reconnects += 1
+            await self._set_state(
+                SubscriptionState.RECONNECTING,
+                error_code=error_code or "CONNECTION_CLOSED",
+            )
             delay = self._backoff_for(self.attempt)
             logger.info("HomeAssistant: reconnect attempt %s in %.1fs", self.attempt, delay)
             await self._sleep(delay)
@@ -191,6 +201,15 @@ class HomeAssistantSubscriber:
     def _backoff_for(self, attempt: int) -> float:
         index = min(max(attempt, 1), len(BACKOFF_SCHEDULE)) - 1
         return min(BACKOFF_SCHEDULE[index], MAX_BACKOFF_SECONDS) * self._jitter(1.0)
+
+    async def _set_state(self, state: str, *, error_code: str | None = None) -> None:
+        self.state = state
+        if self._on_status is None:
+            return
+        try:
+            await self._on_status(state, self.reconnects, error_code)
+        except Exception:  # noqa: BLE001 - metrics persistence must not kill the socket
+            logger.warning("HomeAssistant: could not persist subscription status", exc_info=True)
 
     async def _pump(self, handle: StreamHandle) -> None:
         """Read frames until the socket closes or stop is requested."""

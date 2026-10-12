@@ -22,6 +22,22 @@ ALTER TABLE homemind_family_smart_providers
   ADD COLUMN IF NOT EXISTS reauth_required INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE homemind_family_smart_providers
   ADD COLUMN IF NOT EXISTS rate_limited_until INTEGER;
+ALTER TABLE homemind_family_smart_providers
+  ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'idle';
+ALTER TABLE homemind_family_smart_providers
+  ADD COLUMN IF NOT EXISTS subscription_reconnect_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE homemind_family_smart_providers
+  ADD COLUMN IF NOT EXISTS subscription_last_event_at BIGINT;
+ALTER TABLE homemind_family_smart_providers
+  ADD COLUMN IF NOT EXISTS subscription_error_code TEXT;
+ALTER TABLE homemind_family_smart_providers
+  ADD COLUMN IF NOT EXISTS last_command_at BIGINT;
+ALTER TABLE homemind_family_smart_providers
+  ADD COLUMN IF NOT EXISTS last_command_duration_ms INTEGER;
+ALTER TABLE homemind_family_smart_providers
+  ADD COLUMN IF NOT EXISTS last_command_status TEXT;
+ALTER TABLE homemind_family_smart_providers
+  ADD COLUMN IF NOT EXISTS last_command_error_code TEXT;
 
 ALTER TABLE homemind_family_smart_entities
   ADD COLUMN IF NOT EXISTS device_key TEXT;
@@ -43,6 +59,9 @@ CREATE TABLE IF NOT EXISTS homemind_family_smart_command_executions (
   command_name    TEXT NOT NULL,
   status          TEXT NOT NULL DEFAULT 'STARTED',
   result_json     TEXT,
+  duration_ms     INTEGER,
+  error_code      TEXT,
+  completed_at    BIGINT,
   created_at      BIGINT NOT NULL,
   updated_at      BIGINT NOT NULL
 );

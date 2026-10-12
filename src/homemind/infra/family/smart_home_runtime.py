@@ -20,6 +20,7 @@ from homemind.infra.family.smart_home_subscription import (
     HomeAssistantSubscriber,
     StateChange,
     StreamHandle,
+    SubscriptionState,
     connect_home_assistant,
 )
 
@@ -76,6 +77,12 @@ class SmartHomeSubscriptionManager:
             connect=lambda: self._connect(provider.base_url or "", token),
             reconcile=lambda: self._reconcile(provider, adapter),
             on_change=lambda change: self._apply(provider, change),
+            on_status=lambda status, reconnects, error: self._status(
+                provider.id,
+                status,
+                provider.subscription_reconnect_count + reconnects,
+                error,
+            ),
         )
         task = asyncio.create_task(
             subscriber.run(),
@@ -94,6 +101,7 @@ class SmartHomeSubscriptionManager:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+        self._repo.record_subscription_status(provider_id, SubscriptionState.STOPPED)
 
     async def stop(self) -> None:
         for provider_id in list(self._tasks):
@@ -141,6 +149,25 @@ class SmartHomeSubscriptionManager:
             entity.id,
             {"state": change.state, "attributes": change.attributes},
             changed_at=_timestamp(change.last_changed),
+        )
+        self._repo.record_subscription_status(
+            provider.id,
+            SubscriptionState.SUBSCRIBED,
+            event_at=_timestamp(change.last_updated) or int(datetime.now().timestamp()),
+        )
+
+    async def _status(
+        self,
+        provider_id: str,
+        status: str,
+        reconnects: int,
+        error_code: str | None,
+    ) -> None:
+        self._repo.record_subscription_status(
+            provider_id,
+            status,
+            reconnect_count=reconnects,
+            error_code=error_code,
         )
 
     @staticmethod

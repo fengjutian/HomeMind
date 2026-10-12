@@ -18,6 +18,8 @@ import { useTranslation } from "react-i18next";
 
 import FamilyPageShell from "../../components/family/FamilyPageShell";
 import { useActiveFamily } from "../../hooks/useActiveFamily";
+import { useServerTimezone } from "../../hooks/useServerTimezone";
+import { formatServerDateTime } from "../../utils/formatMessageTime";
 import {
   homeMindFamilyApi,
   type SmartHomeEntity,
@@ -33,6 +35,7 @@ interface ProviderForm {
 export default function FamilySmartHome() {
   const { t } = useTranslation();
   const { familyId } = useActiveFamily();
+  const serverTimezone = useServerTimezone();
   const { message } = App.useApp();
   const [form] = Form.useForm<ProviderForm>();
   const [providers, setProviders] = useState<SmartHomeProvider[]>([]);
@@ -171,7 +174,39 @@ export default function FamilySmartHome() {
                       </Tag>
                     </Space>
                   }
-                  description={provider.base_url}
+                  description={
+                    <Space direction="vertical" size={2}>
+                      <Typography.Text type="secondary">
+                        {provider.base_url}
+                      </Typography.Text>
+                      <Typography.Text type="secondary">
+                        {t("smartHome.subscriptionStatus")}: {provider.subscription_status} ·{" "}
+                        {t("smartHome.reconnectCount")}: {provider.subscription_reconnect_count}
+                      </Typography.Text>
+                      <Typography.Text type="secondary">
+                        {t("smartHome.lastEvent")}: {provider.subscription_last_event_at
+                          ? formatServerDateTime(
+                              provider.subscription_last_event_at,
+                              serverTimezone,
+                            )
+                          : t("smartHome.never")}
+                      </Typography.Text>
+                      <Typography.Text type="secondary">
+                        {t("smartHome.lastCommand")}: {provider.last_command_status ?? t("smartHome.never")}
+                        {provider.last_command_duration_ms !== null
+                          ? ` · ${provider.last_command_duration_ms} ms`
+                          : ""}
+                        {provider.last_command_error_code
+                          ? ` · ${provider.last_command_error_code}`
+                          : ""}
+                      </Typography.Text>
+                      {provider.subscription_error_code ? (
+                        <Typography.Text type="danger">
+                          {t("smartHome.failureReason")}: {provider.subscription_error_code}
+                        </Typography.Text>
+                      ) : null}
+                    </Space>
+                  }
                 />
               </List.Item>
             )}

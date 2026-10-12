@@ -21,6 +21,12 @@
     "sync": "Test and sync",
     "synced": "Devices synchronized",
     "ready": "Ready",
+    "subscriptionStatus": "Subscription",
+    "reconnectCount": "Reconnects",
+    "lastEvent": "Last event",
+    "lastCommand": "Last command",
+    "failureReason": "Failure reason",
+    "never": "Never",
     "deleteConfirm": "Remove this connection and its mapped devices?",
     "deleted": "Connection removed"
   },

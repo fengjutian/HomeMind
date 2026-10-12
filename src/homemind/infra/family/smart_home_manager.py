@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from time import perf_counter
 from typing import Any
 
 from homemind.infra.db.repos.smart_home import (
@@ -389,6 +390,7 @@ class FamilySmartHomeManager:
                 "journal_status": self.repo.command_status(idempotency_key),
             }
         try:
+            started = perf_counter()
             result = asyncio.run(
                 adapter.execute_command(
                     entity.external_entity_id,
@@ -397,10 +399,26 @@ class FamilySmartHomeManager:
                     idempotency_key=idempotency_key,
                 )
             )
-            self.repo.complete_command(idempotency_key, result)
+            self.repo.complete_command(
+                idempotency_key,
+                result,
+                duration_ms=max(0, round((perf_counter() - started) * 1000)),
+            )
             return result
         except CommandNotAllowed as exc:
+            self.repo.fail_command(
+                idempotency_key,
+                duration_ms=max(0, round((perf_counter() - started) * 1000)),
+                error_code=type(exc).__name__,
+            )
             raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, str(exc)) from exc
+        except Exception as exc:
+            self.repo.fail_command(
+                idempotency_key,
+                duration_ms=max(0, round((perf_counter() - started) * 1000)),
+                error_code=type(exc).__name__,
+            )
+            raise
 
     def verify_command(
         self,

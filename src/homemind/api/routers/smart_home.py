@@ -75,6 +75,19 @@ class ProviderResponse(BaseModel):
     enabled: bool
     last_seen_at: int | None
     last_error: str | None
+    last_sync_at: int | None
+    last_success_at: int | None
+    last_error_code: str | None
+    reauth_required: bool
+    rate_limited_until: int | None
+    subscription_status: str
+    subscription_reconnect_count: int
+    subscription_last_event_at: int | None
+    subscription_error_code: str | None
+    last_command_at: int | None
+    last_command_duration_ms: int | None
+    last_command_status: str | None
+    last_command_error_code: str | None
     created_at: int
     updated_at: int
 

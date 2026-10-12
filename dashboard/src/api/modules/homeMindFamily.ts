@@ -196,6 +196,19 @@ export interface SmartHomeProvider {
   enabled: boolean;
   last_seen_at: number | null;
   last_error: string | null;
+  last_sync_at: number | null;
+  last_success_at: number | null;
+  last_error_code: string | null;
+  reauth_required: boolean;
+  rate_limited_until: number | null;
+  subscription_status: string;
+  subscription_reconnect_count: number;
+  subscription_last_event_at: number | null;
+  subscription_error_code: string | null;
+  last_command_at: number | null;
+  last_command_duration_ms: number | null;
+  last_command_status: string | null;
+  last_command_error_code: string | null;
   created_at: number;
   updated_at: number;
 }

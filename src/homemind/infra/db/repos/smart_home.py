@@ -67,6 +67,14 @@ class SmartProviderRow:
     created_by: int
     created_at: int
     updated_at: int
+    subscription_status: str = "idle"
+    subscription_reconnect_count: int = 0
+    subscription_last_event_at: int | None = None
+    subscription_error_code: str | None = None
+    last_command_at: int | None = None
+    last_command_duration_ms: int | None = None
+    last_command_status: str | None = None
+    last_command_error_code: str | None = None
 
     @classmethod
     def from_row(cls, row: DbRow) -> SmartProviderRow:
@@ -97,6 +105,26 @@ class SmartProviderRow:
                 if data.get("rate_limited_until") is not None
                 else None
             ),
+            subscription_status=str(data.get("subscription_status") or "idle"),
+            subscription_reconnect_count=int(data.get("subscription_reconnect_count") or 0),
+            subscription_last_event_at=(
+                int(data["subscription_last_event_at"])
+                if data.get("subscription_last_event_at") is not None
+                else None
+            ),
+            subscription_error_code=data.get("subscription_error_code"),
+            last_command_at=(
+                int(data["last_command_at"])
+                if data.get("last_command_at") is not None
+                else None
+            ),
+            last_command_duration_ms=(
+                int(data["last_command_duration_ms"])
+                if data.get("last_command_duration_ms") is not None
+                else None
+            ),
+            last_command_status=data.get("last_command_status"),
+            last_command_error_code=data.get("last_command_error_code"),
             created_by=int(data["created_by"]),
             created_at=int(data["created_at"]),
             updated_at=int(data["updated_at"]),
@@ -230,6 +258,19 @@ class SmartHomeRepo:
             "enabled",
             "last_seen_at",
             "last_error",
+            "last_sync_at",
+            "last_success_at",
+            "last_error_code",
+            "reauth_required",
+            "rate_limited_until",
+            "subscription_status",
+            "subscription_reconnect_count",
+            "subscription_last_event_at",
+            "subscription_error_code",
+            "last_command_at",
+            "last_command_duration_ms",
+            "last_command_status",
+            "last_command_error_code",
         }
         fields = [key for key in values if key in allowed]
         if not fields:
@@ -295,6 +336,25 @@ class SmartHomeRepo:
         }
         if ok:
             values["last_success_at"] = ts
+        return self.update_provider(provider_id, **values)
+
+    def record_subscription_status(
+        self,
+        provider_id: str,
+        status: str,
+        *,
+        reconnect_count: int | None = None,
+        error_code: str | None = None,
+        event_at: int | None = None,
+    ) -> SmartProviderRow | None:
+        values: dict[str, object] = {
+            "subscription_status": status,
+            "subscription_error_code": error_code,
+        }
+        if reconnect_count is not None:
+            values["subscription_reconnect_count"] = reconnect_count
+        if event_at is not None:
+            values["subscription_last_event_at"] = event_at
         return self.update_provider(provider_id, **values)
 
     def delete_provider(self, provider_id: str) -> bool:
@@ -532,17 +592,53 @@ class SmartHomeRepo:
             )
         return int(cursor.rowcount or 0) == 1
 
-    def complete_command(self, idempotency_key: str, result: dict[str, Any]) -> None:
+    def complete_command(
+        self,
+        idempotency_key: str,
+        result: dict[str, Any],
+        *,
+        duration_ms: int,
+    ) -> None:
+        timestamp = now_ts()
         with self._db.transaction() as conn:
             conn.execute(
                 "UPDATE homemind_family_smart_command_executions "
-                "SET status = 'COMPLETED', result_json = ?, updated_at = ? "
+                "SET status = 'COMPLETED', result_json = ?, duration_ms = ?, "
+                "error_code = NULL, completed_at = ?, updated_at = ? "
                 "WHERE idempotency_key = ?",
                 (
                     json.dumps(result, ensure_ascii=False, sort_keys=True, default=str),
-                    now_ts(),
+                    duration_ms,
+                    timestamp,
+                    timestamp,
                     idempotency_key,
                 ),
+            )
+            conn.execute(
+                "UPDATE homemind_family_smart_providers SET last_command_at = ?, "
+                "last_command_duration_ms = ?, last_command_status = 'COMPLETED', "
+                "last_command_error_code = NULL, updated_at = ? WHERE provider_id = ("
+                "SELECT provider_id FROM homemind_family_smart_command_executions "
+                "WHERE idempotency_key = ?)",
+                (timestamp, duration_ms, timestamp, idempotency_key),
+            )
+
+    def fail_command(self, idempotency_key: str, *, duration_ms: int, error_code: str) -> None:
+        timestamp = now_ts()
+        with self._db.transaction() as conn:
+            conn.execute(
+                "UPDATE homemind_family_smart_command_executions "
+                "SET status = 'FAILED', duration_ms = ?, error_code = ?, "
+                "completed_at = ?, updated_at = ? WHERE idempotency_key = ?",
+                (duration_ms, error_code, timestamp, timestamp, idempotency_key),
+            )
+            conn.execute(
+                "UPDATE homemind_family_smart_providers SET last_command_at = ?, "
+                "last_command_duration_ms = ?, last_command_status = 'FAILED', "
+                "last_command_error_code = ?, updated_at = ? WHERE provider_id = ("
+                "SELECT provider_id FROM homemind_family_smart_command_executions "
+                "WHERE idempotency_key = ?)",
+                (timestamp, duration_ms, error_code, timestamp, idempotency_key),
             )
 
     def command_status(self, idempotency_key: str) -> str | None:
