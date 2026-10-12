@@ -119,6 +119,10 @@ describe("pathPermissionKeys", () => {
 });
 
 describe("unknown dashboard paths", () => {
+  it("highlights hardware on the smart-home page", () => {
+    expect(resolveSelectedKey("/smart-home")).toBe("hardware");
+  });
+
   it("do not highlight a sidebar item", () => {
     expect(resolveSelectedKey("/does-not-exist")).toBe("");
   });

@@ -74,7 +74,7 @@ export const pathToKey: Record<string, string> = {
   "/family-tasks": "family",
   "/family-memory": "family",
   "/devices": "family",
-  "/smart-home": "family",
+  "/smart-home": "hardware",
   "/approvals": "family",
   "/calendar": "family",
   "/task-board": "family",
