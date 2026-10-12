@@ -197,8 +197,8 @@ export default function FamilySmartHome() {
                         {t(
                           `smartHome.subscriptionStates.${provider.subscription_status}`,
                           provider.subscription_status,
-                        )} ·{" "}
-                        {t("smartHome.reconnectCount")}:{" "}
+                        )}{" "}
+                        · {t("smartHome.reconnectCount")}:{" "}
                         {provider.subscription_reconnect_count}
                       </Typography.Text>
                       <Typography.Text type="secondary">

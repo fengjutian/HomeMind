@@ -9,6 +9,17 @@
     "lastCommand": "最后命令",
     "failureReason": "失败原因",
     "never": "从未",
+    "subscriptionStates": {
+      "idle": "空闲",
+      "connecting": "连接中",
+      "subscribed": "已订阅",
+      "reconnecting": "重连中",
+      "stopped": "已停止"
+    },
+    "commandStates": {
+      "COMPLETED": "已完成",
+      "FAILED": "失败"
+    },
     "title": "智能家居",
     "subtitle": "通过 Home Assistant 接入小米及其他品牌设备",
     "pairedDevices": "设备",
