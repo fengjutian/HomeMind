@@ -85,7 +85,12 @@ interface ChatInputProps {
   onStopBrowserRecording?: () => void;
   onReplayBrowserRecording?: () => void;
   isStreaming: boolean;
-  /** Team room: send immediately even while members (or the host) are still talking. */
+  /**
+   * Team members are still producing. Queue the next message instead of
+   * starting another host turn on top of them.
+   */
+  holdSend?: boolean;
+  /** Team room: the host turn itself can still be interrupted while it is the only speaker. */
   isTeam?: boolean;
   disabled?: boolean;
   /** Pre-fill the input with this text on mount (e.g. navigated from another page). */
@@ -150,6 +155,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onStopBrowserRecording,
       onReplayBrowserRecording,
       isStreaming,
+      holdSend = false,
       isTeam = false,
       disabled,
       initialText = "",
@@ -532,14 +538,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       const slashItem = matchSlashCommand(wireText);
       if (slashItem && slashItem.spec.client_action !== "none") {
         // Slash actions are never queued — run immediately or leave input alone.
-        if (isStreaming) return;
+        if (isStreaming || holdSend) return;
         runSlashCommand(slashItem);
         return;
       }
       const ta = textareaRef.current;
       const prevHeight = ta ? ta.getBoundingClientRect().height : 0;
 
-      if (isStreaming && !isTeam) {
+      if ((isStreaming && !isTeam) || holdSend) {
         if (!onQueue) return;
         const result = onQueue({
           text: wireText,
@@ -572,6 +578,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onQueue,
       disabled,
       isStreaming,
+      holdSend,
       isTeam,
       matchSlashCommand,
       runSlashCommand,
@@ -712,7 +719,15 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const handlePolish = useCallback(async () => {
       const draft = text.trim();
-      if (!draft || !agentId || polishing || isStreaming || disabled) return;
+      if (
+        !draft ||
+        !agentId ||
+        polishing ||
+        isStreaming ||
+        holdSend ||
+        disabled
+      )
+        return;
       setPolishing(true);
       try {
         const result = await agentChatApi.polish(agentId, draft, selectedModel);
@@ -737,7 +752,16 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       } finally {
         setPolishing(false);
       }
-    }, [text, agentId, polishing, isStreaming, disabled, selectedModel, t]);
+    }, [
+      text,
+      agentId,
+      polishing,
+      isStreaming,
+      holdSend,
+      disabled,
+      selectedModel,
+      t,
+    ]);
 
     const canSend = Boolean(
       (text.trim() || attachments.length > 0) && !disabled,
@@ -872,7 +896,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
           <ChatInputActionsRow
             isMobile={isMobile}
-            isStreaming={isStreaming}
+            isStreaming={isStreaming || holdSend}
             isTeam={isTeam}
             disabled={disabled}
             canSend={canSend}

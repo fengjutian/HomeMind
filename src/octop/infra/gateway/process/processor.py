@@ -183,6 +183,7 @@ class GlobalProcessor:
             user_repo=user_repo,
             thread_message_repo=thread_message_repo,
             gateway=gateway,
+            hitl_coordinator=self._hitl,
         )
 
     async def _begin_history(
@@ -651,6 +652,7 @@ class GlobalProcessor:
                 outcome=slash_outcome,
                 history_factory=self._begin_history,
                 history_finalize=self._complete_resumed_history,
+                member_hitl=self.teams.deliver_member_hitl,
             ):
                 yield ev
             if slash_outcome.completed_turn:
@@ -699,6 +701,7 @@ class GlobalProcessor:
                         usage_tracker=usage_tracker,
                         history_tracker=history_tracker,
                         outcome=answer_outcome,
+                        member_hitl=self.teams.deliver_member_hitl,
                     ):
                         yield ev
                 finally:
@@ -950,6 +953,7 @@ class GlobalProcessor:
                 outcome=slash_outcome,
                 history_factory=self._begin_history,
                 history_finalize=self._complete_resumed_history,
+                member_hitl=self.teams.deliver_member_hitl,
             ):
                 for frame in message_event_to_cli_chunks(ev):
                     yield _maybe_stamp_team_host(frame, agent_id, team_host)
@@ -1000,6 +1004,7 @@ class GlobalProcessor:
                         usage_tracker=usage_tracker,
                         history_tracker=history_tracker,
                         outcome=answer_outcome,
+                        member_hitl=self.teams.deliver_member_hitl,
                     ):
                         for frame in message_event_to_cli_chunks(ev):
                             yield _maybe_stamp_team_host(frame, agent_id, team_host)
@@ -1060,6 +1065,7 @@ class GlobalProcessor:
                 response_lines=slash_lines,
             )
             self._hitl.expire_pending_for_thread(thread_id, agent_id=agent_id, user_id=user_id)
+            self.teams.cancel_member_hitl(thread_id)
             self._touch_thread_after_turn(thread_id, msg.text)
             for line in slash_lines:
                 yield _maybe_stamp_team_host(
@@ -1088,6 +1094,7 @@ class GlobalProcessor:
             )
 
         self._hitl.expire_pending_for_thread(thread_id, agent_id=agent_id, user_id=user_id)
+        self.teams.cancel_member_hitl(thread_id)
         request = await self._build_dashboard_request(
             msg,
             agent_id=agent_id,
