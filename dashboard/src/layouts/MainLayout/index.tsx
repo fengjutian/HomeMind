@@ -1,5 +1,13 @@
 import { Layout } from "antd";
-import { lazy, Suspense, useEffect, useState, useCallback } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import Sidebar from "../Sidebar";
 import Header from "../Header";
@@ -73,6 +81,29 @@ export default function MainLayout() {
   const [chatSidebarOpen, setChatSidebarOpen] = useChatSidebarOpen();
   const [workbenchMounted, setWorkbenchMounted] = useState(() => onWorkbench);
   const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const contentRef = useRef<HTMLElement>(null);
+  const previousSelectedKey = useRef(selectedKey);
+
+  useLayoutEffect(() => {
+    if (previousSelectedKey.current === selectedKey) return;
+    previousSelectedKey.current = selectedKey;
+
+    const content = contentRef.current;
+    if (!content) return;
+
+    content.classList.remove(styles.routeEntering);
+    void content.offsetWidth;
+    content.classList.add(styles.routeEntering);
+
+    const handleAnimationEnd = () => {
+      content.classList.remove(styles.routeEntering);
+    };
+    content.addEventListener("animationend", handleAnimationEnd, { once: true });
+    return () => {
+      content.removeEventListener("animationend", handleAnimationEnd);
+      content.classList.remove(styles.routeEntering);
+    };
+  }, [selectedKey]);
 
   useEffect(() => {
     setPendingPath(null);
@@ -299,6 +330,7 @@ export default function MainLayout() {
               }}
             >
               <Content
+                ref={contentRef}
                 className="page-container"
                 style={{
                   background: isChatRoute

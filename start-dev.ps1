@@ -57,8 +57,9 @@ $escapedDesktopRoot = ConvertTo-SingleQuotedLiteral $desktopRoot
 $escapedUvCacheRoot = ConvertTo-SingleQuotedLiteral $uvCacheRoot
 
 $startBackend = $Target -in @("backend", "web", "desktop", "all")
-$startFrontend = $Target -in @("frontend", "web", "all")
+$startFrontend = $Target -in @("frontend", "web", "desktop", "all")
 $startDesktop = $Target -in @("desktop", "all")
+$frontendUrl = $null
 
 $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
 $npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue
@@ -110,12 +111,16 @@ if ($startFrontend) {
 }
 
 if ($startDesktop) {
+    if (-not $frontendUrl) {
+        throw "Desktop development requires the Vite frontend URL."
+    }
     if (Test-DevPortInUse 9245) {
         Write-Host "Wails dev server is already listening on 127.0.0.1:9245; skipping duplicate desktop startup."
     } else {
+        $escapedFrontendUrl = ConvertTo-SingleQuotedLiteral $frontendUrl
         Start-DevWindow "HomeMind Desktop" $desktopRoot (
             "Set-Location -LiteralPath '$escapedDesktopRoot'; " +
-            "`$env:OCTOP_DESKTOP_URL = 'http://127.0.0.1:8088'; " +
+            "`$env:OCTOP_DESKTOP_URL = '$escapedFrontendUrl'; " +
             "wails3 dev"
         )
     }
