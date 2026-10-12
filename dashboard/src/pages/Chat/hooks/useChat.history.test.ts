@@ -2,7 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { octopThreadsApi } from "../../../api/modules/octopThreads";
 import * as chatStore from "./chatStore";
-import { useChat } from "./useChat";
+import { convertHistoryMessages, useChat } from "./useChat";
 
 const thread = "versioned-history-test";
 
@@ -123,5 +123,23 @@ describe("history failures", () => {
     expect(
       chatStore.getSnapshot(thread).messages.map((m) => m.content),
     ).toEqual(["older", "latest"]);
+  });
+});
+
+describe("history replay", () => {
+  it("renders the latest version of a repeated message id once", () => {
+    const messages = convertHistoryMessages([
+      { id: "user-1", role: "user", content: "question" },
+      { id: "assistant-1", role: "assistant", content: "partial answer" },
+      { id: "assistant-1", role: "assistant", content: "complete answer" },
+      { id: "user-2", role: "user", content: "next question" },
+    ]);
+
+    expect(messages.map((message) => message.id)).toEqual([
+      "user-1",
+      "assistant-1",
+      "user-2",
+    ]);
+    expect(messages[1].content).toBe("complete answer");
   });
 });

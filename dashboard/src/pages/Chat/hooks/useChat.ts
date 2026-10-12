@@ -678,7 +678,27 @@ export function convertHistoryMessages(
   }>,
   agentId?: string,
 ): ChatMessage[] {
-  const entries: CallEntry[] = messages.map((message, index) => {
+  // A refreshed history projection may contain multiple versions of the same
+  // message. Keep its original position while rendering only the latest one,
+  // otherwise React receives duplicate keys and remounts rich content such as
+  // Mermaid diagrams.
+  const uniqueMessages = [...messages];
+  const indexById = new Map<string, number>();
+  for (let index = 0; index < uniqueMessages.length; index += 1) {
+    const message = uniqueMessages[index];
+    const id = typeof message.id === "string" ? message.id.trim() : "";
+    if (!id) continue;
+    const existingIndex = indexById.get(id);
+    if (existingIndex === undefined) {
+      indexById.set(id, index);
+      continue;
+    }
+    uniqueMessages[existingIndex] = message;
+    uniqueMessages.splice(index, 1);
+    index -= 1;
+  }
+
+  const entries: CallEntry[] = uniqueMessages.map((message, index) => {
     const meta: Record<string, unknown> = {};
     if (message.composer_context) {
       meta.composer_context = message.composer_context;
