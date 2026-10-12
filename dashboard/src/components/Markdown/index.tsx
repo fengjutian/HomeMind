@@ -14,6 +14,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
+import { Maximize2, Minimize2, Scan, ZoomIn, ZoomOut } from "lucide-react";
 import {
   AuthFileDownloadLink,
   isAuthDownloadHref,
@@ -35,9 +36,39 @@ function MermaidBlock({
   onRegenerate?: (code: string) => void;
 }) {
   const { t } = useTranslation();
+  const blockRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === blockRef.current);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const selectDiagram = useCallback(() => {
+    const container = containerRef.current;
+    const selection = window.getSelection();
+    if (!container || !selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement === blockRef.current) {
+      void document.exitFullscreen();
+      return;
+    }
+    void blockRef.current?.requestFullscreen();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,11 +156,63 @@ function MermaidBlock({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={styles.mermaidBlock}
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <div ref={blockRef} className={styles.mermaidBlock}>
+      <div className={styles.mermaidToolbar} role="toolbar">
+        <button
+          type="button"
+          aria-label={t("chat.mermaidSelectAll")}
+          title={t("chat.mermaidSelectAll")}
+          onClick={selectDiagram}
+        >
+          <Scan size={16} />
+        </button>
+        <button
+          type="button"
+          aria-label={t("chat.mermaidZoomOut")}
+          title={t("chat.mermaidZoomOut")}
+          disabled={zoom <= 0.5}
+          onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))}
+        >
+          <ZoomOut size={16} />
+        </button>
+        <span className={styles.mermaidZoomLabel}>
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          type="button"
+          aria-label={t("chat.mermaidZoomIn")}
+          title={t("chat.mermaidZoomIn")}
+          disabled={zoom >= 3}
+          onClick={() => setZoom((value) => Math.min(3, value + 0.25))}
+        >
+          <ZoomIn size={16} />
+        </button>
+        <button
+          type="button"
+          aria-label={
+            isFullscreen
+              ? t("chat.mermaidExitFullscreen")
+              : t("chat.mermaidFullscreen")
+          }
+          title={
+            isFullscreen
+              ? t("chat.mermaidExitFullscreen")
+              : t("chat.mermaidFullscreen")
+          }
+          onClick={toggleFullscreen}
+        >
+          {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
+      </div>
+      <div className={styles.mermaidViewport}>
+        <div
+          ref={containerRef}
+          className={styles.mermaidCanvas}
+          style={{ width: `${zoom * 100}%` }}
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </div>
+    </div>
   );
 }
 
