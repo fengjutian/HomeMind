@@ -503,6 +503,57 @@ class SmartHomeRepo:
             )
         return int(cursor.rowcount or 0)
 
+    # --------------------------------------------------------- command journal
+
+    def reserve_command(
+        self,
+        idempotency_key: str,
+        *,
+        provider_id: str,
+        entity_id: str,
+        command_name: str,
+    ) -> bool:
+        """Reserve one physical command before it reaches the provider."""
+        timestamp = now_ts()
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                "INSERT INTO homemind_family_smart_command_executions("
+                "idempotency_key, provider_id, entity_id, command_name, status, "
+                "created_at, updated_at) VALUES (?, ?, ?, ?, 'STARTED', ?, ?) "
+                "ON CONFLICT(idempotency_key) DO NOTHING",
+                (
+                    idempotency_key,
+                    provider_id,
+                    entity_id,
+                    command_name,
+                    timestamp,
+                    timestamp,
+                ),
+            )
+        return int(cursor.rowcount or 0) == 1
+
+    def complete_command(self, idempotency_key: str, result: dict[str, Any]) -> None:
+        with self._db.transaction() as conn:
+            conn.execute(
+                "UPDATE homemind_family_smart_command_executions "
+                "SET status = 'COMPLETED', result_json = ?, updated_at = ? "
+                "WHERE idempotency_key = ?",
+                (
+                    json.dumps(result, ensure_ascii=False, sort_keys=True, default=str),
+                    now_ts(),
+                    idempotency_key,
+                ),
+            )
+
+    def command_status(self, idempotency_key: str) -> str | None:
+        with self._db.connect() as conn:
+            row = conn.execute(
+                "SELECT status FROM homemind_family_smart_command_executions "
+                "WHERE idempotency_key = ?",
+                (idempotency_key,),
+            ).fetchone()
+        return str(_row_data(row)["status"]) if row is not None else None
+
 
 __all__ = [
     "PROVIDER_KINDS",

@@ -363,10 +363,21 @@ class FamilySmartHomeManager:
         adapter = self._adapter(provider)
         if adapter is None:
             raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "this provider is not connected")
+        if not self.repo.reserve_command(
+            idempotency_key,
+            provider_id=provider.id,
+            entity_id=entity.id,
+            command_name=command_name,
+        ):
+            return {
+                "skipped": True,
+                "reason": "already_submitted",
+                "journal_status": self.repo.command_status(idempotency_key),
+            }
         import asyncio
 
         try:
-            return asyncio.run(
+            result = asyncio.run(
                 adapter.execute_command(
                     entity.external_entity_id,
                     command_name,
@@ -374,6 +385,8 @@ class FamilySmartHomeManager:
                     idempotency_key=idempotency_key,
                 )
             )
+            self.repo.complete_command(idempotency_key, result)
+            return result
         except CommandNotAllowed as exc:
             raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, str(exc)) from exc
 

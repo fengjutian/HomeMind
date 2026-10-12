@@ -5,8 +5,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from homemind.infra.db.migrate import _discover
+from homemind.infra.db.migrate import _discover, run_migrations
 from homemind.infra.db.migrate import _MIGRATIONS_DIR as HM_MIGRATIONS_DIR
+from octop.infra.db.migrate import run_migrations as run_octop_migrations
+from octop.infra.db.pool import SqlitePool
 
 
 def _homemind_migration_names() -> tuple[set[str], set[str]]:
@@ -71,3 +73,21 @@ def test_homemind_migrations_directory_layout_is_stable() -> None:
     # the layout stable so the relative path doesn't drift.
     runner_path = Path(__file__).resolve()
     assert (runner_path.parents[3] / "src" / "homemind" / "infra" / "db" / "migrations").is_dir()
+
+
+def test_unreleased_v26_reapplies_smart_command_journal(tmp_path: Path) -> None:
+    pool = SqlitePool(tmp_path / "octop.db")
+    run_octop_migrations(pool)
+    run_migrations(pool)
+    with pool.connect() as conn:
+        conn.execute("DROP TABLE homemind_family_smart_command_executions")
+        version = conn.execute("SELECT version FROM _homemind_schema_version").fetchone()
+    assert int(version["version"]) == 26
+
+    run_migrations(pool)
+
+    with pool.connect() as conn:
+        conn.execute(
+            "SELECT idempotency_key FROM homemind_family_smart_command_executions WHERE 1 = 0"
+        )
+    pool.close()

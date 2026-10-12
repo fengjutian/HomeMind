@@ -186,6 +186,41 @@ async def test_verify_reports_the_observed_state_not_the_request() -> None:
     assert verdict["verified"] is False
 
 
+@pytest.mark.parametrize(
+    ("entity_id", "command", "payload", "state", "attributes"),
+    [
+        ("climate.hall", "set_temperature", {"temperature": 23}, "heat", {"temperature": 23}),
+        ("climate.hall", "set_hvac_mode", {"hvac_mode": "cool"}, "cool", {}),
+        ("cover.study", "set_cover_position", {"position": 40}, "open", {"current_position": 40}),
+        ("fan.bedroom", "set_fan_percentage", {"percentage": 60}, "on", {"percentage": 60}),
+        ("humidifier.room", "set_humidity", {"humidity": 55}, "on", {"humidity": 55}),
+    ],
+)
+async def test_verify_compares_command_specific_attributes(
+    entity_id: str,
+    command: str,
+    payload: dict[str, Any],
+    state: str,
+    attributes: dict[str, Any],
+) -> None:
+    adapter = _ha()
+
+    async def fake_state(requested_id: str) -> SmartEntity:
+        return SmartEntity(
+            external_id=requested_id,
+            domain=requested_id.partition(".")[0],
+            name="Device",
+            state=state,
+            attributes=attributes,
+        )
+
+    adapter.get_state = fake_state  # type: ignore[method-assign]
+    verdict = await adapter.verify_command(entity_id, command, payload)
+
+    assert verdict["verified"] is True
+    assert verdict["checked"] is True
+
+
 @pytest.mark.asyncio
 async def test_probe_reports_failure_without_raising() -> None:
     adapter = _ha()

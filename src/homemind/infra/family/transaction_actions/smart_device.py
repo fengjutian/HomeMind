@@ -109,6 +109,7 @@ class SmartDeviceCommandHandler:
         return {
             "entity_id": entity_id,
             "command": command,
+            "payload": args,
             "result": result,
         }
 

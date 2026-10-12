@@ -344,15 +344,20 @@ class HomeAssistantAdapter(BaseSmartHomeAdapter):
         entity = await self.get_state(entity_id)
         if entity is None:
             return {"verified": False, "reason": "entity_not_found"}
-        expected = _expected_state(command, payload)
-        if expected is None:
+        expected_state, expected_attributes = _expected_observation(command, payload)
+        if expected_state is None and not expected_attributes:
             # No deterministic expectation: report what it is now and
             # let the caller decide.
             return {"verified": True, "state": entity.state, "checked": False}
+        state_matches = expected_state is None or entity.state.lower() == expected_state.lower()
+        attributes_match = all(
+            entity.attributes.get(key) == value for key, value in expected_attributes.items()
+        )
         return {
-            "verified": entity.state.lower() == expected.lower(),
+            "verified": state_matches and attributes_match,
             "state": entity.state,
-            "expected": expected,
+            "expected_state": expected_state,
+            "expected_attributes": expected_attributes,
             "checked": True,
         }
 
@@ -392,22 +397,40 @@ def _domain_of(entity_id: str) -> str:
     return domain
 
 
-def _expected_state(command: SmartCommand, payload: dict[str, Any]) -> str | None:
-    """What the entity should read after ``command``.
+def _expected_observation(
+    command: SmartCommand, payload: dict[str, Any]
+) -> tuple[str | None, dict[str, Any]]:
+    """What state and attributes should be observed after ``command``.
 
     Only defined for commands whose effect is a single, checkable
     state. Anything else returns ``None`` so verification reports the
     observed state instead of inventing an expectation.
     """
     if command.name == "turn_on":
-        return "on"
+        return "on", {}
     if command.name == "turn_off":
-        return "off"
+        return "off", {}
     if command.name == "toggle":
-        return None
-    if "brightness" in payload:
-        return str(payload["brightness"])
-    return None
+        return None, {}
+    if command.name == "set_temperature" and "temperature" in payload:
+        return None, {"temperature": payload["temperature"]}
+    if command.name == "set_hvac_mode" and "hvac_mode" in payload:
+        return str(payload["hvac_mode"]), {}
+    if command.name == "open_cover":
+        return "open", {}
+    if command.name == "close_cover":
+        return "closed", {}
+    if command.name == "set_cover_position" and "position" in payload:
+        return None, {"current_position": payload["position"]}
+    if command.name == "set_fan_percentage" and "percentage" in payload:
+        return None, {"percentage": payload["percentage"]}
+    if command.name == "set_humidity" and "humidity" in payload:
+        return None, {"humidity": payload["humidity"]}
+    if command.name == "start":
+        return "cleaning", {}
+    if command.name == "pause":
+        return "paused", {}
+    return None, {}
 
 
 #: The documented command catalogue. Locks, cameras and alarm panels are

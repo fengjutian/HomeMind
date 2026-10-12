@@ -186,6 +186,7 @@ class TestExecuteAndVerify:
         )
         assert manager.executed == [("ent1", "turn_on", "txn-1", {"x": 1})]
         assert out["result"] == {"ok": True}
+        assert out["payload"] == {"x": 1}
 
     def test_verify_re_reads_the_entity(self) -> None:
         handler, manager = _handler()

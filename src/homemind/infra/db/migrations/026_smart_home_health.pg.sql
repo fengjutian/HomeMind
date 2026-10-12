@@ -36,4 +36,15 @@ CREATE INDEX IF NOT EXISTS idx_homemind_family_smart_providers_health
 CREATE INDEX IF NOT EXISTS idx_homemind_family_smart_entities_device
   ON homemind_family_smart_entities(provider_id, device_key);
 
+CREATE TABLE IF NOT EXISTS homemind_family_smart_command_executions (
+  idempotency_key TEXT PRIMARY KEY,
+  provider_id     TEXT NOT NULL,
+  entity_id       TEXT NOT NULL,
+  command_name    TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'STARTED',
+  result_json     TEXT,
+  created_at      BIGINT NOT NULL,
+  updated_at      BIGINT NOT NULL
+);
+
 UPDATE _homemind_schema_version SET version = 26;

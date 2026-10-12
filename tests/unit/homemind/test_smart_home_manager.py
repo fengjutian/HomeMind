@@ -324,6 +324,50 @@ def test_previewing_a_read_only_sensor_is_refused(env) -> None:  # noqa: ANN001
         )
 
 
+def test_command_reservation_survives_a_new_adapter_instance(env) -> None:  # noqa: ANN001
+    provider = env["manager"].create_provider(
+        env["family"].id, env["owner"], kind="HOME_ASSISTANT", name="Home"
+    )
+    entity = env["repo"].upsert_entity(
+        env["family"].id,
+        provider_id=provider.id,
+        external_entity_id="light.hall",
+        domain="light",
+        name="Hall",
+    )
+    calls: list[str] = []
+
+    async def post(path: str, _body: Any) -> list[dict[str, bool]]:
+        calls.append(path)
+        return [{"success": True}]
+
+    first_adapter = _StubHa()
+    first_adapter._post = post  # noqa: SLF001
+    first_manager = FamilySmartHomeManager(
+        env["families"], env["repo"], adapter_factory=lambda _provider: first_adapter
+    )
+    first = first_manager.execute_command(
+        provider, entity, "turn_on", {}, idempotency_key="transaction-1"
+    )
+
+    second_adapter = _StubHa()
+    second_adapter._post = post  # noqa: SLF001
+    second_manager = FamilySmartHomeManager(
+        env["families"], env["repo"], adapter_factory=lambda _provider: second_adapter
+    )
+    replay = second_manager.execute_command(
+        provider, entity, "turn_on", {}, idempotency_key="transaction-1"
+    )
+
+    assert first["skipped"] is False
+    assert replay == {
+        "skipped": True,
+        "reason": "already_submitted",
+        "journal_status": "COMPLETED",
+    }
+    assert calls == ["/api/services/light/turn_on"]
+
+
 # ------------------------------------------------------------------ policy
 
 

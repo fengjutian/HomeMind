@@ -75,6 +75,8 @@ def run_migrations(db: DatabasePool) -> None:
         _reapply_unreleased_v2(db)
     if current >= 15:
         _reapply_unreleased_v15(db)
+    if current >= 26:
+        _reapply_unreleased_v26(db)
 
 
 def _reapply_unreleased_v2(db: DatabasePool) -> None:
@@ -109,6 +111,19 @@ def _reapply_unreleased_v15(db: DatabasePool) -> None:
     with db.connect() as conn:
         conn.execute(
             "ALTER TABLE homemind_asset_jobs ADD COLUMN config_json TEXT NOT NULL DEFAULT '{}'",
+        )
+
+
+def _reapply_unreleased_v26(db: DatabasePool) -> None:
+    """Keep already-watermarked unreleased v26 databases equivalent."""
+    timestamp_type = "BIGINT" if db.dialect == "postgresql" else "INTEGER"
+    with db.connect() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS homemind_family_smart_command_executions ("
+            "idempotency_key TEXT PRIMARY KEY, provider_id TEXT NOT NULL, "
+            "entity_id TEXT NOT NULL, command_name TEXT NOT NULL, "
+            "status TEXT NOT NULL DEFAULT 'STARTED', result_json TEXT, "
+            f"created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL)"
         )
 
 
