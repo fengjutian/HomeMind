@@ -213,6 +213,15 @@ class SmartHomeRepo:
             ).fetchall()
         return map_rows(rows, SmartProviderRow)
 
+    def list_enabled_providers(self) -> list[SmartProviderRow]:
+        """Return every enabled provider for process-level runtime wiring."""
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_smart_providers "
+                "WHERE enabled = 1 ORDER BY created_at ASC"
+            ).fetchall()
+        return map_rows(rows, SmartProviderRow)
+
     def update_provider(self, provider_id: str, **values: object) -> SmartProviderRow | None:
         allowed = {
             "name",

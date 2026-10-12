@@ -8,6 +8,7 @@ and a replayed frame — and assert what a reconnect must and must not do.
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 import pytest
@@ -18,6 +19,8 @@ from homemind.infra.family.smart_home_subscription import (
     StateChange,
     StreamHandle,
     SubscriptionState,
+    connect_home_assistant,
+    websocket_url,
 )
 
 
@@ -171,9 +174,7 @@ class TestIncrementalUpdates:
         assert sub.duplicates == 1
 
     async def test_byte_frames_are_decoded(self) -> None:
-        import json as _json
-
-        payload = _json.dumps(_event("light.a", "on")).encode()
+        payload = json.dumps(_event("light.a", "on")).encode()
         socket = _ScriptedSocket([payload, b"not json", None])
         applied: list[StateChange] = []
         reconciles: list[int] = []
@@ -188,6 +189,75 @@ class TestIncrementalUpdates:
         task.cancel()
 
         assert len(applied) == 1
+
+    async def test_text_frames_are_decoded(self) -> None:
+        socket = _ScriptedSocket([json.dumps(_event("light.a", "on")), "not json", None])
+        applied: list[StateChange] = []
+        reconciles: list[int] = []
+        sub = _subscriber([socket], applied, reconciles, stop_after=1)
+
+        task = asyncio.create_task(sub.run())
+        for _ in range(12):
+            if applied:
+                break
+            await asyncio.sleep(0)
+        await sub.stop()
+        task.cancel()
+
+        assert len(applied) == 1
+
+
+@pytest.mark.parametrize(
+    ("base_url", "expected"),
+    [
+        ("http://ha.local:8123", "ws://ha.local:8123/api/websocket"),
+        ("https://example.test/ha/", "wss://example.test/ha/api/websocket"),
+    ],
+)
+def test_websocket_url(base_url: str, expected: str) -> None:
+    assert websocket_url(base_url) == expected
+
+
+def test_websocket_url_rejects_non_http_scheme() -> None:
+    with pytest.raises(ValueError, match="http or https"):
+        websocket_url("ftp://ha.local")
+
+
+async def test_connect_home_assistant_authenticates(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _RawSocket:
+        def __init__(self) -> None:
+            self.frames = [json.dumps({"type": "auth_required"}), json.dumps({"type": "auth_ok"})]
+            self.sent: list[str] = []
+            self.closed = False
+
+        async def recv(self) -> str:
+            return self.frames.pop(0)
+
+        async def send(self, payload: str) -> None:
+            self.sent.append(payload)
+
+        async def close(self) -> None:
+            self.closed = True
+
+    socket = _RawSocket()
+    calls: list[tuple[str, float, float]] = []
+
+    async def connect(url: str, *, open_timeout: float, close_timeout: float) -> _RawSocket:
+        calls.append((url, open_timeout, close_timeout))
+        return socket
+
+    monkeypatch.setattr("websockets.asyncio.client.connect", connect)
+
+    handle = await connect_home_assistant("https://ha.example", "secret-token")
+    await handle.send({"id": 1, "type": "ping"})
+    await handle.close()
+
+    assert calls == [("wss://ha.example/api/websocket", 10.0, 10.0)]
+    assert [json.loads(payload) for payload in socket.sent] == [
+        {"type": "auth", "access_token": "secret-token"},
+        {"id": 1, "type": "ping"},
+    ]
+    assert socket.closed is True
 
 
 class TestReconnect:

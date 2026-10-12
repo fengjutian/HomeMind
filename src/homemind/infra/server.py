@@ -35,6 +35,7 @@ from homemind.infra.family.reminder_runner import ReminderRunner
 from homemind.infra.family.reminders import FamilyReminderManager
 from homemind.infra.family.scan_job import FamilyAssetScanJob
 from homemind.infra.family.search_indexer import FamilySearchIndexer
+from homemind.infra.family.smart_home_runtime import SmartHomeSubscriptionManager
 from homemind.infra.family.task_agent import FamilyTaskAgentExecutor
 from homemind.infra.family.task_scheduler import FamilyTaskScheduler, TaskSchedulerRunner
 from homemind.infra.family.tasks import FamilyTaskManager
@@ -55,6 +56,7 @@ class HomeMindServer(OctopServer):
         self._reminder_runner: ReminderRunner | None = None
         self._task_scheduler_runner: TaskSchedulerRunner | None = None
         self._family_event_bus: FamilyEventBus | None = None
+        self._smart_home_subscriptions: SmartHomeSubscriptionManager | None = None
 
     def build_extra_agent_tools(self) -> list[Any]:
         if self.services is None:
@@ -162,14 +164,30 @@ class HomeMindServer(OctopServer):
     def task_scheduler_runner(self) -> TaskSchedulerRunner | None:
         return self._task_scheduler_runner
 
+    @property
+    def smart_home_subscriptions(self) -> SmartHomeSubscriptionManager | None:
+        return self._smart_home_subscriptions
+
     async def start(self) -> None:
         await super().start()
         self._start_asset_scan_job()
         self._start_family_event_bus()
+        await self._start_smart_home_subscriptions()
         await self._start_memory_maintenance()
         await self._start_asset_job_runner()
         await self._start_reminder_runner()
         await self._start_task_scheduler()
+
+    async def _start_smart_home_subscriptions(self) -> None:
+        if self.services is None:
+            return
+        run_migrations(self.services.db)
+        hm = HomeMindServices.from_pool(self.services.db)
+        self._smart_home_subscriptions = SmartHomeSubscriptionManager(
+            hm.smart_home_repo,
+            self.services.secret_repo,
+        )
+        await self._smart_home_subscriptions.start()
 
     def _start_family_event_bus(self) -> None:
         """Bind the family event bus to Octop's WebSocket hub.
@@ -427,28 +445,33 @@ class HomeMindServer(OctopServer):
 
     async def stop(self) -> None:
         try:
-            if self._task_scheduler_runner is not None:
-                await self._task_scheduler_runner.stop()
-                self._task_scheduler_runner = None
+            if self._smart_home_subscriptions is not None:
+                await self._smart_home_subscriptions.stop()
+                self._smart_home_subscriptions = None
         finally:
             try:
-                if self._reminder_runner is not None:
-                    await self._reminder_runner.stop()
-                    self._reminder_runner = None
+                if self._task_scheduler_runner is not None:
+                    await self._task_scheduler_runner.stop()
+                    self._task_scheduler_runner = None
             finally:
                 try:
-                    if self._asset_job_runner is not None:
-                        await self._asset_job_runner.stop()
-                        self._asset_job_runner = None
+                    if self._reminder_runner is not None:
+                        await self._reminder_runner.stop()
+                        self._reminder_runner = None
                 finally:
                     try:
-                        if self._memory_maintenance is not None:
-                            await self._memory_maintenance.stop()
-                            self._memory_maintenance = None
+                        if self._asset_job_runner is not None:
+                            await self._asset_job_runner.stop()
+                            self._asset_job_runner = None
                     finally:
                         try:
-                            if self._asset_scan_job is not None:
-                                await self._asset_scan_job.shutdown()
-                                self._asset_scan_job = None
+                            if self._memory_maintenance is not None:
+                                await self._memory_maintenance.stop()
+                                self._memory_maintenance = None
                         finally:
-                            await super().stop()
+                            try:
+                                if self._asset_scan_job is not None:
+                                    await self._asset_scan_job.shutdown()
+                                    self._asset_scan_job = None
+                            finally:
+                                await super().stop()

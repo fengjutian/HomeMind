@@ -29,6 +29,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,11 @@ class HomeAssistantSubscriber:
                     raw = json.loads(raw.decode("utf-8"))
                 except (UnicodeDecodeError, json.JSONDecodeError):
                     continue
+            elif isinstance(raw, str):
+                try:
+                    raw = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
             if not isinstance(raw, dict):
                 continue
             change = StateChange.from_event(raw)
@@ -233,6 +239,48 @@ async def _safe_close(handle: StreamHandle) -> None:
         logger.debug("HomeAssistant: closing subscription socket failed", exc_info=True)
 
 
+def websocket_url(base_url: str) -> str:
+    """Translate an HA HTTP base URL to its WebSocket endpoint."""
+    parsed = urlsplit(base_url.rstrip("/"))
+    scheme = {"http": "ws", "https": "wss"}.get(parsed.scheme.lower())
+    if scheme is None or not parsed.netloc:
+        raise ValueError("Home Assistant URL must use http or https")
+    return urlunsplit((scheme, parsed.netloc, f"{parsed.path}/api/websocket", "", ""))
+
+
+async def connect_home_assistant(base_url: str, token: str) -> StreamHandle:
+    """Open and authenticate one Home Assistant WebSocket connection."""
+    from websockets.asyncio.client import connect  # noqa: PLC0415
+
+    socket = await connect(
+        websocket_url(base_url),
+        open_timeout=HA_COMMAND_TIMEOUT_SECONDS,
+        close_timeout=HA_COMMAND_TIMEOUT_SECONDS,
+    )
+    try:
+        required = json.loads(await asyncio.wait_for(socket.recv(), HA_COMMAND_TIMEOUT_SECONDS))
+        if required.get("type") != "auth_required":
+            raise RuntimeError("Home Assistant did not request authentication")
+        await socket.send(json.dumps({"type": "auth", "access_token": token}))
+        result = json.loads(await asyncio.wait_for(socket.recv(), HA_COMMAND_TIMEOUT_SECONDS))
+        if result.get("type") != "auth_ok":
+            raise PermissionError("Home Assistant rejected the credential")
+    except Exception:
+        await socket.close()
+        raise
+
+    async def receive() -> Any:
+        return await socket.recv()
+
+    async def send(payload: dict[str, Any]) -> None:
+        await socket.send(json.dumps(payload, ensure_ascii=False))
+
+    async def close() -> None:
+        await socket.close()
+
+    return StreamHandle(receive=receive, send=send, close=close)
+
+
 __all__ = [
     "BACKOFF_SCHEDULE",
     "MAX_BACKOFF_SECONDS",
@@ -240,4 +288,6 @@ __all__ = [
     "StateChange",
     "StreamHandle",
     "SubscriptionState",
+    "connect_home_assistant",
+    "websocket_url",
 ]

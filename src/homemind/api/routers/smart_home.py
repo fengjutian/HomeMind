@@ -168,7 +168,9 @@ async def create_provider(
     data = body.model_dump(exclude={"credential"})
     credential = body.credential
     if credential is None:
-        return manager.create_provider(family_id, user, **data)
+        provider = manager.create_provider(family_id, user, **data)
+        await _start_subscription(server, provider)
+        return provider
 
     # Authorize before writing a secret so a rejected request cannot leave an
     # orphan credential behind. The manager repeats this check when creating
@@ -182,7 +184,9 @@ async def create_provider(
     )
     try:
         data["secret_ref"] = secret_ref
-        return manager.create_provider(family_id, user, **data)
+        provider = manager.create_provider(family_id, user, **data)
+        await _start_subscription(server, provider)
+        return provider
     except Exception:
         server.services.secret_repo.delete(secret_ref)
         raise
@@ -212,6 +216,9 @@ async def delete_provider(
         None,
     )
     manager.delete_provider(family_id, provider_id, user)
+    subscriptions = getattr(server, "smart_home_subscriptions", None)
+    if subscriptions is not None:
+        await subscriptions.stop_provider(provider_id)
     if (
         provider is not None
         and provider.secret_ref is not None
@@ -220,6 +227,12 @@ async def delete_provider(
         assert server.services is not None
         server.services.secret_repo.delete(provider.secret_ref)
     return Response(status_code=204)
+
+
+async def _start_subscription(server: OctopServer, provider: Any) -> None:
+    subscriptions = getattr(server, "smart_home_subscriptions", None)
+    if subscriptions is not None:
+        await subscriptions.start_provider(provider)
 
 
 @router.put(
