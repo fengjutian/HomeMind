@@ -250,7 +250,7 @@ async def stage_import(
                 size += len(chunk)
                 if size > MAX_IMPORT_BYTES:
                     raise HTTPException(status_code=413, detail="bundle is too large")
-                output.write(chunk)
+                await asyncio.to_thread(output.write, chunk)
         await asyncio.to_thread(_extract_import_bundle, target, target.parent / target.stem)
     except zipfile.BadZipFile as exc:
         raise HTTPException(status_code=400, detail="not a valid zip archive") from exc
