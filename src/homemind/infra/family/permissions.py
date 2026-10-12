@@ -122,6 +122,7 @@ DEFAULT_ACTION_EFFECTS: tuple[tuple[str, PermissionEffect], ...] = (
     ("calendar.update_event", PermissionEffect.REQUIRE_CONFIRMATION),
     ("calendar.cancel_event", PermissionEffect.REQUIRE_CONFIRMATION),
     ("device.command", PermissionEffect.REQUIRE_CONFIRMATION),
+    ("smart_device.command", PermissionEffect.REQUIRE_CONFIRMATION),
     ("knowledge.reindex", PermissionEffect.REQUIRE_CONFIRMATION),
     ("asset.batch_move", PermissionEffect.REQUIRE_CONFIRMATION),
     ("asset.move_to_trash", PermissionEffect.REQUIRE_CONFIRMATION),

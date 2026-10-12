@@ -61,10 +61,11 @@ def test_mcp_route_exposes_every_tool(tmp_path: Path) -> None:
     services = HomeMindServices.from_pool(pool)
     server = _McpServerShim(services, pool)
     tools = server.list_tools()
-    assert len(tools) == 12
+    assert len(tools) == 17
     names = {tool["name"] for tool in tools}
     assert "family.create_task" in names
     assert "family.plan_transaction" in names
+    assert "smart_home.command" in names
     # No tool may accept a user identity argument.
     for tool in tools:
         assert tool["inputSchema"].get("additionalProperties") is False

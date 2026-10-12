@@ -29,7 +29,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from typing import Any
 
@@ -43,6 +43,10 @@ from homemind.infra.family.memory_lifecycle import (
     MemoryLifecycleManager,
     is_sensitive,
 )
+from homemind.infra.family.smart_home_factory import build_adapter
+from homemind.infra.family.smart_home_manager import FamilySmartHomeManager
+from homemind.infra.family.transaction_actions.smart_device import SmartDeviceCommandHandler
+from octop.infra.db.repos.secrets import SecretRepo
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.errors import OctopError
 from octop.infra.users.identity import User
@@ -113,6 +117,11 @@ class HomeMindMcpServer:
         "family.create_event",
         "family.create_memory_candidate",
         "family.plan_transaction",
+        "smart_home.list_entities",
+        "smart_home.get_entity",
+        "smart_home.get_commands",
+        "smart_home.preview_command",
+        "smart_home.command",
     )
 
     def __init__(
@@ -134,6 +143,12 @@ class HomeMindMcpServer:
             self._context,
             services.memory_candidate_repo,
             services.memory_evidence_repo,
+        )
+        secrets = SecretRepo(services.db)
+        self._smart_home = FamilySmartHomeManager(
+            self._family,
+            services.smart_home_repo,
+            adapter_factory=lambda provider: build_adapter(provider, secrets),
         )
 
     # ------------------------------------------------------------- dispatch
@@ -396,6 +411,49 @@ class HomeMindMcpServer:
                 payload=dict(arguments.get("payload") or {}),
                 idempotency_key=arguments.get("idempotency_key"),
             )
+        if name == "smart_home.list_entities":
+            entities = self._smart_home.list_entities(
+                family_id,
+                user,
+                domain=(str(arguments["domain"]) if arguments.get("domain") else None),
+            )
+            return {"entities": [asdict(entity) for entity in entities]}
+        if name == "smart_home.get_entity":
+            entity = self._smart_home.get_entity(
+                family_id,
+                str(arguments.get("entity_id", "")),
+                user,
+            )
+            return {"entity": asdict(entity)}
+        if name == "smart_home.get_commands":
+            return {
+                "commands": self._smart_home.commands_for(
+                    family_id,
+                    str(arguments.get("entity_id", "")),
+                    user,
+                )
+            }
+        if name == "smart_home.preview_command":
+            preview = self._smart_home.preview_command(
+                family_id,
+                str(arguments.get("entity_id", "")),
+                user,
+                command_name=str(arguments.get("command", "")),
+                payload=dict(arguments.get("payload") or {}),
+            )
+            return {"preview": asdict(preview)}
+        if name == "smart_home.command":
+            return self._plan_write(
+                family_id,
+                user,
+                action="smart_device.command",
+                payload={
+                    "entity_id": str(arguments.get("entity_id", "")),
+                    "command": str(arguments.get("command", "")),
+                    "payload": dict(arguments.get("payload") or {}),
+                },
+                idempotency_key=arguments.get("idempotency_key"),
+            )
         raise HomeMindError(
             HomeMindErrorCode.FAMILY_INVALID, f"unhandled tool {name!r}",
         )
@@ -427,6 +485,10 @@ class HomeMindMcpServer:
             FamilyTaskManager(self._family, self._services.family_task_repo),
             self._services.family_transaction_repo,
             self._user_repo,
+        )
+        transactions.registry.register(
+            "smart_device.command",
+            SmartDeviceCommandHandler(self._smart_home),
         )
         transaction, approval = transactions.plan(
             family_id,
@@ -542,6 +604,13 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
         "Plan an arbitrary write transaction. Requires manager rights "
         "when the action is privileged."
     ),
+    "smart_home.list_entities": "List smart-home entities and their latest known state.",
+    "smart_home.get_entity": "Get one smart-home entity and its latest known state.",
+    "smart_home.get_commands": "List allow-listed commands for a smart-home entity.",
+    "smart_home.preview_command": "Validate and preview a command without executing it.",
+    "smart_home.command": (
+        "Plan a smart-home command through permission, approval, execution, and verification."
+    ),
 }
 
 
@@ -624,6 +693,36 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
             "idempotency_key": _STRING,
         },
         ["action"],
+    ),
+    "smart_home.list_entities": _schema(
+        {"family_id": _FAMILY, "domain": _STRING},
+    ),
+    "smart_home.get_entity": _schema(
+        {"family_id": _FAMILY, "entity_id": _STRING},
+        ["entity_id"],
+    ),
+    "smart_home.get_commands": _schema(
+        {"family_id": _FAMILY, "entity_id": _STRING},
+        ["entity_id"],
+    ),
+    "smart_home.preview_command": _schema(
+        {
+            "family_id": _FAMILY,
+            "entity_id": _STRING,
+            "command": _STRING,
+            "payload": {"type": "object"},
+        },
+        ["entity_id", "command"],
+    ),
+    "smart_home.command": _schema(
+        {
+            "family_id": _FAMILY,
+            "entity_id": _STRING,
+            "command": _STRING,
+            "payload": {"type": "object"},
+            "idempotency_key": _STRING,
+        },
+        ["entity_id", "command"],
     ),
 }
 

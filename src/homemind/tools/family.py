@@ -30,10 +30,14 @@ from homemind.infra.family.photo_providers import (
 from homemind.infra.family.privacy import ExternalProcessingGuard
 from homemind.infra.family.search import FamilySearchManager, SearchKind
 from homemind.infra.family.search_indexer import FamilySearchIndexer
+from homemind.infra.family.smart_home_factory import build_adapter
+from homemind.infra.family.smart_home_manager import FamilySmartHomeManager
 from homemind.infra.family.tasks import FamilyTaskManager, TaskStatus
+from homemind.infra.family.transaction_actions.smart_device import SmartDeviceCommandHandler
 from homemind.infra.family.transactions import FamilyTransactionManager
 from octop.infra.db.pool import DatabasePool
 from octop.infra.db.repos.providers import ProviderRepo
+from octop.infra.db.repos.secrets import SecretRepo
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.users.identity import User
 
@@ -95,6 +99,16 @@ def _build_managers(
         permission_evaluator=permissions,
     )
     devices = DeviceRuntimeManager(families, services.family_device_repo)
+    secrets = SecretRepo(services.db)
+    smart_home = FamilySmartHomeManager(
+        families,
+        services.smart_home_repo,
+        adapter_factory=lambda provider: build_adapter(provider, secrets),
+    )
+    transactions.registry.register(
+        "smart_device.command",
+        SmartDeviceCommandHandler(smart_home),
+    )
     return {
         "family": families,
         "permissions": permissions,
@@ -108,6 +122,7 @@ def _build_managers(
         "transactions": transactions,
         "devices": devices,
         "device_repo": services.family_device_repo,
+        "smart_home": smart_home,
     }
 
 
@@ -157,6 +172,7 @@ def build_family_tools(
     filesystem = managers["filesystem"]
     transactions = managers["transactions"]
     devices = managers["device_repo"]
+    smart_home = managers["smart_home"]
 
     def family_list_members(family_id: str) -> str:
         try:
@@ -335,6 +351,76 @@ def build_family_tools(
             if row is None or row.family_id != family_id:
                 raise ValueError("family device not found")
             return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
+    def smart_home_list_entities(family_id: str, domain: str | None = None) -> str:
+        try:
+            rows = smart_home.list_entities(
+                family_id,
+                _current_user(user_repo),
+                domain=domain,
+            )
+            return _ok([asdict(row) for row in rows])
+        except Exception as exc:
+            return _error(exc)
+
+    def smart_home_get_entity(family_id: str, entity_id: str) -> str:
+        try:
+            row = smart_home.get_entity(family_id, entity_id, _current_user(user_repo))
+            return _ok(asdict(row))
+        except Exception as exc:
+            return _error(exc)
+
+    def smart_home_get_commands(family_id: str, entity_id: str) -> str:
+        try:
+            rows = smart_home.commands_for(
+                family_id,
+                entity_id,
+                _current_user(user_repo),
+            )
+            return _ok(rows)
+        except Exception as exc:
+            return _error(exc)
+
+    def smart_home_preview_command(
+        family_id: str,
+        entity_id: str,
+        command: str,
+        payload: dict[str, Any] | None = None,
+    ) -> str:
+        try:
+            preview = smart_home.preview_command(
+                family_id,
+                entity_id,
+                _current_user(user_repo),
+                command_name=command,
+                payload=payload,
+            )
+            return _ok(asdict(preview))
+        except Exception as exc:
+            return _error(exc)
+
+    def smart_home_command(
+        family_id: str,
+        entity_id: str,
+        command: str,
+        payload: dict[str, Any] | None = None,
+        idempotency_key: str | None = None,
+    ) -> str:
+        try:
+            transaction, approval = transactions.plan(
+                family_id,
+                _current_user(user_repo),
+                action="smart_device.command",
+                payload={
+                    "entity_id": entity_id,
+                    "command": command,
+                    "payload": dict(payload or {}),
+                },
+                idempotency_key=idempotency_key,
+            )
+            return _transaction_result(transaction, approval)
         except Exception as exc:
             return _error(exc)
 
@@ -614,17 +700,50 @@ def build_family_tools(
         ("family.get_devices", family_get_devices, "List registered family devices."),
         ("family.get_device", family_get_device, "Get one registered family device."),
         (
+            "smart_home.list_entities",
+            smart_home_list_entities,
+            "List smart-home entities and their latest known state.",
+        ),
+        (
+            "smart_home.get_entity",
+            smart_home_get_entity,
+            "Get one smart-home entity and its latest known state.",
+        ),
+        (
+            "smart_home.get_commands",
+            smart_home_get_commands,
+            "List the allow-listed commands available for a smart-home entity.",
+        ),
+        (
+            "smart_home.preview_command",
+            smart_home_preview_command,
+            "Validate and preview a smart-home command without executing it.",
+        ),
+        (
+            "smart_home.command",
+            smart_home_command,
+            "Plan a smart-home command through permission, approval, execution, and verification.",
+        ),
+        (
             "family.search",
             family_search,
             "Search family members, events, memories, and indexed assets.",
         ),
         ("filesystem.list", filesystem_list, "List a registered family source safely."),
         ("filesystem.search", filesystem_search, "Search a registered family source safely."),
-        ("filesystem.read", filesystem_read, "Read a bounded UTF-8 file from a registered family source."),
+        (
+            "filesystem.read",
+            filesystem_read,
+            "Read a bounded UTF-8 file from a registered family source.",
+        ),
         ("filesystem.copy", filesystem_copy, "Copy a file after permission evaluation."),
         ("filesystem.move", filesystem_move, "Move a file after permission evaluation."),
         ("filesystem.rename", filesystem_rename, "Rename a file after permission evaluation."),
-        ("filesystem.delete", filesystem_delete, "Move a file to recoverable HomeMind trash after approval."),
+        (
+            "filesystem.delete",
+            filesystem_delete,
+            "Move a file to recoverable HomeMind trash after approval.",
+        ),
         ("family.list_albums", family_list_albums, "List family photo albums."),
         ("family.create_album", family_create_album, "Create a family photo album."),
         ("family.add_album_asset", family_add_album_asset, "Add an indexed asset to an album."),

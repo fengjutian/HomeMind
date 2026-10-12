@@ -25,6 +25,7 @@ from homemind.tools.mcp_server import (
 )
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
+from octop.infra.db.repos.secrets import SecretRepo
 from octop.infra.db.repos.settings import SettingsRepo
 from octop.infra.users.identity import Role, User
 
@@ -172,6 +173,63 @@ def test_resolve_context_returns_ambiguities(tmp_path: Path) -> None:
     )
     assert result.ok
     assert "ambiguities" in result.data["context"]
+    pool.close()
+
+
+def test_smart_home_mcp_tools_read_and_plan_an_approved_command(tmp_path: Path) -> None:
+    pool, server, resolver, papa, _mama, family_id, _oid = _bootstrap(tmp_path)
+    resolver.set(papa, family_id)
+    from homemind.infra.db.services import HomeMindServices
+
+    services = HomeMindServices.from_pool(pool)
+    SecretRepo(pool).get_or_create("ha-token", lambda: b"token")
+    provider = services.smart_home_repo.create_provider(
+        family_id,
+        kind="HOME_ASSISTANT",
+        name="Home Assistant",
+        base_url="http://ha.local:8123",
+        secret_ref="ha-token",
+        created_by=papa.id,
+    )
+    entity = services.smart_home_repo.upsert_entity(
+        family_id,
+        provider_id=provider.id,
+        external_entity_id="light.living_room",
+        domain="light",
+        name="Living room lamp",
+        state={"state": "off", "attributes": {}},
+    )
+
+    listed = server.call_tool(
+        "smart_home.list_entities", {"family_id": family_id}, _principal(papa)
+    )
+    commands = server.call_tool(
+        "smart_home.get_commands",
+        {"family_id": family_id, "entity_id": entity.id},
+        _principal(papa),
+    )
+    planned = server.call_tool(
+        "smart_home.command",
+        {
+            "family_id": family_id,
+            "entity_id": entity.id,
+            "command": "turn_on",
+            "idempotency_key": "mcp-turn-1",
+        },
+        _principal(papa),
+    )
+
+    assert listed.ok
+    assert [row["id"] for row in listed.data["entities"]] == [entity.id]
+    assert commands.ok
+    assert {row["name"] for row in commands.data["commands"]} == {
+        "turn_on",
+        "turn_off",
+        "toggle",
+    }
+    assert planned.ok
+    assert planned.data["status"] == "WAITING_APPROVAL"
+    assert planned.data["approval_id"]
     pool.close()
 
 
