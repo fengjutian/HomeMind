@@ -20,12 +20,16 @@ import {
   Typography,
 } from "antd";
 import {
+  Brain,
   ChevronDown,
+  Images,
+  ListTodo,
   Pencil,
   Plus,
   Search,
   Settings,
   Trash2,
+  Users,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useServerTimezone } from "../../hooks/useServerTimezone";
@@ -358,29 +362,55 @@ export default function FamilyPage() {
               label: t("family.tabs.home", "首页"),
               children: (
                 <div className={styles.overview}>
-                  <Title level={4} className={styles.familyName}>
-                    {activeFamily?.name}
-                  </Title>
+                  <div className={styles.overviewHeader}>
+                    <div>
+                      <Text className={styles.overviewEyebrow}>
+                        {t("family.tabs.home", "首页")}
+                      </Text>
+                      <Title level={3} className={styles.familyName}>
+                        {activeFamily?.name}
+                      </Title>
+                    </div>
+                    <div className={styles.familyMark} aria-hidden="true">
+                      <Users size={26} strokeWidth={1.8} />
+                    </div>
+                  </div>
                   <div className={styles.statsGrid}>
-                    <Card className={styles.statCard}>
+                    <Card
+                      className={`${styles.statCard} ${styles.membersCard}`}
+                    >
+                      <div className={styles.statIcon} aria-hidden="true">
+                        <Users size={20} />
+                      </div>
                       <Statistic
                         title={t("family.members", "成员")}
                         value={members.length}
                       />
                     </Card>
-                    <Card className={styles.statCard}>
+                    <Card className={`${styles.statCard} ${styles.albumsCard}`}>
+                      <div className={styles.statIcon} aria-hidden="true">
+                        <Images size={20} />
+                      </div>
                       <Statistic
                         title={t("family.albums", "相册")}
                         value={albums.length}
                       />
                     </Card>
-                    <Card className={styles.statCard}>
+                    <Card className={`${styles.statCard} ${styles.tasksCard}`}>
+                      <div className={styles.statIcon} aria-hidden="true">
+                        <ListTodo size={20} />
+                      </div>
                       <Statistic
                         title={t("family.tasks", "任务")}
                         value={tasks.length}
                       />
                     </Card>
-                    <Card className={styles.statCard}>
+                    <Card
+                      className={`${styles.statCard} ${styles.memoriesCard}`}
+                    >
+                      <div className={styles.statIcon} aria-hidden="true">
+                        <Brain size={20} />
+                      </div>
                       <Statistic
                         title={t("family.memories", "记忆")}
                         value={memories.length}

@@ -43,11 +43,68 @@
 }
 
 .overview {
-  max-width: 1120px;
+  max-width: 1180px;
+  padding: 8px 0 24px;
+}
+
+.overviewHeader {
+  position: relative;
+  display: flex;
+  min-height: 126px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 24px 28px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, #ff6b57 22%, var(--fn-border-secondary));
+  border-radius: 18px;
+  background: radial-gradient(
+      circle at 88% 15%,
+      rgba(255, 255, 255, 0.72),
+      transparent 24%
+    ),
+    linear-gradient(125deg, rgba(255, 107, 87, 0.16), rgba(255, 188, 130, 0.08));
+
+  &::after {
+    position: absolute;
+    right: 90px;
+    bottom: -54px;
+    width: 150px;
+    height: 150px;
+    border: 30px solid rgba(255, 107, 87, 0.06);
+    border-radius: 50%;
+    content: "";
+  }
+}
+
+.overviewEyebrow {
+  display: block;
+  margin-bottom: 6px;
+  color: #e75244;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .familyName {
-  margin: 4px 0 20px !important;
+  margin: 0 !important;
+  font-size: clamp(24px, 3vw, 32px) !important;
+  letter-spacing: -0.02em;
+}
+
+.familyMark {
+  z-index: 1;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(145deg, #ff745f, #f04f45);
+  box-shadow: 0 12px 28px rgba(225, 78, 64, 0.24);
 }
 
 .statsGrid {
@@ -57,8 +114,97 @@
 }
 
 .statCard {
-  border-color: var(--fn-border-secondary);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --stat-accent: #ff6254;
+  --stat-tint: rgba(255, 98, 84, 0.1);
+
+  position: relative;
+  min-height: 144px;
+  overflow: hidden;
+  border-color: color-mix(
+    in srgb,
+    var(--stat-accent) 18%,
+    var(--fn-border-secondary)
+  );
+  border-radius: 16px;
+  background: linear-gradient(
+    145deg,
+    var(--fn-bg-container) 52%,
+    var(--stat-tint)
+  );
+  box-shadow: 0 8px 26px rgba(24, 30, 42, 0.06);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+
+  &::after {
+    position: absolute;
+    right: -28px;
+    bottom: -32px;
+    width: 92px;
+    height: 92px;
+    border-radius: 50%;
+    background: var(--stat-tint);
+    content: "";
+  }
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 34px rgba(24, 30, 42, 0.1);
+  }
+
+  :global(.ant-card-body),
+  :global(.octop-card-body) {
+    padding: 22px;
+  }
+
+  :global(.ant-statistic-title),
+  :global(.octop-statistic-title) {
+    margin-bottom: 10px;
+    color: var(--fn-text-secondary);
+    font-size: 14px;
+  }
+
+  :global(.ant-statistic-content),
+  :global(.octop-statistic-content) {
+    color: var(--fn-text-primary);
+    font-size: 30px;
+    font-weight: 650;
+    line-height: 1.1;
+  }
+}
+
+.statIcon {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 1;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--stat-accent);
+  background: var(--stat-tint);
+}
+
+.membersCard {
+  --stat-accent: #ff6254;
+  --stat-tint: rgba(255, 98, 84, 0.1);
+}
+
+.albumsCard {
+  --stat-accent: #f09a45;
+  --stat-tint: rgba(240, 154, 69, 0.11);
+}
+
+.tasksCard {
+  --stat-accent: #4c9f88;
+  --stat-tint: rgba(76, 159, 136, 0.1);
+}
+
+.memoriesCard {
+  --stat-accent: #8a78c8;
+  --stat-tint: rgba(138, 120, 200, 0.1);
 }
 
 .panelCard {
@@ -280,6 +426,39 @@
   .statsGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+
+  .overview {
+    padding-top: 0;
+  }
+
+  .overviewHeader {
+    min-height: 108px;
+    padding: 20px;
+    border-radius: 14px;
+  }
+
+  .familyMark {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+
+  .statCard {
+    min-height: 124px;
+    border-radius: 14px;
+
+    :global(.ant-card-body),
+    :global(.octop-card-body) {
+      padding: 18px;
+    }
+  }
+
+  .statIcon {
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
   }
 
   .quickForm {
