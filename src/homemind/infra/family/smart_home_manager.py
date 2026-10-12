@@ -363,6 +363,20 @@ class FamilySmartHomeManager:
         adapter = self._adapter(provider)
         if adapter is None:
             raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "this provider is not connected")
+        import asyncio
+
+        try:
+            # Validate the catalogue entry and payload before reserving the
+            # durable key. Invalid input must not poison a key forever.
+            asyncio.run(
+                adapter.preview_command(
+                    entity.external_entity_id,
+                    command_name,
+                    dict(payload or {}),
+                )
+            )
+        except CommandNotAllowed as exc:
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, str(exc)) from exc
         if not self.repo.reserve_command(
             idempotency_key,
             provider_id=provider.id,
@@ -374,8 +388,6 @@ class FamilySmartHomeManager:
                 "reason": "already_submitted",
                 "journal_status": self.repo.command_status(idempotency_key),
             }
-        import asyncio
-
         try:
             result = asyncio.run(
                 adapter.execute_command(

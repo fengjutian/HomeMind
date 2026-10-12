@@ -5,8 +5,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from homemind.infra.db.migrate import _discover, run_migrations
-from homemind.infra.db.migrate import _MIGRATIONS_DIR as HM_MIGRATIONS_DIR
+from homemind.infra.db.migrate import (
+    _MIGRATIONS_DIR as HM_MIGRATIONS_DIR,
+)
+from homemind.infra.db.migrate import (
+    _discover,
+    run_migrations,
+)
 from octop.infra.db.migrate import run_migrations as run_octop_migrations
 from octop.infra.db.pool import SqlitePool
 

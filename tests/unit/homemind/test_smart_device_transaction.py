@@ -59,7 +59,7 @@ class _Manager:
         self, provider: Any, entity: Any, command: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
         self.verified.append((entity.id, command))
-        return {"state": "on"}
+        return {"verified": True, "state": "on"}
 
 
 def _entity(domain: str = "light", family_id: str = "fam1") -> Any:
@@ -192,7 +192,8 @@ class TestExecuteAndVerify:
         handler, manager = _handler()
         out = handler.verify(_ctx(), {"entity_id": "ent1", "command": "turn_on"})
         assert manager.verified == [("ent1", "turn_on")]
-        assert out["confirmed"] == {"state": "on"}
+        assert out["verified"] is True
+        assert out["confirmed"] == {"verified": True, "state": "on"}
 
     def test_preview_reports_risk_and_target(self) -> None:
         handler, _ = _handler()

@@ -130,7 +130,12 @@ class SmartDeviceCommandHandler:
             command,
             dict(payload.get("payload") or {}),
         )
-        return {"entity_id": entity_id, "command": command, "confirmed": confirmation}
+        return {
+            "entity_id": entity_id,
+            "command": command,
+            "verified": bool(confirmation.get("verified", False)),
+            "confirmed": confirmation,
+        }
 
     def _entity(self, entity_id: str, family_id: str) -> Any:
         """Fetch the entity, refusing cross-family access."""

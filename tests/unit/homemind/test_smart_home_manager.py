@@ -368,6 +368,38 @@ def test_command_reservation_survives_a_new_adapter_instance(env) -> None:  # no
     assert calls == ["/api/services/light/turn_on"]
 
 
+def test_invalid_payload_does_not_reserve_the_idempotency_key(env) -> None:  # noqa: ANN001
+    provider = env["manager"].create_provider(
+        env["family"].id, env["owner"], kind="HOME_ASSISTANT", name="Home"
+    )
+    entity = env["repo"].upsert_entity(
+        env["family"].id,
+        provider_id=provider.id,
+        external_entity_id="climate.hall",
+        domain="climate",
+        name="Thermostat",
+    )
+
+    manager = FamilySmartHomeManager(
+        env["families"],
+        env["repo"],
+        adapter_factory=lambda _provider: HomeAssistantAdapter(
+            base_url="http://ha.local",
+            token="token",
+        ),
+    )
+    with pytest.raises(HomeMindError):
+        manager.execute_command(
+            provider,
+            entity,
+            "set_temperature",
+            {},
+            idempotency_key="invalid-command",
+        )
+
+    assert env["repo"].command_status("invalid-command") is None
+
+
 # ------------------------------------------------------------------ policy
 
 
