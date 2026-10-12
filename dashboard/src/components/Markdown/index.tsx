@@ -398,6 +398,156 @@ const Markdown = memo(function Markdown({
   const remarkPlugins = useMemo(() => [remarkGfm, ...mathRemark], [mathRemark]);
   const rehypePlugins = useMemo(() => [...mathRehype], [mathRehype]);
 
+  const markdownComponents = useMemo(
+    () => ({
+      code(
+        codeProps: React.ComponentPropsWithoutRef<"code"> & {
+          className?: string;
+        },
+      ) {
+        const { className: codeClassName, children, ...props } = codeProps;
+        const match = /language-(\w+)/.exec(codeClassName || "");
+        const codeString = String(children).replace(/\n$/, "");
+
+        // Mermaid blocks — show source code while streaming to avoid parse errors
+        if (match && match[1] === "mermaid") {
+          if (isStreaming) {
+            return (
+              <div className={styles.codeBlockWrapper}>
+                <div className={styles.codeBlockHeader}>
+                  <span className={styles.codeBlockLang}>mermaid</span>
+                  <CodeCopyButton code={codeString} />
+                </div>
+                <HighlightedCode language="text" code={codeString} plain />
+              </div>
+            );
+          }
+          return (
+            <MermaidBlock
+              code={codeString}
+              onRegenerate={onRegenerateMermaid}
+            />
+          );
+        }
+
+        // Fenced code blocks with language
+        if (match) {
+          const shellLang = isShellLanguage(match[1]);
+          return (
+            <div className={styles.codeBlockWrapper}>
+              <div className={styles.codeBlockHeader}>
+                <span className={styles.codeBlockLang}>{match[1]}</span>
+                <div className={styles.codeBlockActions}>
+                  {shellLang && (
+                    <ShellRunButton
+                      code={codeString}
+                      onRun={onRunShellCommand}
+                      disabled={shellCommandDisabled}
+                      disabledTitle={shellCommandDisabledTitle}
+                      label={runLabel}
+                    />
+                  )}
+                  <CodeCopyButton code={codeString} />
+                </div>
+              </div>
+              <HighlightedCode
+                language={match[1]}
+                code={codeString}
+                plain={!!isStreaming}
+              />
+            </div>
+          );
+        }
+
+        // Fenced code blocks without language
+        if (
+          "node" in props &&
+          (props as Record<string, unknown>).node &&
+          codeString.includes("\n")
+        ) {
+          return (
+            <div className={styles.codeBlockWrapper}>
+              <div className={styles.codeBlockHeader}>
+                <span className={styles.codeBlockLang}>text</span>
+                <CodeCopyButton code={codeString} />
+              </div>
+              <HighlightedCode
+                language="text"
+                code={codeString}
+                plain={!!isStreaming}
+              />
+            </div>
+          );
+        }
+
+        // Inline code
+        return (
+          <code className={styles.inlineCode} {...props}>
+            {children}
+          </code>
+        );
+      },
+
+      // Table styling
+      table({
+        children,
+        ...props
+      }: {
+        children?: ReactNode;
+      } & TableHTMLAttributes<HTMLTableElement>) {
+        return (
+          <div className={styles.tableWrapper}>
+            <table {...props}>{children}</table>
+          </div>
+        );
+      },
+
+      // Auth-required workspace downloads use blob fetch; other links open
+      // in a new tab (JWT lives in Authorization, not the browser navigation).
+      a({
+        children,
+        href,
+        ...props
+      }: {
+        children?: ReactNode;
+        href?: string;
+      } & AnchorHTMLAttributes<HTMLAnchorElement>) {
+        if (isAuthDownloadHref(href)) {
+          return (
+            <AuthFileDownloadLink url={href!} style={{ color: "inherit" }}>
+              {children}
+            </AuthFileDownloadLink>
+          );
+        }
+        return (
+          <a href={href} target="_blank" rel="noreferrer" {...props}>
+            {children}
+          </a>
+        );
+      },
+
+      // Images: convert file:// paths to accessible HTTP URLs
+      img({
+        src,
+        alt,
+        ...props
+      }: {
+        src?: string;
+        alt?: string;
+      } & ImgHTMLAttributes<HTMLImageElement>) {
+        return <MarkdownImage src={src} alt={alt} {...props} />;
+      },
+    }),
+    [
+      isStreaming,
+      onRegenerateMermaid,
+      onRunShellCommand,
+      shellCommandDisabled,
+      shellCommandDisabledTitle,
+      runLabel,
+    ],
+  );
+
   return (
     <div
       className={`${styles.markdownBody} ${
@@ -408,145 +558,7 @@ const Markdown = memo(function Markdown({
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
-        components={{
-          code(
-            codeProps: React.ComponentPropsWithoutRef<"code"> & {
-              className?: string;
-            },
-          ) {
-            const { className: codeClassName, children, ...props } = codeProps;
-            const match = /language-(\w+)/.exec(codeClassName || "");
-            const codeString = String(children).replace(/\n$/, "");
-
-            // Mermaid blocks — show source code while streaming to avoid parse errors
-            if (match && match[1] === "mermaid") {
-              if (isStreaming) {
-                return (
-                  <div className={styles.codeBlockWrapper}>
-                    <div className={styles.codeBlockHeader}>
-                      <span className={styles.codeBlockLang}>mermaid</span>
-                      <CodeCopyButton code={codeString} />
-                    </div>
-                    <HighlightedCode language="text" code={codeString} plain />
-                  </div>
-                );
-              }
-              return (
-                <MermaidBlock
-                  code={codeString}
-                  onRegenerate={onRegenerateMermaid}
-                />
-              );
-            }
-
-            // Fenced code blocks with language
-            if (match) {
-              const shellLang = isShellLanguage(match[1]);
-              return (
-                <div className={styles.codeBlockWrapper}>
-                  <div className={styles.codeBlockHeader}>
-                    <span className={styles.codeBlockLang}>{match[1]}</span>
-                    <div className={styles.codeBlockActions}>
-                      {shellLang && (
-                        <ShellRunButton
-                          code={codeString}
-                          onRun={onRunShellCommand}
-                          disabled={shellCommandDisabled}
-                          disabledTitle={shellCommandDisabledTitle}
-                          label={runLabel}
-                        />
-                      )}
-                      <CodeCopyButton code={codeString} />
-                    </div>
-                  </div>
-                  <HighlightedCode
-                    language={match[1]}
-                    code={codeString}
-                    plain={!!isStreaming}
-                  />
-                </div>
-              );
-            }
-
-            // Fenced code blocks without language
-            if (
-              "node" in props &&
-              (props as Record<string, unknown>).node &&
-              codeString.includes("\n")
-            ) {
-              return (
-                <div className={styles.codeBlockWrapper}>
-                  <div className={styles.codeBlockHeader}>
-                    <span className={styles.codeBlockLang}>text</span>
-                    <CodeCopyButton code={codeString} />
-                  </div>
-                  <HighlightedCode
-                    language="text"
-                    code={codeString}
-                    plain={!!isStreaming}
-                  />
-                </div>
-              );
-            }
-
-            // Inline code
-            return (
-              <code className={styles.inlineCode} {...props}>
-                {children}
-              </code>
-            );
-          },
-
-          // Table styling
-          table({
-            children,
-            ...props
-          }: {
-            children?: ReactNode;
-          } & TableHTMLAttributes<HTMLTableElement>) {
-            return (
-              <div className={styles.tableWrapper}>
-                <table {...props}>{children}</table>
-              </div>
-            );
-          },
-
-          // Auth-required workspace downloads use blob fetch; other links open
-          // in a new tab (JWT lives in Authorization, not the browser navigation).
-          a({
-            children,
-            href,
-            ...props
-          }: {
-            children?: ReactNode;
-            href?: string;
-          } & AnchorHTMLAttributes<HTMLAnchorElement>) {
-            if (isAuthDownloadHref(href)) {
-              return (
-                <AuthFileDownloadLink url={href!} style={{ color: "inherit" }}>
-                  {children}
-                </AuthFileDownloadLink>
-              );
-            }
-            return (
-              <a href={href} target="_blank" rel="noreferrer" {...props}>
-                {children}
-              </a>
-            );
-          },
-
-          // Images: convert file:// paths to accessible HTTP URLs
-          img({
-            src,
-            alt,
-            ...props
-          }: {
-            src?: string;
-            alt?: string;
-          } & ImgHTMLAttributes<HTMLImageElement>) {
-            return <MarkdownImage src={src} alt={alt} {...props} />;
-          },
-        }}
+        components={markdownComponents}
       >
         {renderContent}
       </ReactMarkdown>

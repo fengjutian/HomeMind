@@ -2,12 +2,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import Markdown from "./index";
 
+const mermaidMocks = vi.hoisted(() => ({
+  parse: vi.fn(async () => true),
+  render: vi.fn(async () => ({
+    svg: '<svg viewBox="0 0 800 400"><text data-testid="diagram-label">Diagram</text></svg>',
+  })),
+}));
+
 vi.mock("./mermaidLoader", () => ({
   loadMermaid: vi.fn(async () => ({
-    parse: vi.fn(async () => true),
-    render: vi.fn(async () => ({
-      svg: '<svg viewBox="0 0 800 400"><text data-testid="diagram-label">Diagram</text></svg>',
-    })),
+    parse: mermaidMocks.parse,
+    render: mermaidMocks.render,
   })),
 }));
 
@@ -43,6 +48,24 @@ describe("Mermaid controls", () => {
     expect(screen.getByText("125%")).toBeInTheDocument();
     fireEvent.click(zoomOut);
     expect(screen.getByText("100%")).toBeInTheDocument();
+  });
+
+  it("keeps the diagram instance and zoom across parent rerenders", async () => {
+    const content = "```mermaid\nflowchart TD\nA-->B\n```";
+    const rendersBefore = mermaidMocks.render.mock.calls.length;
+    const view = render(<Markdown content={content} style={{ opacity: 1 }} />);
+
+    await screen.findByText("Diagram");
+    expect(mermaidMocks.render).toHaveBeenCalledTimes(rendersBefore + 1);
+    fireEvent.click(screen.getByRole("button", { name: "chat.mermaidZoomIn" }));
+    expect(screen.getByText("125%")).toBeInTheDocument();
+
+    view.rerender(<Markdown content={content} style={{ opacity: 1 }} />);
+
+    expect(screen.getByText("125%")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mermaidMocks.render).toHaveBeenCalledTimes(rendersBefore + 1),
+    );
   });
 
   it("selects the diagram and toggles fullscreen", async () => {
