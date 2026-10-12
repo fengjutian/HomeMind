@@ -35,7 +35,7 @@ const observer = new IntersectionObserver((entries) => {
   });
 }, { threshold: 0.12 });
 
-document.querySelectorAll(".manifesto article, .feature, .steps li, .section-heading, .how-copy").forEach((element) => observer.observe(element));
+document.querySelectorAll(".manifesto article, .feature, .day-card, .control-copy, .control-map, .steps li, .section-heading, .how-copy, .faq-intro, .faq-list").forEach((element) => observer.observe(element));
 
 const header = document.querySelector(".site-header");
 window.addEventListener("scroll", () => header.classList.toggle("is-scrolled", window.scrollY > 24), { passive: true });

@@ -27,6 +27,17 @@
     "lastCommand": "Last command",
     "failureReason": "Failure reason",
     "never": "Never",
+    "subscriptionStates": {
+      "idle": "Idle",
+      "connecting": "Connecting",
+      "subscribed": "Subscribed",
+      "reconnecting": "Reconnecting",
+      "stopped": "Stopped"
+    },
+    "commandStates": {
+      "COMPLETED": "Completed",
+      "FAILED": "Failed"
+    },
     "deleteConfirm": "Remove this connection and its mapped devices?",
     "deleted": "Connection removed"
   },

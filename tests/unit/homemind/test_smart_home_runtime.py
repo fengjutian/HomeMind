@@ -48,6 +48,7 @@ class _Repo:
     def __init__(self, providers: list[SmartProviderRow]) -> None:
         self.providers = providers
         self.sync_results: list[dict[str, Any]] = []
+        self.subscription_updates: list[dict[str, Any]] = []
         self.state_updates: list[tuple[str, dict[str, Any], int | None]] = []
         self.entity = cast(SmartEntityRow, type("Entity", (), {"id": "entity-1"})())
 
@@ -56,6 +57,13 @@ class _Repo:
 
     def record_sync_result(self, provider_id: str, **values: Any) -> None:
         self.sync_results.append({"provider_id": provider_id, **values})
+
+    def record_subscription_status(
+        self, provider_id: str, status: str, **values: Any
+    ) -> None:
+        self.subscription_updates.append(
+            {"provider_id": provider_id, "status": status, **values}
+        )
 
     def get_entity_by_external(
         self, provider_id: str, external_entity_id: str
@@ -110,6 +118,7 @@ async def test_manager_applies_live_state_and_stops() -> None:
                         "state": "on",
                         "attributes": {"brightness": 120},
                         "last_changed": "2026-10-12T08:00:00Z",
+                        "last_updated": "2026-10-12T08:00:01Z",
                     },
                 },
             },
@@ -131,6 +140,11 @@ async def test_manager_applies_live_state_and_stops() -> None:
         )
     ]
     assert socket.closed is True
+    assert any(update["status"] == "subscribed" for update in repo.subscription_updates)
+    assert any(
+        update.get("event_at") == 1791792001 for update in repo.subscription_updates
+    )
+    assert repo.subscription_updates[-1]["status"] == "stopped"
 
 
 async def test_manager_marks_a_dangling_secret_for_reauthentication() -> None:

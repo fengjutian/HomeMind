@@ -366,6 +366,46 @@ def test_command_reservation_survives_a_new_adapter_instance(env) -> None:  # no
         "journal_status": "COMPLETED",
     }
     assert calls == ["/api/services/light/turn_on"]
+    observed = env["repo"].get_provider(provider.id)
+    assert observed.last_command_status == "COMPLETED"
+    assert observed.last_command_duration_ms is not None
+    assert observed.last_command_error_code is None
+
+
+def test_failed_command_records_sanitized_observability(env) -> None:  # noqa: ANN001
+    provider = env["manager"].create_provider(
+        env["family"].id, env["owner"], kind="HOME_ASSISTANT", name="Home"
+    )
+    entity = env["repo"].upsert_entity(
+        env["family"].id,
+        provider_id=provider.id,
+        external_entity_id="light.hall",
+        domain="light",
+        name="Hall",
+    )
+    adapter = HomeAssistantAdapter(base_url="http://private-ha.local", token="token")
+
+    async def fail(_path: str, _body: Any) -> None:
+        raise OSError("private-ha.local must not be persisted")
+
+    adapter._post = fail  # noqa: SLF001
+    manager = FamilySmartHomeManager(
+        env["families"], env["repo"], adapter_factory=lambda _provider: adapter
+    )
+
+    with pytest.raises(OSError):
+        manager.execute_command(
+            provider,
+            entity,
+            "turn_on",
+            {},
+            idempotency_key="failed-command",
+        )
+
+    observed = env["repo"].get_provider(provider.id)
+    assert observed.last_command_status == "FAILED"
+    assert observed.last_command_error_code == "OSError"
+    assert "private-ha.local" not in str(observed)
 
 
 def test_invalid_payload_does_not_reserve_the_idempotency_key(env) -> None:  # noqa: ANN001

@@ -169,8 +169,21 @@ export default function FamilySmartHome() {
                   title={
                     <Space wrap>
                       <span>{provider.name}</span>
-                      <Tag color={provider.last_error ? "red" : "green"}>
-                        {provider.last_error ?? t("smartHome.ready")}
+                      <Tag
+                        color={
+                          provider.subscription_status === "subscribed"
+                            ? "green"
+                            : provider.subscription_status === "reconnecting"
+                            ? "red"
+                            : "gold"
+                        }
+                      >
+                        {provider.subscription_status
+                          ? t(
+                              `smartHome.subscriptionStates.${provider.subscription_status}`,
+                              provider.subscription_status,
+                            )
+                          : t("smartHome.ready")}
                       </Tag>
                     </Space>
                   }
@@ -180,11 +193,17 @@ export default function FamilySmartHome() {
                         {provider.base_url}
                       </Typography.Text>
                       <Typography.Text type="secondary">
-                        {t("smartHome.subscriptionStatus")}: {provider.subscription_status} ·{" "}
-                        {t("smartHome.reconnectCount")}: {provider.subscription_reconnect_count}
+                        {t("smartHome.subscriptionStatus")}:{" "}
+                        {t(
+                          `smartHome.subscriptionStates.${provider.subscription_status}`,
+                          provider.subscription_status,
+                        )} ·{" "}
+                        {t("smartHome.reconnectCount")}:{" "}
+                        {provider.subscription_reconnect_count}
                       </Typography.Text>
                       <Typography.Text type="secondary">
-                        {t("smartHome.lastEvent")}: {provider.subscription_last_event_at
+                        {t("smartHome.lastEvent")}:{" "}
+                        {provider.subscription_last_event_at
                           ? formatServerDateTime(
                               provider.subscription_last_event_at,
                               serverTimezone,
@@ -192,7 +211,13 @@ export default function FamilySmartHome() {
                           : t("smartHome.never")}
                       </Typography.Text>
                       <Typography.Text type="secondary">
-                        {t("smartHome.lastCommand")}: {provider.last_command_status ?? t("smartHome.never")}
+                        {t("smartHome.lastCommand")}:{" "}
+                        {provider.last_command_status
+                          ? t(
+                              `smartHome.commandStates.${provider.last_command_status}`,
+                              provider.last_command_status,
+                            )
+                          : t("smartHome.never")}
                         {provider.last_command_duration_ms !== null
                           ? ` · ${provider.last_command_duration_ms} ms`
                           : ""}
@@ -202,7 +227,8 @@ export default function FamilySmartHome() {
                       </Typography.Text>
                       {provider.subscription_error_code ? (
                         <Typography.Text type="danger">
-                          {t("smartHome.failureReason")}: {provider.subscription_error_code}
+                          {t("smartHome.failureReason")}:{" "}
+                          {provider.subscription_error_code}
                         </Typography.Text>
                       ) : null}
                     </Space>
