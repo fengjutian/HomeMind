@@ -391,6 +391,12 @@ class FamilyTransactionManager:
         self.family.require_manager(family_id, user)
         return self.repo.list_approvals(family_id, status)
 
+    def list_approvals_with_transactions(
+        self, family_id: str, user: User
+    ) -> list[tuple[FamilyApprovalRow, FamilyTransactionRow]]:
+        self.family.require_manager(family_id, user)
+        return self.repo.list_approvals_with_transactions(family_id)
+
     def list_audit(self, family_id: str, user: User) -> list[FamilyAuditRow]:
         self.family.require_manager(family_id, user)
         return self.repo.list_audit(family_id)

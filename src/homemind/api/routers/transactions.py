@@ -116,13 +116,13 @@ async def list_approvals(
 )
 async def approval_dashboard(family_id: str, server: Server, user: CurrentUser) -> object:
     manager = _manager(server)
-    approvals = manager.list_approvals(family_id, user, None)
+    rows = manager.list_approvals_with_transactions(family_id, user)
     return [
         {
-            "approval": row,
-            "transaction": manager.get_transaction(family_id, row.transaction_id, user),
+            "approval": approval,
+            "transaction": transaction,
         }
-        for row in approvals
+        for approval, transaction in rows
     ]
 
 

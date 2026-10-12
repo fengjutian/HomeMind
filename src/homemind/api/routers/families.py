@@ -30,15 +30,46 @@ from homemind.infra.family.permissions import (
     FamilyPermissionEvaluator,
     PermissionDecision,
 )
-from octop.api.deps import current_user, get_server
+from octop.api.deps import current_user, get_server, sign_token
 from octop.infra.server import OctopServer
 from octop.infra.users.identity import User
 
 router = APIRouter()
 
+MEDIA_TOKEN_TTL_SECONDS = 120
+Server = Annotated[OctopServer, Depends(get_server)]
+CurrentUser = Annotated[User, Depends(current_user)]
+
 
 class _RowModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+
+class MediaTokenResponse(BaseModel):
+    access_token: str
+    expires_in: int
+
+
+@router.post(
+    "/media-token",
+    response_model=MediaTokenResponse,
+    summary="Create a short-lived token for media elements",
+)
+async def create_media_token(server: Server, user: CurrentUser) -> MediaTokenResponse:
+    assert server.services is not None
+    secret = server.services.secret_repo.get("jwt")
+    if secret is None:
+        raise RuntimeError("jwt secret missing")
+    return MediaTokenResponse(
+        access_token=sign_token(
+            secret,
+            sub=user.id,
+            uname=user.username,
+            role=user.role,
+            ttl_seconds=MEDIA_TOKEN_TTL_SECONDS,
+        ),
+        expires_in=MEDIA_TOKEN_TTL_SECONDS,
+    )
 
 
 class FamilyResponse(_RowModel):
@@ -278,10 +309,6 @@ def _asset_response(row: Any) -> FamilyAssetResponse:
         visibility=row.visibility,
         status=row.status,
     )
-
-
-Server = Annotated[OctopServer, Depends(get_server)]
-CurrentUser = Annotated[User, Depends(current_user)]
 
 
 @router.post("", response_model=FamilyResponse, status_code=201, summary="Create a family")

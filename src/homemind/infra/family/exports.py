@@ -290,6 +290,7 @@ class FamilyExportManager:
         *,
         bundle: Path,
         dry_run: bool = True,
+        import_id: str | None = None,
     ) -> dict[str, Any]:
         """Validate a bundle and stage it for a manager's review.
 
@@ -305,7 +306,7 @@ class FamilyExportManager:
 
         from octop.infra.utils.ulid import new_ulid  # noqa: PLC0415
 
-        import_id = new_ulid()
+        import_id = import_id or new_ulid()
         with self._services.db.transaction() as conn:
             conn.execute(
                 "INSERT INTO homemind_family_imports("
@@ -691,6 +692,11 @@ class FamilyExportManager:
         """
 
         return self._root / _safe_segment(family_id) / _safe_segment(export_id)
+
+    def import_bundle_dir(self, import_id: str) -> Path:
+        """Return the server-owned staging directory for an import."""
+
+        return self._root / "imports" / _safe_segment(import_id)
 
 
 def _safe_segment(value: str) -> str:

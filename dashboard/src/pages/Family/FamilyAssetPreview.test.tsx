@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App } from "antd";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,7 +49,7 @@ describe("FamilyAssetPreview", () => {
     getAssetThumbnailUrl.mockClear();
   });
 
-  it("gives the video element a direct range-capable URL", () => {
+  it("gives the video element a direct range-capable URL", async () => {
     render(
       <App>
         <FamilyAssetPreview
@@ -60,9 +60,11 @@ describe("FamilyAssetPreview", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "trip.mp4" }));
-    expect(document.querySelector("video")).toHaveAttribute(
-      "src",
-      "https://server.test/video.mp4?access_token=short",
+    await waitFor(() =>
+      expect(document.querySelector("video")).toHaveAttribute(
+        "src",
+        "https://server.test/video.mp4?access_token=short",
+      ),
     );
     expect(getAssetContentUrl).toHaveBeenCalledWith("family-1", "video-1");
   });

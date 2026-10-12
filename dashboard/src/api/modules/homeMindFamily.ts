@@ -1,9 +1,40 @@
 import { getApiUrl } from "../config";
 import { getAuthToken, request, requestBlob } from "../request";
 
-const authenticatedUrl = (path: string): string => {
+let mediaToken: { owner: string; value: string; expiresAt: number } | null = null;
+let mediaTokenRequest: { owner: string; promise: Promise<string> } | null = null;
+
+const getMediaToken = async (): Promise<string> => {
+  const owner = getAuthToken();
+  if (
+    mediaToken?.owner === owner &&
+    mediaToken.expiresAt > Date.now() + 15_000
+  )
+    return mediaToken.value;
+  if (mediaTokenRequest?.owner !== owner) {
+    const promise = request<{ access_token: string; expires_in: number }>(
+      `${root}/media-token`,
+      { method: "POST" },
+    ).then((result) => {
+      mediaToken = {
+        owner,
+        value: result.access_token,
+        expiresAt: Date.now() + result.expires_in * 1000,
+      };
+      return result.access_token;
+    });
+    mediaTokenRequest = { owner, promise };
+    const clearRequest = () => {
+      if (mediaTokenRequest?.promise === promise) mediaTokenRequest = null;
+    };
+    void promise.then(clearRequest, clearRequest);
+  }
+  return mediaTokenRequest.promise;
+};
+
+const authenticatedUrl = async (path: string): Promise<string> => {
   const url = getApiUrl(path);
-  const token = getAuthToken();
+  const token = await getMediaToken();
   if (!token) return url;
   return `${url}${
     url.includes("?") ? "&" : "?"
@@ -537,9 +568,9 @@ export const homeMindFamilyApi = {
       options,
       onProgress,
     ),
-  getAssetContentUrl: (familyId: string, assetId: string) =>
+  getAssetContentUrl: async (familyId: string, assetId: string) =>
     authenticatedUrl(`${root}/${familyId}/assets/${assetId}/content`),
-  getAssetThumbnailUrl: (familyId: string, assetId: string) =>
+  getAssetThumbnailUrl: async (familyId: string, assetId: string) =>
     authenticatedUrl(`${root}/${familyId}/assets/${assetId}/thumbnail`),
   analyzePhotoLocal: (familyId: string, assetId: string) =>
     request<PhotoIntelligence>(

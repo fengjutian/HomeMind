@@ -555,6 +555,47 @@ class FamilyTransactionRepo:
             rows = conn.execute(sql, params).fetchall()
         return map_rows(rows, FamilyApprovalRow)
 
+    def list_approvals_with_transactions(
+        self, family_id: str
+    ) -> list[tuple[FamilyApprovalRow, FamilyTransactionRow]]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT a.approval_id AS a_approval_id, a.transaction_id AS a_transaction_id, "
+                "a.family_id AS a_family_id, a.status AS a_status, "
+                "a.requested_by AS a_requested_by, a.decided_by AS a_decided_by, "
+                "a.reason AS a_reason, a.created_at AS a_created_at, "
+                "a.decided_at AS a_decided_at, "
+                "a.approval_expires_at AS a_approval_expires_at, t.* "
+                "FROM homemind_family_approvals a "
+                "JOIN homemind_family_transactions t ON t.transaction_id = a.transaction_id "
+                "WHERE a.family_id = ? ORDER BY a.created_at DESC",
+                (family_id,),
+            ).fetchall()
+        result: list[tuple[FamilyApprovalRow, FamilyTransactionRow]] = []
+        for row in rows:
+            approval = FamilyApprovalRow(
+                id=str(row["a_approval_id"]),
+                transaction_id=str(row["a_transaction_id"]),
+                family_id=str(row["a_family_id"]),
+                status=str(row["a_status"]),
+                requested_by=int(row["a_requested_by"]),
+                decided_by=(
+                    int(row["a_decided_by"]) if row["a_decided_by"] is not None else None
+                ),
+                reason=row["a_reason"],
+                created_at=int(row["a_created_at"]),
+                decided_at=(
+                    int(row["a_decided_at"]) if row["a_decided_at"] is not None else None
+                ),
+                approval_expires_at=(
+                    int(row["a_approval_expires_at"])
+                    if row["a_approval_expires_at"] is not None
+                    else None
+                ),
+            )
+            result.append((approval, FamilyTransactionRow.from_row(row)))
+        return result
+
     def decide_approval(
         self, approval_id: str, status: str, decided_by: int, reason: str | None
     ) -> FamilyApprovalRow:

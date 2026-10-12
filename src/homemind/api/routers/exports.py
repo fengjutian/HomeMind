@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import shutil
 import tempfile
 import zipfile
@@ -19,7 +20,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
@@ -82,17 +83,6 @@ class FamilyImportStageResponse(BaseModel):
     format: str
     version: int
     conflicts: list[dict[str, object]]
-
-
-class FamilyImportDecideBody(BaseModel):
-    bundle_path: str = Field(
-        min_length=1,
-        max_length=400,
-        description=(
-            "Server-side path returned by the stage call. The client may "
-            "not supply an arbitrary filesystem path."
-        ),
-    )
 
 
 def _services(server: OctopServer) -> HomeMindServices:
@@ -242,7 +232,15 @@ async def stage_import(
     The upload is unpacked with entry names validated, because an
     uploaded archive is untrusted input.
     """
-    target = Path(tempfile.gettempdir()) / f"homemind-import-{family_id}-{_stamp()}.zip"
+    from octop.infra.utils.ulid import new_ulid  # noqa: PLC0415
+
+    manager = _manager(server)
+    import_id = new_ulid()
+    destination = manager.import_bundle_dir(import_id)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temp_name = tempfile.mkstemp(prefix="homemind-import-", suffix=".zip")
+    os.close(descriptor)
+    target = Path(temp_name)
     try:
         size = 0
         with target.open("wb") as output:
@@ -251,18 +249,24 @@ async def stage_import(
                 if size > MAX_IMPORT_BYTES:
                     raise HTTPException(status_code=413, detail="bundle is too large")
                 await asyncio.to_thread(output.write, chunk)
-        await asyncio.to_thread(_extract_import_bundle, target, target.parent / target.stem)
+        await asyncio.to_thread(_extract_import_bundle, target, destination)
+        staged = await asyncio.to_thread(
+            manager.stage_import,
+            family_id,
+            user,
+            bundle=destination,
+            dry_run=dry_run,
+            import_id=import_id,
+        )
     except zipfile.BadZipFile as exc:
+        await asyncio.to_thread(_cleanup, destination)
         raise HTTPException(status_code=400, detail="not a valid zip archive") from exc
+    except Exception:
+        await asyncio.to_thread(_cleanup, destination)
+        raise
     finally:
         with contextlib.suppress(OSError):
             target.unlink()
-    staged = _manager(server).stage_import(
-        family_id,
-        user,
-        bundle=target.parent / target.stem,
-        dry_run=dry_run,
-    )
     manifest = staged["manifest"]
     return FamilyImportStageResponse(
         import_id=staged["import_id"],
@@ -286,16 +290,15 @@ async def stage_import(
 async def apply_import(
     family_id: str,
     import_id: str,
-    body: FamilyImportDecideBody,
     server: Server,
     user: CurrentUser,
 ) -> dict[str, object]:
-    result = _manager(server).apply_import(
-        family_id,
-        import_id,
-        user,
-        bundle=Path(body.bundle_path),
+    manager = _manager(server)
+    bundle = manager.import_bundle_dir(import_id)
+    result = await asyncio.to_thread(
+        manager.apply_import, family_id, import_id, user, bundle=bundle
     )
+    await asyncio.to_thread(_cleanup, bundle)
     return result
 
 
@@ -309,7 +312,10 @@ async def reject_import(
     server: Server,
     user: CurrentUser,
 ) -> dict[str, object]:
-    return _manager(server).reject_import(family_id, import_id, user)
+    manager = _manager(server)
+    result = await asyncio.to_thread(manager.reject_import, family_id, import_id, user)
+    await asyncio.to_thread(_cleanup, manager.import_bundle_dir(import_id))
+    return result
 
 
 def _stamp() -> str:
@@ -331,6 +337,5 @@ __all__ = [
     "router",
     "FamilyExportListItem",
     "FamilyExportResponse",
-    "FamilyImportDecideBody",
     "FamilyImportStageResponse",
 ]

@@ -1,6 +1,7 @@
-import { Button, Image, Modal, Progress, Space, Spin, Typography } from "antd";
+import { App, Button, Image, Modal, Progress, Space, Spin, Typography } from "antd";
 import { Film, Music, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   homeMindFamilyApi,
@@ -24,11 +25,14 @@ export default function FamilyAssetPreview({
   const containerRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [src, setSrc] = useState("");
+  const [originalSrc, setOriginalSrc] = useState("");
   const [previewFailed, setPreviewFailed] = useState(false);
   const [mediaUrl, setMediaUrl] = useState("");
   const [playerOpen, setPlayerOpen] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [transferProgress, setTransferProgress] = useState(0);
+  const { message } = App.useApp();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const element = containerRef.current;
@@ -51,15 +55,45 @@ export default function FamilyAssetPreview({
 
   useEffect(() => {
     if (!visible || asset.asset_type !== "PHOTO") return;
-    setSrc(homeMindFamilyApi.getAssetThumbnailUrl(familyId, asset.id));
+    let cancelled = false;
+    setSrc("");
+    setOriginalSrc("");
     setPreviewFailed(false);
+    void Promise.all([
+      homeMindFamilyApi.getAssetThumbnailUrl(familyId, asset.id),
+      homeMindFamilyApi.getAssetContentUrl(familyId, asset.id),
+    ])
+      .then(([thumbnail, original]) => {
+        if (!cancelled) {
+          setSrc(thumbnail);
+          setOriginalSrc(original);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [asset.asset_type, asset.id, familyId, visible]);
 
-  const openPlayer = () => {
+  const openPlayer = async () => {
     setPlayerOpen(true);
     setMediaLoading(true);
     setTransferProgress(0);
-    setMediaUrl(homeMindFamilyApi.getAssetContentUrl(familyId, asset.id));
+    try {
+      setMediaUrl(await homeMindFamilyApi.getAssetContentUrl(familyId, asset.id));
+    } catch (error) {
+      setPlayerOpen(false);
+      setMediaLoading(false);
+      message.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handleMediaError = () => {
+    setMediaLoading(false);
+    setTransferProgress(0);
+    message.error(t("family.mediaLoadFailed", "媒体加载失败"));
   };
 
   const closePlayer = () => {
@@ -113,7 +147,7 @@ export default function FamilyAssetPreview({
           onCancel={closePlayer}
         >
           <Spin spinning={mediaLoading}>
-            {mediaUrl && transferProgress < 100 && (
+            {mediaLoading && mediaUrl && (
               <div className={styles.mediaTransferProgress}>
                 <Progress percent={transferProgress} status="active" />
               </div>
@@ -126,6 +160,7 @@ export default function FamilyAssetPreview({
                 autoPlay
                 preload="metadata"
                 onCanPlay={() => setMediaLoading(false)}
+                onError={handleMediaError}
                 onProgress={(event) =>
                   updateBufferedProgress(event.currentTarget)
                 }
@@ -139,6 +174,7 @@ export default function FamilyAssetPreview({
                 autoPlay
                 preload="metadata"
                 onCanPlay={() => setMediaLoading(false)}
+                onError={handleMediaError}
                 onProgress={(event) =>
                   updateBufferedProgress(event.currentTarget)
                 }
@@ -161,7 +197,7 @@ export default function FamilyAssetPreview({
           width={size}
           height={size}
           src={src}
-          fallback={homeMindFamilyApi.getAssetContentUrl(familyId, asset.id)}
+          fallback={originalSrc}
           onError={() => setPreviewFailed(true)}
           alt={asset.name}
           className={styles.assetThumbnail}
