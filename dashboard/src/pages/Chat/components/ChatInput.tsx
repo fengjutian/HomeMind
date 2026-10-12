@@ -747,14 +747,12 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             uploadProgress={uploadProgress}
             onCancelUpload={cancelUpload}
             selectedConnectors={selectedConnectors}
-            selectedModel={selectedModel}
             availableConnectors={availableConnectors}
             availableKnowledgeBases={availableKnowledgeBases}
             onRemoveAttachment={removeAttachment}
             onConnectorsChange={onConnectorsChange}
             selectedKnowledgeBaseIds={selectedKnowledgeBaseIds}
             onKnowledgeBaseIdsChange={onKnowledgeBaseIdsChange}
-            onModelChange={onModelChange}
           />
 
           <div className={styles.inputRow} style={{ position: "relative" }}>

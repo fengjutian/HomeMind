@@ -36,9 +36,11 @@ import type { AgentSubagentSummary } from "../../../api/modules/subagents";
 import {
   modelOptionLabel,
   modelOptionValue,
+  modelShortLabel,
 } from "../../../utils/modelOptions";
 import { customProviderLogo, getProviderLogo } from "../../../assets/providers";
 import ContextWindowRing from "./ContextWindowRing";
+import ContextChip from "./ContextChip";
 import SkillPickerPopover from "./SkillPickerPopover";
 import ExpertPickerPopover from "./ExpertPickerPopover";
 import SubagentPickerPopover from "./SubagentPickerPopover";
@@ -954,6 +956,14 @@ export default function ChatInputActionsRow({
             <Paperclip size={16} />
           </button>
         </Tooltip>
+        {selectedModel && onModelChange ? (
+          <ContextChip
+            variant="model"
+            icon={<Cpu size={12} strokeWidth={2.2} aria-hidden />}
+            label={modelShortLabel(selectedModel)}
+            onRemove={() => onModelChange(null)}
+          />
+        ) : null}
       </>
     );
   };

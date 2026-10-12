@@ -1,5 +1,5 @@
 import { Image } from "antd";
-import { X, FileText, Cpu } from "lucide-react";
+import { X, FileText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuthImageSrc } from "../../../hooks/useAuthImageSrc";
 import type { ChatAttachment } from "../hooks/useChat";
@@ -9,7 +9,6 @@ import { knowledgeIconForName } from "../../KnowledgeBases/knowledgeIcons";
 import { inferKindFromNameAndMime } from "../utils/chatAttachments";
 import { ChatMediaPlayer } from "./ChatMediaPlayer";
 import ContextChip from "./ContextChip";
-import { modelShortLabel } from "../../../utils/modelOptions";
 import type { UploadProgress } from "../../../api/resumableUploader";
 import styles from "../index.module.less";
 
@@ -30,7 +29,6 @@ interface ChatInputPreviewBarProps {
   onCancelUpload?: () => void;
   selectedConnectors: string[];
   selectedKnowledgeBaseIds: string[];
-  selectedModel?: string | null;
   availableConnectors?: {
     mcp_server_name: string;
     label: string;
@@ -41,7 +39,6 @@ interface ChatInputPreviewBarProps {
   onRemoveAttachment: (index: number) => void;
   onConnectorsChange?: (names: string[]) => void;
   onKnowledgeBaseIdsChange?: (ids: string[]) => void;
-  onModelChange?: (model: string | null) => void;
 }
 
 function ComposerImagePreview({
@@ -112,22 +109,14 @@ export default function ChatInputPreviewBar({
   onRemoveAttachment,
   onConnectorsChange,
   onKnowledgeBaseIdsChange,
-  selectedModel,
-  onModelChange,
 }: ChatInputPreviewBarProps) {
   const { t } = useTranslation();
-  // Show the chip whenever a model is explicitly selected, mirroring how
-  // connectors behave — not only when it differs from the
-  // agent default (that was the old "override" behavior).
-  const selectedModelValue = (selectedModel || "").trim();
-  const showModelChip = selectedModelValue.length > 0 && !!onModelChange;
 
   const hasContent =
     attachments.length > 0 ||
     uploading ||
     selectedConnectors.length > 0 ||
-    selectedKnowledgeBaseIds.length > 0 ||
-    showModelChip;
+    selectedKnowledgeBaseIds.length > 0;
 
   if (!hasContent) return null;
 
@@ -299,14 +288,6 @@ export default function ChatInputPreviewBar({
             />
           );
         })}
-      {showModelChip && (
-        <ContextChip
-          variant="model"
-          icon={<Cpu size={12} strokeWidth={2.2} aria-hidden />}
-          label={modelShortLabel(selectedModelValue)}
-          onRemove={() => onModelChange?.(null)}
-        />
-      )}
     </div>
   );
 }

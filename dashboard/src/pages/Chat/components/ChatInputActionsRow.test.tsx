@@ -71,6 +71,23 @@ describe("ChatInputActionsRow plus menu", () => {
     expect(screen.getByLabelText("快捷指令")).toBeInTheDocument();
   });
 
+  it("shows the selected model on the bottom toolbar and clears it", () => {
+    const onModelChange = vi.fn();
+    render(
+      <MemoryRouter>
+        <ChatInputActionsRow
+          {...baseProps}
+          selectedModel="Provider/compact-model"
+          onModelChange={onModelChange}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "compact-model" }));
+
+    expect(onModelChange).toHaveBeenCalledWith(null);
+  });
+
   it("opens a flyout beside the plus menu instead of a window drawer", async () => {
     render(
       <MemoryRouter>
