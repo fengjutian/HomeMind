@@ -2,6 +2,27 @@
   "app": {
     "pageTitle": "HomeMind - An intelligent partner that understands you, helps you, and grows with you"
   },
+  "avatarPresets": {
+    "label": "More avatar styles",
+    "styles": {
+      "adventurer-neutral": "Adventurer",
+      "avataaars-neutral": "Avataaars",
+      "big-ears-neutral": "Big Ears",
+      "big-smile": "Big Smile",
+      "bottts-neutral": "Bottts",
+      "croodles-neutral": "Croodles",
+      "fun-emoji": "Fun Emoji",
+      "lorelei-neutral": "Lorelei",
+      "micah": "Micah",
+      "miniavs": "Miniavs",
+      "notionists-neutral": "Notionists",
+      "open-peeps": "Open Peeps",
+      "personas": "Personas",
+      "pixel-art-neutral": "Pixel Art",
+      "shapes": "Shapes",
+      "thumbs": "Thumbs"
+    }
+  },
   "family": {
     "title": "Family Center",
     "subtitle": "Manage family members, albums, tasks, and shared memories",

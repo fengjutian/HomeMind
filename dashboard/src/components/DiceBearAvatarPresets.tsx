@@ -1,20 +1,42 @@
 import { Avatar, Style } from "@dicebear/core";
+import adventurerNeutral from "@dicebear/styles/adventurer-neutral.json";
+import avataaarsNeutral from "@dicebear/styles/avataaars-neutral.json";
+import bigEarsNeutral from "@dicebear/styles/big-ears-neutral.json";
+import bigSmile from "@dicebear/styles/big-smile.json";
 import botttsNeutral from "@dicebear/styles/bottts-neutral.json";
+import croodlesNeutral from "@dicebear/styles/croodles-neutral.json";
+import funEmoji from "@dicebear/styles/fun-emoji.json";
 import loreleiNeutral from "@dicebear/styles/lorelei-neutral.json";
+import micah from "@dicebear/styles/micah.json";
+import miniavs from "@dicebear/styles/miniavs.json";
 import notionistsNeutral from "@dicebear/styles/notionists-neutral.json";
+import openPeeps from "@dicebear/styles/open-peeps.json";
+import personas from "@dicebear/styles/personas.json";
 import pixelArtNeutral from "@dicebear/styles/pixel-art-neutral.json";
 import shapes from "@dicebear/styles/shapes.json";
+import thumbs from "@dicebear/styles/thumbs.json";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import styles from "./DiceBearAvatarPresets.module.less";
 
 const PRESETS = [
+  { id: "adventurer-neutral", style: new Style(adventurerNeutral) },
+  { id: "avataaars-neutral", style: new Style(avataaarsNeutral) },
+  { id: "big-ears-neutral", style: new Style(bigEarsNeutral) },
+  { id: "big-smile", style: new Style(bigSmile) },
   { id: "bottts-neutral", style: new Style(botttsNeutral) },
+  { id: "croodles-neutral", style: new Style(croodlesNeutral) },
+  { id: "fun-emoji", style: new Style(funEmoji) },
   { id: "notionists-neutral", style: new Style(notionistsNeutral) },
   { id: "lorelei-neutral", style: new Style(loreleiNeutral) },
+  { id: "micah", style: new Style(micah) },
+  { id: "miniavs", style: new Style(miniavs) },
+  { id: "open-peeps", style: new Style(openPeeps) },
+  { id: "personas", style: new Style(personas) },
   { id: "pixel-art-neutral", style: new Style(pixelArtNeutral) },
   { id: "shapes", style: new Style(shapes) },
+  { id: "thumbs", style: new Style(thumbs) },
 ] as const;
 
 function createSvg(style: (typeof PRESETS)[number]["style"], seed: string) {

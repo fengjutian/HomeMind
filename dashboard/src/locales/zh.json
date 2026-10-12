@@ -2,6 +2,27 @@
   "app": {
     "pageTitle": "HomeMind - 懂你、帮你、陪你成长的智能伙伴"
   },
+  "avatarPresets": {
+    "label": "更多头像风格",
+    "styles": {
+      "adventurer-neutral": "冒险家",
+      "avataaars-neutral": "卡通人物",
+      "big-ears-neutral": "大耳朵",
+      "big-smile": "灿烂笑脸",
+      "bottts-neutral": "机器人",
+      "croodles-neutral": "涂鸦人物",
+      "fun-emoji": "趣味表情",
+      "lorelei-neutral": "洛蕾莱",
+      "micah": "米卡",
+      "miniavs": "迷你人物",
+      "notionists-neutral": "手绘人物",
+      "open-peeps": "开放人物",
+      "personas": "个性人物",
+      "pixel-art-neutral": "像素人物",
+      "shapes": "几何图形",
+      "thumbs": "拇指人物"
+    }
+  },
   "family": {
     "title": "家庭中心",
     "subtitle": "管理家庭成员、相册、任务与共同记忆",

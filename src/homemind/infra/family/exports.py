@@ -201,7 +201,9 @@ class FamilyExportManager:
             )
         _hm_inc("family_export_created_total")
         logger.info(
-            "FamilyExportManager: exported family %s to %s", family_id, export_id,
+            "FamilyExportManager: exported family %s to %s",
+            family_id,
+            export_id,
         )
         return {
             "export_id": export_id,
@@ -235,7 +237,10 @@ class FamilyExportManager:
         ]
 
     def download_path(
-        self, family_id: str, export_id: str, user: User,
+        self,
+        family_id: str,
+        export_id: str,
+        user: User,
     ) -> Path:
         """Resolve an export to a path on disk.
 
@@ -247,27 +252,32 @@ class FamilyExportManager:
         self._family.require_manager(family_id, user)
         with self._services.db.connect() as conn:
             row = conn.execute(
-                "SELECT status FROM homemind_family_exports "
-                "WHERE export_id = ? AND family_id = ?",
+                "SELECT status FROM homemind_family_exports WHERE export_id = ? AND family_id = ?",
                 (export_id, family_id),
             ).fetchone()
         if row is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "export not found",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "export not found",
             )
         if str(row["status"]) != EXPORT_STATUS_COMPLETED:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_CONFLICT, "export is not ready",
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "export is not ready",
             )
         path = self._bundle_dir(family_id, export_id)
         if not path.is_dir():
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "export bundle is gone",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "export bundle is gone",
             )
         return path
 
     def delete_export(
-        self, family_id: str, export_id: str, user: User,
+        self,
+        family_id: str,
+        export_id: str,
+        user: User,
     ) -> bool:
         self._family.require_manager(family_id, user)
         path = self._bundle_dir(family_id, export_id)
@@ -275,8 +285,7 @@ class FamilyExportManager:
             shutil.rmtree(path, ignore_errors=True)
         with self._services.db.transaction() as conn:
             cursor = conn.execute(
-                "DELETE FROM homemind_family_exports "
-                "WHERE export_id = ? AND family_id = ?",
+                "DELETE FROM homemind_family_exports WHERE export_id = ? AND family_id = ?",
                 (export_id, family_id),
             )
         return int(cursor.rowcount or 0) > 0
@@ -319,7 +328,8 @@ class FamilyExportManager:
                     json.dumps(manifest.as_dict(), ensure_ascii=False, sort_keys=True),
                     1 if dry_run else 0,
                     json.dumps(
-                        [c.__dict__ for c in conflicts], ensure_ascii=False,
+                        [c.__dict__ for c in conflicts],
+                        ensure_ascii=False,
                     ),
                     user.id,
                     int(time.time()),
@@ -335,7 +345,12 @@ class FamilyExportManager:
         }
 
     def apply_import(
-        self, family_id: str, import_id: str, user: User, *, bundle: Path,
+        self,
+        family_id: str,
+        import_id: str,
+        user: User,
+        *,
+        bundle: Path,
     ) -> dict[str, Any]:
         """Apply a staged import.
 
@@ -353,11 +368,13 @@ class FamilyExportManager:
             ).fetchone()
         if row is None:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "import not found",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "import not found",
             )
         if str(row["status"]) != IMPORT_STATUS_STAGED:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_CONFLICT, "import is already decided",
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "import is already decided",
             )
         conflicts = json.loads(str(row["conflict_report"]))
         if conflicts:
@@ -381,7 +398,10 @@ class FamilyExportManager:
         return {"import_id": import_id, "status": IMPORT_STATUS_APPLIED, "applied": applied}
 
     def reject_import(
-        self, family_id: str, import_id: str, user: User,
+        self,
+        family_id: str,
+        import_id: str,
+        user: User,
     ) -> dict[str, Any]:
         self._family.require_manager(family_id, user)
         with self._services.db.transaction() as conn:
@@ -393,7 +413,8 @@ class FamilyExportManager:
             )
         if cursor.rowcount != 1:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_CONFLICT, "import is already decided",
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "import is already decided",
             )
         return {"import_id": import_id, "status": IMPORT_STATUS_REJECTED}
 
@@ -513,7 +534,8 @@ class FamilyExportManager:
                     "space_id": asset.space_id,
                 }
                 for asset in self._services.family_asset_repo.search(
-                    family_id, limit=10000,
+                    family_id,
+                    limit=10000,
                 )
             ],
             "devices": devices,
@@ -533,7 +555,8 @@ class FamilyExportManager:
         target_root = bundle_dir / "assets"
         target_root.mkdir(parents=True, exist_ok=True)
         for asset in self._services.family_asset_repo.search(
-            family_id, limit=10000,
+            family_id,
+            limit=10000,
         ):
             try:
                 from urllib.parse import unquote, urlparse  # noqa: PLC0415
@@ -571,17 +594,20 @@ class FamilyExportManager:
         path = _safe_join(bundle, "manifest.json")
         if path is None or not path.is_file():
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "bundle has no manifest",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "bundle has no manifest",
             )
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, f"unreadable manifest: {exc}",
+                HomeMindErrorCode.FAMILY_INVALID,
+                f"unreadable manifest: {exc}",
             ) from exc
         if data.get("format") != FORMAT:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "not a HomeMind family export",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "not a HomeMind family export",
             )
         if int(data.get("version", 0)) != FORMAT_VERSION:
             raise HomeMindError(
@@ -596,8 +622,7 @@ class FamilyExportManager:
             timezone=str(data["timezone"]),
             includes_original_assets=bool(data["includes_original_assets"]),
             checksums={
-                str(key): str(value)
-                for key, value in (data.get("checksums") or {}).items()
+                str(key): str(value) for key, value in (data.get("checksums") or {}).items()
             },
         )
 
@@ -636,9 +661,7 @@ class FamilyExportManager:
         members_path = _safe_join(bundle, "members.json")
         if members_path is not None and members_path.is_file():
             payload = json.loads(members_path.read_text(encoding="utf-8"))
-            existing = {
-                member.id for member in self._services.family_repo.list_members(family_id)
-            }
+            existing = {member.id for member in self._services.family_repo.list_members(family_id)}
             for item in payload:
                 member_id = str(item.get("member_id", ""))
                 if member_id in existing:
@@ -652,7 +675,10 @@ class FamilyExportManager:
         return conflicts
 
     def _write_members(
-        self, family_id: str, user: User, bundle: Path,
+        self,
+        family_id: str,
+        user: User,
+        bundle: Path,
     ) -> dict[str, int]:
         """Create members from the bundle, skipping existing ids."""
 
@@ -662,9 +688,7 @@ class FamilyExportManager:
         if members_path is None or not members_path.is_file():
             return {"created": 0, "skipped": 0}
         payload = json.loads(members_path.read_text(encoding="utf-8"))
-        existing = {
-            member.id for member in self._services.family_repo.list_members(family_id)
-        }
+        existing = {member.id for member in self._services.family_repo.list_members(family_id)}
         created = skipped = 0
         for item in payload:
             member_id = str(item.get("member_id", ""))
@@ -700,9 +724,7 @@ class FamilyExportManager:
 
 
 def _safe_segment(value: str) -> str:
-    cleaned = "".join(
-        char if (char.isalnum() or char in "-_") else "_" for char in str(value)
-    )
+    cleaned = "".join(char if (char.isalnum() or char in "-_") else "_" for char in str(value))
     return cleaned[:128] or "_"
 
 
@@ -729,7 +751,8 @@ def _write_section(bundle_dir: Path, filename: str, data: Any) -> None:
     path = _safe_join(bundle_dir, filename)
     if path is None:
         raise HomeMindError(
-            HomeMindErrorCode.FAMILY_INVALID, f"unsafe section name {filename!r}",
+            HomeMindErrorCode.FAMILY_INVALID,
+            f"unsafe section name {filename!r}",
         )
     path.parent.mkdir(parents=True, exist_ok=True)
     _strip_forbidden(data)

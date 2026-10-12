@@ -579,14 +579,10 @@ class FamilyTransactionRepo:
                 family_id=str(row["a_family_id"]),
                 status=str(row["a_status"]),
                 requested_by=int(row["a_requested_by"]),
-                decided_by=(
-                    int(row["a_decided_by"]) if row["a_decided_by"] is not None else None
-                ),
+                decided_by=(int(row["a_decided_by"]) if row["a_decided_by"] is not None else None),
                 reason=row["a_reason"],
                 created_at=int(row["a_created_at"]),
-                decided_at=(
-                    int(row["a_decided_at"]) if row["a_decided_at"] is not None else None
-                ),
+                decided_at=(int(row["a_decided_at"]) if row["a_decided_at"] is not None else None),
                 approval_expires_at=(
                     int(row["a_approval_expires_at"])
                     if row["a_approval_expires_at"] is not None
