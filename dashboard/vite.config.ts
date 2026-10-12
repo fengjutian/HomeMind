@@ -167,6 +167,9 @@ export default defineConfig(({ mode }) => {
     define: {
       BASE_URL: JSON.stringify(apiBaseUrl),
       MOBILE: false,
+      // Injected so the login QR code can point at this dev server even when
+      // the page is loaded through another origin (e.g. the API on :8088).
+      DEV_SERVER_PORT: JSON.stringify(devServerPort),
     },
     plugins: [
       suppressViteDisconnectReload(),

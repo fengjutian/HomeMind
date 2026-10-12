@@ -52,6 +52,8 @@ _JWT_EXEMPT_EXACT = (
     "/api/auth/ldap/status",
     "/api/auth/invite/validate",
     "/api/auth/invite/redeem",
+    # Login page renders a LAN QR code before any session exists.
+    "/api/settings/server-address",
     "/api/docs",
     "/api/openapi.json",
 )

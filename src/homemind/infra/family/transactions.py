@@ -135,8 +135,8 @@ class FamilyTransactionManager:
             raise OctopError(ErrorCode.FORBIDDEN, "family membership required")
         handler = self.registry.get(action)
         if handler is None:
-            raise OctopError(
-                ErrorCode.BAD_REQUEST,
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
                 f"unsupported family transaction action: {action}",
             )
         transaction = self.repo.create_transaction(

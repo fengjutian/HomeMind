@@ -12,6 +12,13 @@ vi.mock("../../api/modules/auth", () => ({
     getAuthStatus: () => Promise.resolve({ setup_required: false }),
     getOauthStatus: () => Promise.resolve({ providers: [] }),
     getCaptcha: () => Promise.resolve({ provider: "none" }),
+    getServerAddress: () =>
+      Promise.resolve({
+        url: "http://192.168.1.23:8088",
+        port: 8088,
+        host: "192.168.1.23",
+        is_lan: true,
+      }),
   },
 }));
 

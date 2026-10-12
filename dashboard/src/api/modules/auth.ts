@@ -102,6 +102,16 @@ export interface LdapStatus {
   display_name: string;
 }
 
+/** LAN-reachable base URLs reported by the server for the login QR code. */
+export interface ServerAddress {
+  /** Preferred URL to encode, e.g. `http://192.168.1.23:8088`. */
+  url: string;
+  port: number;
+  host: string;
+  /** False when the server could not detect a routable IPv4 address. */
+  is_lan: boolean;
+}
+
 export interface SetupBody {
   username: string;
   password: string;
@@ -212,6 +222,12 @@ export const authApi = {
 
   /** Return whether directory (LDAP) logins are available, and its label. */
   getLdapStatus: () => request<LdapStatus>("/auth/ldap/status"),
+
+  /**
+   * Return this server's LAN address so the login page can render a scannable
+   * QR code. Unauthenticated — the login screen has no session yet.
+   */
+  getServerAddress: () => request<ServerAddress>("/settings/server-address"),
 
   /** Start an OIDC authorization-code login flow. */
   startOidc: (redirect_after?: string) =>
