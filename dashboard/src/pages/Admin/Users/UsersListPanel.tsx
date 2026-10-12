@@ -1998,6 +1998,7 @@ export default function UsersListPanel() {
           loading={loading}
           dataSource={filteredRows}
           pagination={false}
+          sticky
           scroll={{ x: 1360 }}
           rowSelection={{
             selectedRowKeys: selectedIds,

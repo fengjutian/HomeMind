@@ -499,24 +499,42 @@ html[data-theme="dark"] .octop-ant-switch-checked {
 }
 
 /* ---- Scrollbar ---- */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--fn-text-primary) 14%, transparent)
+    transparent;
 }
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: var(--fn-text-quaternary);
+  min-width: 36px;
+  min-height: 36px;
+  border: 3px solid transparent;
+  background: color-mix(in srgb, var(--fn-text-primary) 14%, transparent);
+  background-clip: padding-box;
   border-radius: var(--fn-radius-full);
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--fn-text-tertiary);
+  border-width: 2px;
+  background: color-mix(in srgb, var(--fn-text-primary) 24%, transparent);
+  background-clip: padding-box;
 }
 
-html[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
-html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.18);
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }

@@ -1411,6 +1411,36 @@
     padding: 10px 12px;
     vertical-align: middle;
   }
+
+  // Fixed columns make Ant Design use a native horizontal scroller. Hide its
+  // Windows chrome and use the synchronized sticky bar as a macOS-style
+  // floating scroll indicator instead.
+  :global(.ant-table-body) {
+    scrollbar-width: none;
+  }
+
+  :global(.ant-table-body::-webkit-scrollbar) {
+    width: 0;
+    height: 0;
+  }
+
+  :global(.ant-table-sticky-scroll) {
+    height: 10px !important;
+    border-top: 0;
+    background: transparent;
+  }
+
+  :global(.ant-table-sticky-scroll-bar) {
+    bottom: 2px;
+    height: 6px;
+    background: color-mix(in srgb, var(--fn-text-primary) 14%, transparent);
+    border-radius: var(--fn-radius-full);
+  }
+
+  :global(.ant-table-sticky-scroll-bar:hover),
+  :global(.ant-table-sticky-scroll-bar-active) {
+    background: color-mix(in srgb, var(--fn-text-primary) 24%, transparent);
+  }
 }
 
 .userTableRowDisabled {
