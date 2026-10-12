@@ -6194,6 +6194,12 @@
     "qqMailAuthGuide": "如何获取邮箱授权码",
     "personalMailAuthGuide": "如何获取邮箱授权码",
     "mailProvider": "邮箱服务商",
+    "mailProviders": {
+      "qq": "QQ 邮箱",
+      "netease": "网易邮箱",
+      "gmail": "Gmail",
+      "custom": "其他"
+    },
     "imapHost": "IMAP 服务器",
     "smtpHost": "SMTP 服务器",
     "newsAuthGuide": "如何获取腾讯新闻 API Key",

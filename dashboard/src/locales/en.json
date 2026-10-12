@@ -6193,6 +6193,12 @@
     "qqMailAuthGuide": "How to get mailbox authorization code",
     "personalMailAuthGuide": "How to get mailbox authorization code",
     "mailProvider": "Mail provider",
+    "mailProviders": {
+      "qq": "QQ Mail",
+      "netease": "NetEase Mail",
+      "gmail": "Gmail",
+      "custom": "Other"
+    },
     "imapHost": "IMAP server",
     "smtpHost": "SMTP server",
     "newsAuthGuide": "How to get a Tencent News API Key",
