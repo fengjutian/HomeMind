@@ -245,7 +245,7 @@ function renderMessageGroup(
 
 export default function MessageList(props: MessageListProps) {
   const {
-    messages,
+    messages: incomingMessages,
     agentId,
     composerLookups,
     loading,
@@ -295,6 +295,23 @@ export default function MessageList(props: MessageListProps) {
   const [firstItemIndex, setFirstItemIndex] = useState(VIRTUOSO_START_INDEX);
   const prevGroupCountRef = useRef(0);
 
+  // Keep the previous conversation painted while an uncached thread hydrates.
+  // Replacing the whole list with a spinner here unmounts the scroll container
+  // and makes long conversations visibly flash before history arrives.
+  const retainedMessagesRef = useRef(incomingMessages);
+  const retainedSessionKeyRef = useRef(sessionKey);
+  const isInitialHistoryLoading = loading && incomingMessages.length === 0;
+  if (!isInitialHistoryLoading) {
+    retainedMessagesRef.current = incomingMessages;
+    retainedSessionKeyRef.current = sessionKey;
+  }
+  const messages = isInitialHistoryLoading
+    ? retainedMessagesRef.current
+    : incomingMessages;
+  const renderedSessionKey = isInitialHistoryLoading
+    ? retainedSessionKeyRef.current
+    : sessionKey;
+
   const messageGroups = useMemo(
     () => groupConsecutiveAssistantMessages(messages, agentId ?? undefined),
     [messages, agentId],
@@ -325,7 +342,7 @@ export default function MessageList(props: MessageListProps) {
     [liveSpeakers, agents, activeAgent?.agent_id, activeAgent?.name],
   );
 
-  const stableSessionKey = sessionKey || "__default__";
+  const stableSessionKey = renderedSessionKey || "__default__";
 
   // Keep this callback identity stable. An inline parent `onLoadMoreHistory`
   // (or flag churn) used to recreate it every render → useAutoScroll re-bound
@@ -784,23 +801,12 @@ export default function MessageList(props: MessageListProps) {
     [historyHeader, hasFooter, footer],
   );
 
-  // History first paint uses a loading spinner with no scroll node. When messages
-  // arrive the list mounts; bump scrollerMountKey so useAutoScroll re-binds
-  // wheel/scroll listeners (deps would otherwise stay stale after a null bind).
   const bindNonVirtualScroller = useCallback((el: HTMLDivElement | null) => {
     containerRef.current = el;
     if (el) {
       setScrollerMountKey((k) => k + 1);
     }
   }, []);
-
-  if (loading && messages.length === 0) {
-    return (
-      <div className={styles.messageListLoading}>
-        <Spin />
-      </div>
-    );
-  }
 
   return (
     <div ref={wrapperRef} className={styles.messageListWrapper}>
@@ -873,6 +879,11 @@ export default function MessageList(props: MessageListProps) {
         hasNewActivity={Boolean(isStreaming || hasLiveSpeakers)}
         onClick={() => scrollToBottom()}
       />
+      {isInitialHistoryLoading && (
+        <div className={styles.messageListLoading} aria-busy="true">
+          <Spin />
+        </div>
+      )}
     </div>
   );
 }

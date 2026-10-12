@@ -173,10 +173,14 @@
 }
 
 .messageListLoading {
-  flex: 1;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--fn-bg-container) 8%, transparent);
 }
 
 .historyLoadMore {
