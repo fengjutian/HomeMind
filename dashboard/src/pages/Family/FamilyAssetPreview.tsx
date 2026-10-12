@@ -113,7 +113,7 @@ export default function FamilyAssetPreview({
           onCancel={closePlayer}
         >
           <Spin spinning={mediaLoading}>
-            {mediaLoading && (
+            {mediaUrl && transferProgress < 100 && (
               <div className={styles.mediaTransferProgress}>
                 <Progress percent={transferProgress} status="active" />
               </div>
