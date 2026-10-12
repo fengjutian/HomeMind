@@ -2,6 +2,28 @@
   "app": {
     "pageTitle": "HomeMind - An intelligent partner that understands you, helps you, and grows with you"
   },
+  "smartHome": {
+    "title": "Smart home",
+    "subtitle": "Connect Xiaomi and other devices through Home Assistant",
+    "pairedDevices": "Devices",
+    "add": "Add Home Assistant",
+    "providers": "Connections",
+    "entities": "Smart devices",
+    "noProviders": "No smart-home connection yet",
+    "noEntities": "Connect and sync Home Assistant to discover devices",
+    "name": "Connection name",
+    "baseUrl": "Home Assistant URL",
+    "token": "Long-lived access token",
+    "tokenHint": "The token is stored as a server secret and is never returned.",
+    "connect": "Connect",
+    "connected": "Connected and devices synchronized",
+    "connectionFailed": "The connection could not be reached. Check the URL and token.",
+    "sync": "Test and sync",
+    "synced": "Devices synchronized",
+    "ready": "Ready",
+    "deleteConfirm": "Remove this connection and its mapped devices?",
+    "deleted": "Connection removed"
+  },
   "avatarPresets": {
     "label": "More avatar styles",
     "styles": {

@@ -2,6 +2,28 @@
   "app": {
     "pageTitle": "HomeMind - 懂你、帮你、陪你成长的智能伙伴"
   },
+  "smartHome": {
+    "title": "智能家居",
+    "subtitle": "通过 Home Assistant 接入小米及其他品牌设备",
+    "pairedDevices": "设备",
+    "add": "添加 Home Assistant",
+    "providers": "接入方式",
+    "entities": "智能设备",
+    "noProviders": "尚未接入智能家居",
+    "noEntities": "连接并同步 Home Assistant 后，这里会显示设备",
+    "name": "连接名称",
+    "baseUrl": "Home Assistant 地址",
+    "token": "长期访问令牌",
+    "tokenHint": "令牌将保存到服务端密钥库，之后不会再次返回。",
+    "connect": "连接",
+    "connected": "连接成功，设备已同步",
+    "connectionFailed": "无法连接，请检查地址和令牌。",
+    "sync": "测试并同步",
+    "synced": "设备已同步",
+    "ready": "正常",
+    "deleteConfirm": "移除此连接及其已映射设备？",
+    "deleted": "连接已移除"
+  },
   "avatarPresets": {
     "label": "更多头像风格",
     "styles": {

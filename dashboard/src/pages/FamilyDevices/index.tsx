@@ -7,10 +7,26 @@
 import DevicesPanel from "../Family/DevicesPanel";
 import FamilyPageShell from "../../components/family/FamilyPageShell";
 import { useActiveFamily } from "../../hooks/useActiveFamily";
+import { Button } from "antd";
+import { Wifi } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 export default function FamilyDevices() {
+  const navigate = useNavigate();
+  const { t } = useTranslation();
   return (
-    <FamilyPageShell title="设备">
+    <FamilyPageShell
+      title={t("smartHome.pairedDevices")}
+      actions={
+        <Button
+          icon={<Wifi size={16} />}
+          onClick={() => navigate("/smart-home")}
+        >
+          {t("smartHome.title")}
+        </Button>
+      }
+    >
       <DevicesPanelHoster />
     </FamilyPageShell>
   );

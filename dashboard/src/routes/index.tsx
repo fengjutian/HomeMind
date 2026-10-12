@@ -26,6 +26,7 @@ const FamilyTimelinePage = lazy(() => import("../pages/FamilyTimeline"));
 const FamilyTasksPage = lazy(() => import("../pages/FamilyTasks"));
 const FamilyMemoryPage = lazy(() => import("../pages/FamilyMemory"));
 const FamilyDevicesPage = lazy(() => import("../pages/FamilyDevices"));
+const FamilySmartHomePage = lazy(() => import("../pages/FamilySmartHome"));
 const FamilyApprovalsPage = lazy(() => import("../pages/FamilyApprovals"));
 const FamilyCalendarPage = lazy(() => import("../pages/FamilyCalendar"));
 const FamilyTaskBoardPage = lazy(() => import("../pages/FamilyTaskBoard"));
@@ -73,6 +74,7 @@ export const pathToKey: Record<string, string> = {
   "/family-tasks": "family",
   "/family-memory": "family",
   "/devices": "family",
+  "/smart-home": "family",
   "/approvals": "family",
   "/calendar": "family",
   "/task-board": "family",
@@ -187,6 +189,7 @@ export const routeConfigs: RouteConfig[] = [
   { path: "/family-tasks", element: <FamilyTasksPage /> },
   { path: "/family-memory", element: <FamilyMemoryPage /> },
   { path: "/devices", element: <FamilyDevicesPage /> },
+  { path: "/smart-home", element: <FamilySmartHomePage /> },
   { path: "/approvals", element: <FamilyApprovalsPage /> },
   { path: "/calendar", element: <FamilyCalendarPage /> },
   { path: "/task-board", element: <FamilyTaskBoardPage /> },

@@ -1,15 +1,14 @@
 import { getApiUrl } from "../config";
 import { getAuthToken, request, requestBlob } from "../request";
 
-let mediaToken: { owner: string; value: string; expiresAt: number } | null = null;
-let mediaTokenRequest: { owner: string; promise: Promise<string> } | null = null;
+let mediaToken: { owner: string; value: string; expiresAt: number } | null =
+  null;
+let mediaTokenRequest: { owner: string; promise: Promise<string> } | null =
+  null;
 
 const getMediaToken = async (): Promise<string> => {
   const owner = getAuthToken();
-  if (
-    mediaToken?.owner === owner &&
-    mediaToken.expiresAt > Date.now() + 15_000
-  )
+  if (mediaToken?.owner === owner && mediaToken.expiresAt > Date.now() + 15_000)
     return mediaToken.value;
   if (mediaTokenRequest?.owner !== owner) {
     const promise = request<{ access_token: string; expires_in: number }>(
@@ -184,6 +183,34 @@ export interface FamilyDeviceCommand {
   error: string | null;
   created_at: number;
   updated_at: number;
+}
+
+export interface SmartHomeProvider {
+  id: string;
+  family_id: string;
+  kind: string;
+  name: string;
+  base_url: string | null;
+  secret_ref: string | null;
+  topic_allowlist: string[];
+  enabled: boolean;
+  last_seen_at: number | null;
+  last_error: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface SmartHomeEntity {
+  id: string;
+  family_id: string;
+  provider_id: string;
+  external_entity_id: string;
+  domain: string;
+  name: string;
+  capabilities: string[];
+  state: Record<string, unknown>;
+  last_state_at: number | null;
+  last_changed_at: number | null;
 }
 
 export interface FamilyEvent {
@@ -478,6 +505,33 @@ export const homeMindFamilyApi = {
       `${root}/${familyId}/devices/${deviceId}/commands`,
       json(body),
     ),
+  listSmartHomeProviders: (familyId: string) =>
+    request<SmartHomeProvider[]>(`${root}/${familyId}/smart-home/providers`),
+  createHomeAssistantProvider: (
+    familyId: string,
+    body: { name: string; base_url: string; credential: string },
+  ) =>
+    request<SmartHomeProvider>(
+      `${root}/${familyId}/smart-home/providers`,
+      json({ kind: "HOME_ASSISTANT", ...body }),
+    ),
+  deleteSmartHomeProvider: (familyId: string, providerId: string) =>
+    request<void>(
+      `${root}/${familyId}/smart-home/providers/${providerId}`,
+      mutate("DELETE"),
+    ),
+  probeSmartHomeProvider: (familyId: string, providerId: string) =>
+    request<{ ok: boolean }>(
+      `${root}/${familyId}/smart-home/providers/${providerId}/probe`,
+      json({}),
+    ),
+  syncSmartHomeProvider: (familyId: string, providerId: string) =>
+    request<SmartHomeEntity[]>(
+      `${root}/${familyId}/smart-home/providers/${providerId}/sync`,
+      json({}),
+    ),
+  listSmartHomeEntities: (familyId: string) =>
+    request<SmartHomeEntity[]>(`${root}/${familyId}/smart-home/entities`),
   listSpaces: (familyId: string) =>
     request<FamilySpace[]>(`${root}/${familyId}/spaces`),
   createSpace: (

@@ -39,3 +39,13 @@ class SecretRepo:
                 "UPDATE secrets SET v = ?, rotated_at = ? WHERE k = ?",
                 (new_value, now_ts(), k),
             )
+
+    def delete(self, k: str) -> bool:
+        """Delete one named secret.
+
+        Callers should only remove keys they own.  This is primarily used by
+        integrations whose credential lifecycle is tied to a provider row.
+        """
+        with self._db.transaction() as conn:
+            cursor = conn.execute("DELETE FROM secrets WHERE k = ?", (k,))
+            return int(cursor.rowcount) > 0

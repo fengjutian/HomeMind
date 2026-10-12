@@ -10,10 +10,11 @@ endpoint would bypass all three.
 
 from __future__ import annotations
 
+import secrets
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
@@ -38,8 +39,15 @@ class ProviderCreateBody(BaseModel):
     secret_ref: str | None = Field(
         default=None,
         description=(
-            "Name of a credential in the secret store. The secret itself "
-            "is never accepted or returned by this API."
+            "Existing credential reference for trusted automation. Omit this "
+            "when credential is supplied."
+        ),
+    )
+    credential: SecretStr | None = Field(
+        default=None,
+        description=(
+            "Home Assistant long-lived access token. It is written to the "
+            "server secret store and is never returned by this API."
         ),
     )
     topic_allowlist: list[str] = Field(
@@ -148,16 +156,36 @@ class _SecretStoreAdapter:
     status_code=201,
     summary="Register a Home Assistant or MQTT connection",
     description=(
-        "Manager-only. The request carries a *reference* to a stored "
-        "credential; the secret itself never passes through this API, "
-        "so it cannot appear in a request log, an error message, or "
-        "this response."
+        "Manager-only. A Home Assistant credential may be supplied once; "
+        "it is moved into the server secret store and is never returned. "
+        "Trusted automation may instead provide an existing secret_ref."
     ),
 )
 async def create_provider(
     family_id: str, body: ProviderCreateBody, server: Server, user: CurrentUser
 ) -> object:
-    return _manager(server).create_provider(family_id, user, **body.model_dump())
+    manager = _manager(server)
+    data = body.model_dump(exclude={"credential"})
+    credential = body.credential
+    if credential is None:
+        return manager.create_provider(family_id, user, **data)
+
+    # Authorize before writing a secret so a rejected request cannot leave an
+    # orphan credential behind. The manager repeats this check when creating
+    # the provider; keeping the domain guard there prevents other callers from
+    # bypassing it.
+    manager.family.require_manager(family_id, user)
+    assert server.services is not None
+    secret_ref = f"homemind/smart-home/{family_id}/{secrets.token_urlsafe(18)}"
+    server.services.secret_repo.get_or_create(
+        secret_ref, lambda: credential.get_secret_value().encode("utf-8")
+    )
+    try:
+        data["secret_ref"] = secret_ref
+        return manager.create_provider(family_id, user, **data)
+    except Exception:
+        server.services.secret_repo.delete(secret_ref)
+        raise
 
 
 @router.get(
@@ -178,7 +206,19 @@ async def list_providers(family_id: str, server: Server, user: CurrentUser) -> o
 async def delete_provider(
     family_id: str, provider_id: str, server: Server, user: CurrentUser
 ) -> Response:
-    _manager(server).delete_provider(family_id, provider_id, user)
+    manager = _manager(server)
+    provider = next(
+        (row for row in manager.list_providers(family_id, user) if row.id == provider_id),
+        None,
+    )
+    manager.delete_provider(family_id, provider_id, user)
+    if (
+        provider is not None
+        and provider.secret_ref is not None
+        and provider.secret_ref.startswith(f"homemind/smart-home/{family_id}/")
+    ):
+        assert server.services is not None
+        server.services.secret_repo.delete(provider.secret_ref)
     return Response(status_code=204)
 
 
@@ -211,9 +251,7 @@ async def put_topics(
         "in a status field."
     ),
 )
-async def probe_provider(
-    family_id: str, provider_id: str, server: Server, user: CurrentUser
-) -> object:
+def probe_provider(family_id: str, provider_id: str, server: Server, user: CurrentUser) -> object:
     return ProbeResponse(ok=_manager(server).probe(family_id, provider_id, user))
 
 
@@ -223,9 +261,7 @@ async def probe_provider(
     summary="Refresh the entity mapping from the provider",
     description="Manager-only. An outage leaves the previous mapping intact.",
 )
-async def sync_entities(
-    family_id: str, provider_id: str, server: Server, user: CurrentUser
-) -> object:
+def sync_entities(family_id: str, provider_id: str, server: Server, user: CurrentUser) -> object:
     return _manager(server).sync_entities(family_id, provider_id, user)
 
 
@@ -269,7 +305,7 @@ async def list_commands(
         "Transaction so it is approved, audited, and verified."
     ),
 )
-async def preview_command(
+def preview_command(
     family_id: str,
     entity_id: str,
     body: CommandPreviewBody,
