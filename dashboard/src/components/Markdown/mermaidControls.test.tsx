@@ -53,14 +53,26 @@ describe("Mermaid controls", () => {
   it("keeps the diagram instance and zoom across parent rerenders", async () => {
     const content = "```mermaid\nflowchart TD\nA-->B\n```";
     const rendersBefore = mermaidMocks.render.mock.calls.length;
-    const view = render(<Markdown content={content} style={{ opacity: 1 }} />);
+    const view = render(
+      <Markdown
+        content={content}
+        style={{ opacity: 1 }}
+        onRegenerateMermaid={vi.fn()}
+      />,
+    );
 
     await screen.findByText("Diagram");
     expect(mermaidMocks.render).toHaveBeenCalledTimes(rendersBefore + 1);
     fireEvent.click(screen.getByRole("button", { name: "chat.mermaidZoomIn" }));
     expect(screen.getByText("125%")).toBeInTheDocument();
 
-    view.rerender(<Markdown content={content} style={{ opacity: 1 }} />);
+    view.rerender(
+      <Markdown
+        content={content}
+        style={{ opacity: 1 }}
+        onRegenerateMermaid={vi.fn()}
+      />,
+    );
 
     expect(screen.getByText("125%")).toBeInTheDocument();
     await waitFor(() =>

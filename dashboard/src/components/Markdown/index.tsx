@@ -397,6 +397,22 @@ const Markdown = memo(function Markdown({
     useMathPlugins(renderContent);
   const remarkPlugins = useMemo(() => [remarkGfm, ...mathRemark], [mathRemark]);
   const rehypePlugins = useMemo(() => [...mathRehype], [mathRehype]);
+  const rendererOptionsRef = useRef({
+    isStreaming,
+    onRegenerateMermaid,
+    onRunShellCommand,
+    shellCommandDisabled,
+    shellCommandDisabledTitle,
+    runLabel,
+  });
+  rendererOptionsRef.current = {
+    isStreaming,
+    onRegenerateMermaid,
+    onRunShellCommand,
+    shellCommandDisabled,
+    shellCommandDisabledTitle,
+    runLabel,
+  };
 
   const markdownComponents = useMemo(
     () => ({
@@ -405,6 +421,14 @@ const Markdown = memo(function Markdown({
           className?: string;
         },
       ) {
+        const {
+          isStreaming,
+          onRegenerateMermaid,
+          onRunShellCommand,
+          shellCommandDisabled,
+          shellCommandDisabledTitle,
+          runLabel,
+        } = rendererOptionsRef.current;
         const { className: codeClassName, children, ...props } = codeProps;
         const match = /language-(\w+)/.exec(codeClassName || "");
         const codeString = String(children).replace(/\n$/, "");
@@ -538,14 +562,7 @@ const Markdown = memo(function Markdown({
         return <MarkdownImage src={src} alt={alt} {...props} />;
       },
     }),
-    [
-      isStreaming,
-      onRegenerateMermaid,
-      onRunShellCommand,
-      shellCommandDisabled,
-      shellCommandDisabledTitle,
-      runLabel,
-    ],
+    [],
   );
 
   return (
