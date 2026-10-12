@@ -39,7 +39,12 @@ export interface NotificationPrefs {
 export const homeMindNotificationApi = {
   list: (
     familyId: string,
-    options: { type?: string; unreadOnly?: boolean; limit?: number; offset?: number } = {},
+    options: {
+      type?: string;
+      unreadOnly?: boolean;
+      limit?: number;
+      offset?: number;
+    } = {},
   ) => {
     const params = new URLSearchParams();
     if (options.type) params.set("type", options.type);
@@ -53,7 +58,9 @@ export const homeMindNotificationApi = {
   },
 
   unreadCount: (familyId: string) =>
-    request<{ unread: number }>(`${root}/${familyId}/notifications/unread-count`),
+    request<{ unread: number }>(
+      `${root}/${familyId}/notifications/unread-count`,
+    ),
 
   markRead: (familyId: string, notificationId: string) =>
     request<FamilyNotification>(
@@ -83,10 +90,13 @@ export const homeMindNotificationApi = {
       timezone?: string | null;
     },
   ) =>
-    request<NotificationPrefs>(`${root}/${familyId}/notifications/preferences`, {
-      method: "PUT",
-      body: JSON.stringify(body),
-    }),
+    request<NotificationPrefs>(
+      `${root}/${familyId}/notifications/preferences`,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      },
+    ),
 };
 
 /** Notification types, mirroring the backend enum. */

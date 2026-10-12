@@ -68,7 +68,11 @@ export async function collectPages<T>(
 export const homeMindMobileApi = {
   notificationsPage: (
     familyId: string,
-    options: { cursor?: string | null; limit?: number; unreadOnly?: boolean } = {},
+    options: {
+      cursor?: string | null;
+      limit?: number;
+      unreadOnly?: boolean;
+    } = {},
   ) => {
     const params = new URLSearchParams();
     if (options.cursor) params.set("cursor", options.cursor);
@@ -80,7 +84,9 @@ export const homeMindMobileApi = {
   },
 
   unreadCount: (familyId: string) =>
-    request<MobileUnreadCount>(`${root}/${familyId}/notifications/unread-count`),
+    request<MobileUnreadCount>(
+      `${root}/${familyId}/notifications/unread-count`,
+    ),
 
   markRead: (familyId: string, notificationId: string) =>
     request<FamilyNotification>(

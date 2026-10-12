@@ -65,7 +65,10 @@ export default function FamilyPageShell({
             {title}
           </Typography.Title>
           {subtitle ? (
-            <Text type="secondary" style={{ fontSize: isPhone ? 12 : undefined }}>
+            <Text
+              type="secondary"
+              style={{ fontSize: isPhone ? 12 : undefined }}
+            >
               {subtitle}
             </Text>
           ) : null}
@@ -81,7 +84,9 @@ export default function FamilyPageShell({
           <Spin />
         </div>
       ) : familyId === null ? (
-        <Empty description={emptyHint ?? t("family.noActiveFamily", "尚未选择家庭")}>
+        <Empty
+          description={emptyHint ?? t("family.noActiveFamily", "尚未选择家庭")}
+        >
           <Button type="primary" onClick={() => navigate("/family")}>
             {t("family.selectFamily", "去选择家庭")}
           </Button>
@@ -143,7 +148,14 @@ export function useFamilyQuery<T>(
 
 export function QueryError({ error }: { error: Error | null }) {
   if (error === null) return null;
-  return <Alert type="error" message={error.message} showIcon style={{ marginBottom: 12 }} />;
+  return (
+    <Alert
+      type="error"
+      message={error.message}
+      showIcon
+      style={{ marginBottom: 12 }}
+    />
+  );
 }
 
 export { homeMindFamilyApi };

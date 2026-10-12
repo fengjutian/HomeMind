@@ -100,6 +100,7 @@ interface MessageListProps {
   thinkingStartedAt?: number | null;
   sessionKey?: string;
   onRegenerate?: (messageId: string) => void;
+  onRegenerateMermaid?: (code: string) => void;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
   forkDisabled?: boolean;
@@ -125,6 +126,7 @@ interface GroupRenderContext {
   lastAssistantGroupIndex: number;
   lastUserGroupIndex: number;
   onRegenerate?: (messageId: string) => void;
+  onRegenerateMermaid?: (code: string) => void;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
   forkDisabled?: boolean;
@@ -173,6 +175,7 @@ function renderMessageGroup(
             isTurnInProgress={isTurnInProgress}
             liveSpeakers={ctx.liveSpeakers}
             onRegenerate={ctx.onRegenerate}
+            onRegenerateMermaid={ctx.onRegenerateMermaid}
             onEditUserMessage={ctx.onEditUserMessage}
             onForkAssistantMessage={ctx.onForkAssistantMessage}
             forkDisabled={ctx.forkDisabled}
@@ -226,6 +229,7 @@ function renderMessageGroup(
         isTurnInProgress={isTurnInProgress}
         liveSpeakers={ctx.liveSpeakers}
         onRegenerate={ctx.onRegenerate}
+        onRegenerateMermaid={ctx.onRegenerateMermaid}
         onEditUserMessage={ctx.onEditUserMessage}
         onForkAssistantMessage={ctx.onForkAssistantMessage}
         forkDisabled={ctx.forkDisabled}
@@ -259,6 +263,7 @@ export default function MessageList(props: MessageListProps) {
     thinkingStartedAt = null,
     sessionKey,
     onRegenerate,
+    onRegenerateMermaid,
     onEditUserMessage,
     onForkAssistantMessage,
     forkDisabled,
@@ -726,6 +731,7 @@ export default function MessageList(props: MessageListProps) {
       lastAssistantGroupIndex,
       lastUserGroupIndex,
       onRegenerate,
+      onRegenerateMermaid,
       onEditUserMessage,
       onForkAssistantMessage,
       forkDisabled,
@@ -749,6 +755,7 @@ export default function MessageList(props: MessageListProps) {
       lastAssistantGroupIndex,
       lastUserGroupIndex,
       onRegenerate,
+      onRegenerateMermaid,
       onEditUserMessage,
       onForkAssistantMessage,
       forkDisabled,

@@ -67,7 +67,10 @@ export default function FamilyTaskBoard() {
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<ScheduledTask | null>(null);
 
-  const fetcher = useCallback((id: string) => familyTaskSchedulerApi.board(id), []);
+  const fetcher = useCallback(
+    (id: string) => familyTaskSchedulerApi.board(id),
+    [],
+  );
   const { data, loading, error, reload } = useFamilyQuery(familyId, fetcher);
 
   const act = async (
@@ -107,7 +110,8 @@ export default function FamilyTaskBoard() {
                   familyId
                     ? (task) =>
                         void act(
-                          () => familyTaskSchedulerApi.cancel(familyId, task.id),
+                          () =>
+                            familyTaskSchedulerApi.cancel(familyId, task.id),
                           "familyTaskBoard.cancelled",
                         )
                     : undefined
@@ -159,7 +163,11 @@ function BoardColumn({
 }) {
   const { t } = useTranslation();
   return (
-    <Card size="small" loading={loading} title={<Badge count={tasks.length}>{title}</Badge>}>
+    <Card
+      size="small"
+      loading={loading}
+      title={<Badge count={tasks.length}>{title}</Badge>}
+    >
       {tasks.length === 0 ? (
         <Text type="secondary">{t("familyTaskBoard.empty", "空")}</Text>
       ) : (
@@ -175,7 +183,9 @@ function BoardColumn({
                   <Tag color="blue">{task.agent_id}</Tag>
                 </Tooltip>
               ) : null}
-              {task.recurrence_rule ? <Tag color="cyan">{task.recurrence_rule}</Tag> : null}
+              {task.recurrence_rule ? (
+                <Tag color="cyan">{task.recurrence_rule}</Tag>
+              ) : null}
               {task.schedule_at !== null ? (
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   {formatMessageTime(task.schedule_at * 1000, timezone)}
@@ -263,18 +273,38 @@ function CreateTaskModal({
       okText={t("familyTaskBoard.create", "创建")}
       destroyOnHidden
     >
-      <Form form={form} layout="vertical" initialValues={{ task_type: "DEVICE", max_attempts: 3 }}>
-        <Form.Item name="title" label={t("familyTaskBoard.title_", "标题")} rules={[{ required: true }]}>
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{ task_type: "DEVICE", max_attempts: 3 }}
+      >
+        <Form.Item
+          name="title"
+          label={t("familyTaskBoard.title_", "标题")}
+          rules={[{ required: true }]}
+        >
           <Input maxLength={200} />
         </Form.Item>
-        <Form.Item name="description" label={t("familyTaskBoard.description", "说明")}>
+        <Form.Item
+          name="description"
+          label={t("familyTaskBoard.description", "说明")}
+        >
           <Input.TextArea rows={2} maxLength={5000} />
         </Form.Item>
-        <Form.Item name="task_type" label={t("familyTaskBoard.taskType", "类型")}>
+        <Form.Item
+          name="task_type"
+          label={t("familyTaskBoard.taskType", "类型")}
+        >
           <Select
             options={[
-              { value: "DEVICE", label: t("familyTaskBoard.typeDevice", "设备/系统") },
-              { value: "AGENT", label: t("familyTaskBoard.typeAgent", "由 Agent 执行") },
+              {
+                value: "DEVICE",
+                label: t("familyTaskBoard.typeDevice", "设备/系统"),
+              },
+              {
+                value: "AGENT",
+                label: t("familyTaskBoard.typeAgent", "由 Agent 执行"),
+              },
             ]}
           />
         </Form.Item>
@@ -289,34 +319,60 @@ function CreateTaskModal({
                 label={t("familyTaskBoard.agent", "执行 Agent")}
                 rules={[{ required: true }]}
               >
-                <Input placeholder={t("familyTaskBoard.agentHint", "Agent ID")} />
+                <Input
+                  placeholder={t("familyTaskBoard.agentHint", "Agent ID")}
+                />
               </Form.Item>
             ) : null
           }
         </Form.Item>
-        <Form.Item name="schedule_at" label={t("familyTaskBoard.scheduleAt", "执行时间")}>
+        <Form.Item
+          name="schedule_at"
+          label={t("familyTaskBoard.scheduleAt", "执行时间")}
+        >
           <DatePicker showTime style={{ width: "100%" }} />
         </Form.Item>
         <Form.Item
           name="recurrence_rule"
           label={t("familyTaskBoard.recurrence", "重复规则")}
-          extra={t("familyTaskBoard.recurrenceHint", "RFC 5545 RRULE；每次运行只生成下一个")}
+          extra={t(
+            "familyTaskBoard.recurrenceHint",
+            "RFC 5545 RRULE；每次运行只生成下一个",
+          )}
         >
           <Select
             allowClear
             options={[
-              { value: "FREQ=DAILY", label: t("familyTaskBoard.daily", "每天") },
-              { value: "FREQ=WEEKLY", label: t("familyTaskBoard.weekly", "每周") },
-              { value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", label: t("familyTaskBoard.weekdays", "工作日") },
-              { value: "FREQ=MONTHLY", label: t("familyTaskBoard.monthly", "每月") },
+              {
+                value: "FREQ=DAILY",
+                label: t("familyTaskBoard.daily", "每天"),
+              },
+              {
+                value: "FREQ=WEEKLY",
+                label: t("familyTaskBoard.weekly", "每周"),
+              },
+              {
+                value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+                label: t("familyTaskBoard.weekdays", "工作日"),
+              },
+              {
+                value: "FREQ=MONTHLY",
+                label: t("familyTaskBoard.monthly", "每月"),
+              },
             ]}
           />
         </Form.Item>
         <Space>
-          <Form.Item name="priority" label={t("familyTaskBoard.priority", "优先级")}>
+          <Form.Item
+            name="priority"
+            label={t("familyTaskBoard.priority", "优先级")}
+          >
             <InputNumber min={-100} max={100} />
           </Form.Item>
-          <Form.Item name="max_attempts" label={t("familyTaskBoard.maxAttempts", "最大尝试")}>
+          <Form.Item
+            name="max_attempts"
+            label={t("familyTaskBoard.maxAttempts", "最大尝试")}
+          >
             <InputNumber min={1} max={20} />
           </Form.Item>
         </Space>
@@ -336,12 +392,13 @@ function TaskDetailModal({
 }) {
   const { t } = useTranslation();
   const { familyId } = useActiveFamily();
-  const [attempts, setAttempts] = useState<
-    Awaited<ReturnType<typeof familyTaskSchedulerApi.listAttempts>> | null
-  >(null);
+  const [attempts, setAttempts] = useState<Awaited<
+    ReturnType<typeof familyTaskSchedulerApi.listAttempts>
+  > | null>(null);
 
   const fetcher = useCallback(
-    (taskId: string) => familyTaskSchedulerApi.listAttempts(familyId as string, taskId),
+    (taskId: string) =>
+      familyTaskSchedulerApi.listAttempts(familyId as string, taskId),
     [familyId],
   );
   const { data, loading } = useFamilyQuery(task?.id ?? null, fetcher);
@@ -353,7 +410,7 @@ function TaskDetailModal({
       onCancel={onClose}
       footer={null}
       destroyOnHidden
-      afterOpenChange={(isOpen) => setAttempts(isOpen ? (data ?? null) : null)}
+      afterOpenChange={(isOpen) => setAttempts(isOpen ? data ?? null : null)}
     >
       {task ? (
         <Space direction="vertical" style={{ width: "100%" }}>
@@ -361,17 +418,22 @@ function TaskDetailModal({
             <Tag>{task.status}</Tag>
             <Tag>{task.task_type}</Tag>
             {task.agent_id ? <Tag color="blue">{task.agent_id}</Tag> : null}
-            {task.priority !== 0 ? <Tag color="gold">P{task.priority}</Tag> : null}
+            {task.priority !== 0 ? (
+              <Tag color="gold">P{task.priority}</Tag>
+            ) : null}
             {task.version > 1 ? <Tag>v{task.version}</Tag> : null}
           </Space>
           {task.description ? <Text>{task.description}</Text> : null}
           {task.result_summary ? (
             <Text type="secondary">{task.result_summary}</Text>
           ) : null}
-          {task.last_error ? <Text type="danger">{task.last_error}</Text> : null}
+          {task.last_error ? (
+            <Text type="danger">{task.last_error}</Text>
+          ) : null}
           {task.transaction_id ? (
             <Text type="secondary">
-              {t("familyTaskBoard.transaction", "关联事务")}: {task.transaction_id}
+              {t("familyTaskBoard.transaction", "关联事务")}:{" "}
+              {task.transaction_id}
             </Text>
           ) : null}
           {task.schedule_at !== null ? (
@@ -398,7 +460,9 @@ function TaskDetailModal({
             loading={loading}
           >
             {(attempts ?? []).length === 0 ? (
-              <Text type="secondary">{t("familyTaskBoard.noAttempts", "还没有执行过")}</Text>
+              <Text type="secondary">
+                {t("familyTaskBoard.noAttempts", "还没有执行过")}
+              </Text>
             ) : (
               (attempts ?? []).map((attempt) => (
                 <div key={attempt.id}>

@@ -11,7 +11,17 @@
  * meets a state machine.
  */
 import { useCallback, useState } from "react";
-import { App, Button, Card, Checkbox, Empty, Grid, Input, Segmented, Space } from "antd";
+import {
+  App,
+  Button,
+  Card,
+  Checkbox,
+  Empty,
+  Grid,
+  Input,
+  Segmented,
+  Space,
+} from "antd";
 import { useTranslation } from "react-i18next";
 
 import { useActiveFamily } from "../../hooks/useActiveFamily";
@@ -32,11 +42,15 @@ export default function FamilyTasks() {
   const screens = useBreakpoint();
   const isPhone = screens.sm === false;
 
-  const fetcher = useCallback((id: string) => homeMindFamilyApi.listTasks(id), []);
+  const fetcher = useCallback(
+    (id: string) => homeMindFamilyApi.listTasks(id),
+    [],
+  );
   const { data, loading, error, reload } = useFamilyQuery(familyId, fetcher);
 
   const visible = (data ?? []).filter((task) => {
-    if (filter === "OPEN") return task.status !== "DONE" && task.status !== "CANCELLED";
+    if (filter === "OPEN")
+      return task.status !== "DONE" && task.status !== "CANCELLED";
     if (filter === "DONE") return task.status === "DONE";
     return true;
   });

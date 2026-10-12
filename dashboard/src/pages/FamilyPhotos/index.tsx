@@ -52,21 +52,33 @@ export default function FamilyPhotos() {
                   cover={
                     familyId === null ? null : (
                       <img
-                        src={homeMindPagesApi.assetThumbnailUrl(familyId, asset.id)}
+                        src={homeMindPagesApi.assetThumbnailUrl(
+                          familyId,
+                          asset.id,
+                        )}
                         alt={asset.name}
-                        style={{ width: "100%", height: 120, objectFit: "cover" }}
+                        style={{
+                          width: "100%",
+                          height: 120,
+                          objectFit: "cover",
+                        }}
                         loading="lazy"
                         onError={(event) => {
                           // A thumbnail that cannot render must not leave a
                           // broken image in the grid.
-                          (event.currentTarget as HTMLImageElement).style.display =
-                            "none";
+                          (
+                            event.currentTarget as HTMLImageElement
+                          ).style.display = "none";
                         }}
                       />
                     )
                   }
                 >
-                  <Text ellipsis title={asset.name} style={{ display: "block" }}>
+                  <Text
+                    ellipsis
+                    title={asset.name}
+                    style={{ display: "block" }}
+                  >
                     {asset.name}
                   </Text>
                   <Tag>{asset.asset_type}</Tag>

@@ -13,8 +13,7 @@ export const homemindActiveFamilyApi = {
       method: "PUT",
       body: JSON.stringify({ family_id: familyId }),
     }),
-  clear: () =>
-    request<ActiveFamilyResponse>(root, { method: "DELETE" }),
+  clear: () => request<ActiveFamilyResponse>(root, { method: "DELETE" }),
 };
 
 export type ActiveFamilyApi = typeof homemindActiveFamilyApi;

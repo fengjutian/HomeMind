@@ -98,7 +98,9 @@ export default function MainLayout() {
     const handleAnimationEnd = () => {
       content.classList.remove(styles.routeEntering);
     };
-    content.addEventListener("animationend", handleAnimationEnd, { once: true });
+    content.addEventListener("animationend", handleAnimationEnd, {
+      once: true,
+    });
     return () => {
       content.removeEventListener("animationend", handleAnimationEnd);
       content.classList.remove(styles.routeEntering);
@@ -298,10 +300,7 @@ export default function MainLayout() {
             }}
           >
             {pendingPath && pendingPath !== currentPath ? (
-              <div
-                className={styles.routeProgress}
-                aria-hidden="true"
-              />
+              <div className={styles.routeProgress} aria-hidden="true" />
             ) : null}
             {isMobile &&
               !(

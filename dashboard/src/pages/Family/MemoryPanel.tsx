@@ -389,9 +389,7 @@ export default function MemoryPanel({
             />
           </Form.Item>
           <Button type="primary" htmlType="submit" icon={<Plus size={16} />}>
-            {editing
-              ? t("common.save", "保存")
-              : t("common.create", "创建")}
+            {editing ? t("common.save", "保存") : t("common.create", "创建")}
           </Button>
         </Form>
       </Modal>

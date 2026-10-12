@@ -103,37 +103,39 @@ export default function FamilyTimeline() {
       }
     >
       <>
-      <QueryError error={error} />
-      <Card size="small">
-        {loading && entries.length === 0 ? (
-          <Text type="secondary">{t("family.timeline.loading", "加载中…")}</Text>
-        ) : entries.length === 0 ? (
-          <Empty description={t("family.timeline.empty", "暂无记录")} />
-        ) : (
-          [...grouped.entries()].map(([day, items]) => (
-            <div key={day} style={{ marginBottom: 16 }}>
-              <Typography.Title level={5} style={{ marginTop: 0 }}>
-                {day}
-              </Typography.Title>
-              <List
-                size="small"
-                dataSource={items}
-                renderItem={(entry) => (
-                  <List.Item key={entry.id}>
-                    <Space>
-                      <Tag>{entry.tag}</Tag>
-                      <Text>{entry.title}</Text>
-                      <Text type="secondary">
-                        {formatServerDateTime(entry.at, data?.timezone)}
-                      </Text>
-                    </Space>
-                  </List.Item>
-                )}
-              />
-            </div>
-          ))
-        )}
-      </Card>
+        <QueryError error={error} />
+        <Card size="small">
+          {loading && entries.length === 0 ? (
+            <Text type="secondary">
+              {t("family.timeline.loading", "加载中…")}
+            </Text>
+          ) : entries.length === 0 ? (
+            <Empty description={t("family.timeline.empty", "暂无记录")} />
+          ) : (
+            [...grouped.entries()].map(([day, items]) => (
+              <div key={day} style={{ marginBottom: 16 }}>
+                <Typography.Title level={5} style={{ marginTop: 0 }}>
+                  {day}
+                </Typography.Title>
+                <List
+                  size="small"
+                  dataSource={items}
+                  renderItem={(entry) => (
+                    <List.Item key={entry.id}>
+                      <Space>
+                        <Tag>{entry.tag}</Tag>
+                        <Text>{entry.title}</Text>
+                        <Text type="secondary">
+                          {formatServerDateTime(entry.at, data?.timezone)}
+                        </Text>
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              </div>
+            ))
+          )}
+        </Card>
       </>
     </FamilyPageShell>
   );

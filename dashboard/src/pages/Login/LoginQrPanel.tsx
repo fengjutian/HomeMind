@@ -18,7 +18,10 @@ const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
  * a phone resolves to the phone itself. Falls back to the current origin when
  * no LAN address could be detected.
  */
-export function buildScanUrl(lanHost: string | null, loc = window.location): string {
+export function buildScanUrl(
+  lanHost: string | null,
+  loc = window.location,
+): string {
   const onLoopback = LOOPBACK_HOSTS.has(loc.hostname);
   if (!onLoopback && !lanHost) return loc.origin;
   const host = lanHost ?? loc.hostname;

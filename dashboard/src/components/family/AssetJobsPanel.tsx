@@ -47,7 +47,10 @@ import {
   type AssetJob,
   type AssetJobItem,
 } from "../../api/modules/homeMindPages";
-import { homeMindFamilyApi, type FamilyAsset } from "../../api/modules/homeMindFamily";
+import {
+  homeMindFamilyApi,
+  type FamilyAsset,
+} from "../../api/modules/homeMindFamily";
 
 const { Text } = Typography;
 
@@ -184,13 +187,23 @@ export default function AssetJobsPanel({
               onChange={(value) => setFilter(String(value))}
               options={[
                 { label: t("family.jobsAll", "全部"), value: "ALL" },
-                { label: JOB_STATUS_LABELS.RUNNING ?? "进行中", value: "RUNNING" },
-                { label: JOB_STATUS_LABELS.COMPLETED ?? "已完成", value: "COMPLETED" },
+                {
+                  label: JOB_STATUS_LABELS.RUNNING ?? "进行中",
+                  value: "RUNNING",
+                },
+                {
+                  label: JOB_STATUS_LABELS.COMPLETED ?? "已完成",
+                  value: "COMPLETED",
+                },
                 { label: JOB_STATUS_LABELS.FAILED ?? "失败", value: "FAILED" },
               ]}
             />
             {showCreate ? (
-              <Button size="small" type="primary" onClick={() => setCreateOpen(true)}>
+              <Button
+                size="small"
+                type="primary"
+                onClick={() => setCreateOpen(true)}
+              >
                 {t("family.jobsNew", "新建任务")}
               </Button>
             ) : null}
@@ -251,7 +264,9 @@ export default function AssetJobsPanel({
                   </Button>
                   <Button
                     size="small"
-                    disabled={row.status !== "PENDING" && row.status !== "RUNNING"}
+                    disabled={
+                      row.status !== "PENDING" && row.status !== "RUNNING"
+                    }
                     onClick={() =>
                       act(t("family.jobsPaused", "已暂停"), (id) =>
                         homeMindPagesApi.pauseAssetJob(id, row.job_id),
@@ -284,7 +299,10 @@ export default function AssetJobsPanel({
                   <Tooltip
                     title={
                       row.failed_items > 0
-                        ? t("family.jobsRetryHint", "只重跑失败项，已成功的不会重复执行")
+                        ? t(
+                            "family.jobsRetryHint",
+                            "只重跑失败项，已成功的不会重复执行",
+                          )
                         : ""
                     }
                   >
@@ -330,7 +348,12 @@ export default function AssetJobsPanel({
             label={t("family.jobsType", "类型")}
             rules={[{ required: true }]}
           >
-            <Select options={ASSET_JOB_TYPES.map((value) => ({ value, label: value }))} />
+            <Select
+              options={ASSET_JOB_TYPES.map((value) => ({
+                value,
+                label: value,
+              }))}
+            />
           </Form.Item>
           {isAssetScoped ? (
             <Form.Item
@@ -367,7 +390,10 @@ export default function AssetJobsPanel({
               rules={[
                 {
                   required: true,
-                  message: t("family.jobsSourceRequired", "扫描任务需要选择来源"),
+                  message: t(
+                    "family.jobsSourceRequired",
+                    "扫描任务需要选择来源",
+                  ),
                 },
               ]}
             >
@@ -412,7 +438,9 @@ export default function AssetJobsPanel({
         onClose={() => setDetail(null)}
         title={
           detail
-            ? `${detail.job_type} · ${JOB_STATUS_LABELS[detail.status] ?? detail.status}`
+            ? `${detail.job_type} · ${
+                JOB_STATUS_LABELS[detail.status] ?? detail.status
+              }`
             : ""
         }
         extra={
@@ -448,7 +476,9 @@ export default function AssetJobsPanel({
               dataIndex: "status",
               width: 100,
               render: (value: string) => (
-                <Tag color={ITEM_STATUS_COLORS[value] ?? "default"}>{value}</Tag>
+                <Tag color={ITEM_STATUS_COLORS[value] ?? "default"}>
+                  {value}
+                </Tag>
               ),
             },
             {

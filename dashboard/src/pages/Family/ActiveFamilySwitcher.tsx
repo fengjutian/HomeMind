@@ -107,9 +107,7 @@ export default function ActiveFamilySwitcher({
             {current.name}
           </Tag>
         ) : (
-          <span>
-            {t("family.activeFamily.none", "未选择家族")}
-          </span>
+          <span>{t("family.activeFamily.none", "未选择家族")}</span>
         )}
         <ChevronDown size={14} />
       </Button>

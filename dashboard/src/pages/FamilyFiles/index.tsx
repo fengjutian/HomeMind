@@ -108,80 +108,84 @@ export default function FamilyFiles() {
       }
     >
       <>
-      <QueryError error={sources.error} />
-      <Card size="small">
-        <Breadcrumb
-          items={[
-            {
-              title: t("family.files.root", "根目录"),
-              onClick: () => setPath("."),
-            },
-            ...crumbs,
-          ]}
-        />
-        <Table
-          size="small"
-          style={{ marginTop: 12 }}
-          rowKey="path"
-          pagination={false}
-          dataSource={entries.data ?? []}
-          locale={{ emptyText: <Empty description={t("family.files.empty", "暂无文件")} /> }}
-          columns={[
-            {
-              title: t("family.files.name", "名称"),
-              dataIndex: "path",
-              render: (value: string, row) =>
-                row.kind === "directory" ? (
-                  <a onClick={() => setPath(value)}>{value}</a>
-                ) : (
-                  value
-                ),
-            },
-            {
-              title: t("family.files.size", "大小"),
-              dataIndex: "size_bytes",
-              width: 120,
-              render: (value: number | null) =>
-                value === null ? "-" : `${Math.round(value / 1024)} KB`,
-            },
-            {
-              title: t("family.files.modified", "修改时间"),
-              width: 200,
-              render: (_value, row) => row.path,
-            },
-            {
-              title: t("family.files.actions", "操作"),
-              width: 140,
-              render: (_value, row) =>
-                row.kind === "directory" ? null : (
-                  <Popconfirm
-                    title={t("family.files.confirmDelete", "确认移入恢复站?")}
-                    onConfirm={() => {
-                      if (sourceId === null) return;
-                      mutate("已提交删除申请", (id) =>
-                        homeMindFamilyApi.mutateFile(id, {
-                          action: "filesystem.delete",
-                          source_id: sourceId,
-                          path: row.path,
-                        }),
-                      );
-                    }}
-                  >
-                    <Button size="small" danger>
-                      {t("family.files.delete", "删除")}
-                    </Button>
-                  </Popconfirm>
-                ),
-            },
-          ]}
-        />
-        {entries.loading ? (
-          <Text type="secondary">{t("family.files.loading", "加载中…")}</Text>
-        ) : null}
-        <div style={{ marginTop: 12 }}>
-          <Tag>{t("family.files.trashHint", "删除的文件会先进入恢复站")}</Tag>
-        </div>
-      </Card>
+        <QueryError error={sources.error} />
+        <Card size="small">
+          <Breadcrumb
+            items={[
+              {
+                title: t("family.files.root", "根目录"),
+                onClick: () => setPath("."),
+              },
+              ...crumbs,
+            ]}
+          />
+          <Table
+            size="small"
+            style={{ marginTop: 12 }}
+            rowKey="path"
+            pagination={false}
+            dataSource={entries.data ?? []}
+            locale={{
+              emptyText: (
+                <Empty description={t("family.files.empty", "暂无文件")} />
+              ),
+            }}
+            columns={[
+              {
+                title: t("family.files.name", "名称"),
+                dataIndex: "path",
+                render: (value: string, row) =>
+                  row.kind === "directory" ? (
+                    <a onClick={() => setPath(value)}>{value}</a>
+                  ) : (
+                    value
+                  ),
+              },
+              {
+                title: t("family.files.size", "大小"),
+                dataIndex: "size_bytes",
+                width: 120,
+                render: (value: number | null) =>
+                  value === null ? "-" : `${Math.round(value / 1024)} KB`,
+              },
+              {
+                title: t("family.files.modified", "修改时间"),
+                width: 200,
+                render: (_value, row) => row.path,
+              },
+              {
+                title: t("family.files.actions", "操作"),
+                width: 140,
+                render: (_value, row) =>
+                  row.kind === "directory" ? null : (
+                    <Popconfirm
+                      title={t("family.files.confirmDelete", "确认移入恢复站?")}
+                      onConfirm={() => {
+                        if (sourceId === null) return;
+                        mutate("已提交删除申请", (id) =>
+                          homeMindFamilyApi.mutateFile(id, {
+                            action: "filesystem.delete",
+                            source_id: sourceId,
+                            path: row.path,
+                          }),
+                        );
+                      }}
+                    >
+                      <Button size="small" danger>
+                        {t("family.files.delete", "删除")}
+                      </Button>
+                    </Popconfirm>
+                  ),
+              },
+            ]}
+          />
+          {entries.loading ? (
+            <Text type="secondary">{t("family.files.loading", "加载中…")}</Text>
+          ) : null}
+          <div style={{ marginTop: 12 }}>
+            <Tag>{t("family.files.trashHint", "删除的文件会先进入恢复站")}</Tag>
+          </div>
+        </Card>
       </>
     </FamilyPageShell>
   );

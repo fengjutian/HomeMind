@@ -12,7 +12,17 @@
  * language of whoever happened to trigger it.
  */
 import { useCallback, useEffect, useState } from "react";
-import { App, Badge, Button, Drawer, Empty, List, Segmented, Space, Typography } from "antd";
+import {
+  App,
+  Badge,
+  Button,
+  Drawer,
+  Empty,
+  List,
+  Segmented,
+  Space,
+  Typography,
+} from "antd";
 import { BellOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -120,7 +130,10 @@ export default function FamilyNotificationsBell() {
   const openOne = async (notification: FamilyNotification) => {
     try {
       if (notification.read_at === null) {
-        await homeMindNotificationApi.markRead(familyId as string, notification.id);
+        await homeMindNotificationApi.markRead(
+          familyId as string,
+          notification.id,
+        );
         await loadCount();
         await loadList();
       }
@@ -168,10 +181,17 @@ export default function FamilyNotificationsBell() {
               onChange={(value) => setFilter(String(value) as Filter)}
               options={[
                 { label: t("notificationsBell.all", "全部"), value: "ALL" },
-                { label: t("notificationsBell.unread", "未读"), value: "UNREAD" },
+                {
+                  label: t("notificationsBell.unread", "未读"),
+                  value: "UNREAD",
+                },
               ]}
             />
-            <Button size="small" onClick={() => void readAll()} disabled={unread === 0}>
+            <Button
+              size="small"
+              onClick={() => void readAll()}
+              disabled={unread === 0}
+            >
               {t("notificationsBell.readAll", "全部已读")}
             </Button>
           </Space>
@@ -181,7 +201,9 @@ export default function FamilyNotificationsBell() {
           loading={loading}
           dataSource={items}
           locale={{
-            emptyText: <Empty description={t("notificationsBell.empty", "暂无通知")} />,
+            emptyText: (
+              <Empty description={t("notificationsBell.empty", "暂无通知")} />
+            ),
           }}
           renderItem={(notification) => {
             const title = t(notification.title_key, notification.type);
@@ -190,16 +212,25 @@ export default function FamilyNotificationsBell() {
               <List.Item
                 onClick={() => void openOne(notification)}
                 style={{
-                  cursor: targetRoute(notification) !== null ? "pointer" : "default",
+                  cursor:
+                    targetRoute(notification) !== null ? "pointer" : "default",
                   opacity: notification.read_at === null ? 1 : 0.55,
                 }}
               >
                 <List.Item.Meta
                   title={
                     <Space>
-                      <Text strong={notification.read_at === null}>{title}</Text>
+                      <Text strong={notification.read_at === null}>
+                        {title}
+                      </Text>
                       {notification.severity !== "INFO" ? (
-                        <Text type={notification.severity === "CRITICAL" ? "danger" : "warning"}>
+                        <Text
+                          type={
+                            notification.severity === "CRITICAL"
+                              ? "danger"
+                              : "warning"
+                          }
+                        >
                           {notification.severity}
                         </Text>
                       ) : null}
@@ -209,7 +240,10 @@ export default function FamilyNotificationsBell() {
                     <Space direction="vertical" size={0}>
                       <Text type="secondary">{body}</Text>
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        {formatMessageTime(notification.created_at * 1000, timezone)}
+                        {formatMessageTime(
+                          notification.created_at * 1000,
+                          timezone,
+                        )}
                       </Text>
                     </Space>
                   }

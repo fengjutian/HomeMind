@@ -71,7 +71,10 @@ const RECURRENCE_OPTIONS: { value: string; labelKey: string }[] = [
   { value: "", labelKey: "familyCalendar.recurrenceNone" },
   { value: "FREQ=DAILY", labelKey: "familyCalendar.recurrenceDaily" },
   { value: "FREQ=WEEKLY", labelKey: "familyCalendar.recurrenceWeekly" },
-  { value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", labelKey: "familyCalendar.recurrenceWeekdays" },
+  {
+    value: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+    labelKey: "familyCalendar.recurrenceWeekdays",
+  },
   { value: "FREQ=MONTHLY", labelKey: "familyCalendar.recurrenceMonthly" },
 ];
 
@@ -96,7 +99,8 @@ export default function FamilyCalendar() {
   } = useFamilyQuery(familyId, calendarsFetcher);
 
   const window = useMemo(() => {
-    const start = view === "WEEK" ? anchor.startOf("week") : anchor.startOf("month");
+    const start =
+      view === "WEEK" ? anchor.startOf("week") : anchor.startOf("month");
     const end = view === "WEEK" ? anchor.endOf("week") : anchor.endOf("month");
     // Pad by a day so a timezone offset cannot clip an occurrence that
     // belongs to the visible edge of the grid.
@@ -107,11 +111,21 @@ export default function FamilyCalendar() {
   }, [anchor, view]);
 
   const occurrencesFetcher = useCallback(
-    (id: string) => homeMindCalendarApi.listOccurrences(id, window.from, window.to, calendarId),
+    (id: string) =>
+      homeMindCalendarApi.listOccurrences(
+        id,
+        window.from,
+        window.to,
+        calendarId,
+      ),
     [window.from, window.to, calendarId],
   );
-  const { data: occurrences, loading, error, reload } =
-    useFamilyQuery(familyId, occurrencesFetcher);
+  const {
+    data: occurrences,
+    loading,
+    error,
+    reload,
+  } = useFamilyQuery(familyId, occurrencesFetcher);
 
   const events = useMemo(
     () => (occurrences ?? []).filter((o) => o.status === "CONFIRMED"),
@@ -126,7 +140,8 @@ export default function FamilyCalendar() {
       if (bucket) bucket.push(occurrence);
       else map.set(key, [occurrence]);
     }
-    for (const bucket of map.values()) bucket.sort((a, b) => a.starts_at - b.starts_at);
+    for (const bucket of map.values())
+      bucket.sort((a, b) => a.starts_at - b.starts_at);
     return map;
   }, [events, timezone]);
 
@@ -178,7 +193,10 @@ export default function FamilyCalendar() {
             options={[
               { label: t("familyCalendar.viewMonth", "月"), value: "MONTH" },
               { label: t("familyCalendar.viewWeek", "周"), value: "WEEK" },
-              { label: t("familyCalendar.viewAgenda", "议程"), value: "AGENDA" },
+              {
+                label: t("familyCalendar.viewAgenda", "议程"),
+                value: "AGENDA",
+              },
             ]}
           />
           <Button
@@ -192,7 +210,9 @@ export default function FamilyCalendar() {
             {t("familyCalendar.today", "今天")}
           </Button>
           <Button
-            onClick={() => setAnchor(anchor.add(1, view === "WEEK" ? "week" : "month"))}
+            onClick={() =>
+              setAnchor(anchor.add(1, view === "WEEK" ? "week" : "month"))
+            }
           >
             ›
           </Button>
@@ -214,7 +234,12 @@ export default function FamilyCalendar() {
           />
         ) : null}
         {view === "WEEK" ? (
-          <WeekStrip anchor={anchor} byDay={byDay} timezone={timezone} onSelect={setEditing} />
+          <WeekStrip
+            anchor={anchor}
+            byDay={byDay}
+            timezone={timezone}
+            onSelect={setEditing}
+          />
         ) : null}
         {view === "AGENDA" ? (
           <Agenda
@@ -275,7 +300,8 @@ function MonthGrid({
                     style={{ cursor: "pointer", marginInlineEnd: 0 }}
                     onClick={() => onSelect(item)}
                   >
-                    {formatServerHourMinute(item.starts_at * 1000, timezone)} {item.title}
+                    {formatServerHourMinute(item.starts_at * 1000, timezone)}{" "}
+                    {item.title}
                   </Tag>
                 </div>
               ))}
@@ -312,7 +338,10 @@ function WeekStrip({
         const items = byDay.get(key) ?? [];
         return (
           <Col key={key} xs={24} sm={12} md={8} lg={6} xl={3}>
-            <Card size="small" styles={{ body: { padding: 8, minHeight: 120 } }}>
+            <Card
+              size="small"
+              styles={{ body: { padding: 8, minHeight: 120 } }}
+            >
               <Text strong>{day.format("MM-DD ddd")}</Text>
               <div>
                 {items.map((item) => (
@@ -386,7 +415,8 @@ function OccurrenceRow({
         text={
           <span>
             {formatServerHourMinute(occurrence.starts_at * 1000, timezone)}–
-            {formatServerHourMinute(occurrence.ends_at * 1000, timezone)} {occurrence.title}
+            {formatServerHourMinute(occurrence.ends_at * 1000, timezone)}{" "}
+            {occurrence.title}
             {occurrence.location ? (
               <Text type="secondary"> · {occurrence.location}</Text>
             ) : null}
@@ -562,7 +592,10 @@ function EventModal({
         <Form.Item name="location" label={t("familyCalendar.location", "地点")}>
           <Input maxLength={300} />
         </Form.Item>
-        <Form.Item name="description" label={t("familyCalendar.description", "备注")}>
+        <Form.Item
+          name="description"
+          label={t("familyCalendar.description", "备注")}
+        >
           <Input.TextArea rows={2} maxLength={5000} />
         </Form.Item>
         <Form.Item
@@ -575,10 +608,16 @@ function EventModal({
         <Form.Item
           name="recurrence_rule"
           label={t("familyCalendar.recurrence", "重复")}
-          extra={t("familyCalendar.recurrenceHint", "重复规则以 RFC 5545 RRULE 保存")}
+          extra={t(
+            "familyCalendar.recurrenceHint",
+            "重复规则以 RFC 5545 RRULE 保存",
+          )}
         >
           <Select
-            options={RECURRENCE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+            options={RECURRENCE_OPTIONS.map((o) => ({
+              value: o.value,
+              label: t(o.labelKey),
+            }))}
           />
         </Form.Item>
         {isEdit && occurrence ? (

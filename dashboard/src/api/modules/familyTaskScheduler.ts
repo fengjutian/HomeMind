@@ -96,17 +96,20 @@ export const familyTaskSchedulerApi = {
       priority?: number;
       max_attempts?: number;
     },
-  ) => request<ScheduledTask>(`${root}/${familyId}/task-scheduler/tasks`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  }),
+  ) =>
+    request<ScheduledTask>(`${root}/${familyId}/task-scheduler/tasks`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   board: (familyId: string) =>
     request<TaskBoard>(`${root}/${familyId}/task-scheduler/board`),
 
   schedule: (familyId: string, taskId: string, scheduleAt: number | null) =>
     request<ScheduledTask>(
-      `${root}/${familyId}/task-scheduler/tasks/${taskId}/schedule?schedule_at=${scheduleAt ?? ""}`,
+      `${root}/${familyId}/task-scheduler/tasks/${taskId}/schedule?schedule_at=${
+        scheduleAt ?? ""
+      }`,
       { method: "POST" },
     ),
 
@@ -136,7 +139,11 @@ export const familyTaskSchedulerApi = {
       `${root}/${familyId}/task-scheduler/tasks/${taskId}/dependencies`,
     ),
 
-  removeDependency: (familyId: string, taskId: string, dependsOnTaskId: string) =>
+  removeDependency: (
+    familyId: string,
+    taskId: string,
+    dependsOnTaskId: string,
+  ) =>
     request<void>(
       `${root}/${familyId}/task-scheduler/tasks/${taskId}/dependencies/${dependsOnTaskId}`,
       { method: "DELETE" },

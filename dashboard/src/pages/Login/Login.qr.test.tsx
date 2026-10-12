@@ -51,9 +51,9 @@ function renderLogin() {
 describe("buildScanUrl", () => {
   it("points at the dev server, not the page's own port", () => {
     // Opened through the API on 8088 — the phone still needs the dev server.
-    expect(buildScanUrl("192.168.2.191", loc("http://192.168.2.191:8088/"))).toBe(
-      `http://192.168.2.191:${DEV_SERVER_PORT}`,
-    );
+    expect(
+      buildScanUrl("192.168.2.191", loc("http://192.168.2.191:8088/")),
+    ).toBe(`http://192.168.2.191:${DEV_SERVER_PORT}`);
   });
 
   it("keeps the LAN host when the page is on loopback", () => {

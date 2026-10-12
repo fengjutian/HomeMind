@@ -38,9 +38,7 @@ export default function InvitesPanel({ familyId }: InvitesPanelProps) {
   const [includeRedeemed, setIncludeRedeemed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [latest, setLatest] = useState<FamilyInviteCreateResponse | null>(
-    null,
-  );
+  const [latest, setLatest] = useState<FamilyInviteCreateResponse | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -145,7 +143,12 @@ export default function InvitesPanel({ familyId }: InvitesPanelProps) {
             label={t("family.inviteTtl", "有效期（秒）")}
             rules={[{ required: true, type: "number", min: 60, max: 2592000 }]}
           >
-            <InputNumber min={60} max={2592000} step={3600} style={{ width: "100%" }} />
+            <InputNumber
+              min={60}
+              max={2592000}
+              step={3600}
+              style={{ width: "100%" }}
+            />
           </Form.Item>
           <Button
             type="primary"
@@ -185,7 +188,10 @@ export default function InvitesPanel({ familyId }: InvitesPanelProps) {
               value={includeRedeemed ? "all" : "pending"}
               onChange={(value) => setIncludeRedeemed(value === "all")}
               options={[
-                { value: "pending", label: t("family.invitesPending", "未使用") },
+                {
+                  value: "pending",
+                  label: t("family.invitesPending", "未使用"),
+                },
                 { value: "all", label: t("family.invitesAll", "全部") },
               ]}
               style={{ width: 100 }}
@@ -214,11 +220,7 @@ export default function InvitesPanel({ familyId }: InvitesPanelProps) {
                         cancelText={t("family.cancel", "取消")}
                         onConfirm={() => void revoke(invite)}
                       >
-                        <Button
-                          type="text"
-                          danger
-                          icon={<Trash2 size={16} />}
-                        >
+                        <Button type="text" danger icon={<Trash2 size={16} />}>
                           {t("family.revoke", "撤销")}
                         </Button>
                       </Popconfirm>,
@@ -232,13 +234,9 @@ export default function InvitesPanel({ familyId }: InvitesPanelProps) {
                     <span>{invite.display_name}</span>
                     <Tag color="blue">{invite.role}</Tag>
                     {invite.redeemed_at !== null ? (
-                      <Tag color="green">
-                        {t("family.redeemed", "已兑换")}
-                      </Tag>
+                      <Tag color="green">{t("family.redeemed", "已兑换")}</Tag>
                     ) : (
-                      <Tag color="gold">
-                        {t("family.pending", "待使用")}
-                      </Tag>
+                      <Tag color="gold">{t("family.pending", "待使用")}</Tag>
                     )}
                   </Space>
                 }

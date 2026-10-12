@@ -27,7 +27,14 @@ import { stabilizeStreamingMarkdown } from "./stabilizeStreamingMarkdown";
 import styles from "./index.module.less";
 
 /* ---- Mermaid block component ---- */
-function MermaidBlock({ code }: { code: string }) {
+function MermaidBlock({
+  code,
+  onRegenerate,
+}: {
+  code: string;
+  onRegenerate?: (code: string) => void;
+}) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState(false);
@@ -93,9 +100,23 @@ function MermaidBlock({ code }: { code: string }) {
 
   if (error) {
     return (
-      <pre className={styles.codeBlock}>
-        <code>{code}</code>
-      </pre>
+      <div className={styles.mermaidError}>
+        <div className={styles.mermaidErrorHeader}>
+          <span>{t("chat.mermaidRenderFailed")}</span>
+          {onRegenerate ? (
+            <button
+              type="button"
+              className={styles.mermaidRegenerateBtn}
+              onClick={() => onRegenerate(code)}
+            >
+              {t("chat.regenerateMermaid")}
+            </button>
+          ) : null}
+        </div>
+        <pre className={styles.codeBlock}>
+          <code>{code}</code>
+        </pre>
+      </div>
     );
   }
 
@@ -249,6 +270,8 @@ export interface MarkdownProps {
   shellCommandDisabled?: boolean;
   shellCommandDisabledTitle?: string;
   shellCommandLabel?: string;
+  /** Ask the assistant to regenerate only a Mermaid block that failed to parse. */
+  onRegenerateMermaid?: (code: string) => void;
 }
 
 const Markdown = memo(function Markdown({
@@ -260,6 +283,7 @@ const Markdown = memo(function Markdown({
   shellCommandDisabled,
   shellCommandDisabledTitle,
   shellCommandLabel,
+  onRegenerateMermaid,
 }: MarkdownProps) {
   const { t } = useTranslation();
   const runLabel = shellCommandLabel ?? t("terminal.ai.execBtn");
@@ -305,7 +329,12 @@ const Markdown = memo(function Markdown({
                   </div>
                 );
               }
-              return <MermaidBlock code={codeString} />;
+              return (
+                <MermaidBlock
+                  code={codeString}
+                  onRegenerate={onRegenerateMermaid}
+                />
+              );
             }
 
             // Fenced code blocks with language

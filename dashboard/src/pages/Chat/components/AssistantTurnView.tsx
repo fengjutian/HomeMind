@@ -43,6 +43,7 @@ interface AssistantTurnViewProps {
    */
   liveSpeakers?: ReadonlyArray<string>;
   onRegenerate?: (messageId: string) => void;
+  onRegenerateMermaid?: (code: string) => void;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
   forkDisabled?: boolean;
@@ -82,6 +83,7 @@ export default function AssistantTurnView({
   isTurnInProgress = false,
   liveSpeakers = [],
   onRegenerate,
+  onRegenerateMermaid,
   onEditUserMessage,
   onForkAssistantMessage,
   forkDisabled,
@@ -271,6 +273,7 @@ export default function AssistantTurnView({
             agentId={agentId}
             showAvatar={firstSummaryIdx < 0 && !trailingHasSummary}
             onRegenerate={onRegenerate}
+            onRegenerateMermaid={onRegenerateMermaid}
             onEditUserMessage={onEditUserMessage}
             onForkAssistantMessage={onForkAssistantMessage}
             forkDisabled={forkDisabled}

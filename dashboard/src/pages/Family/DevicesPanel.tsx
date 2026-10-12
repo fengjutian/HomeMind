@@ -49,9 +49,10 @@ export default function DevicesPanel({ familyId }: DevicesPanelProps) {
   const [pairing, setPairing] = useState<FamilyDevicePairingResponse | null>(
     null,
   );
-  const [rotatedToken, setRotatedToken] = useState<{ deviceId: string; token: string } | null>(
-    null,
-  );
+  const [rotatedToken, setRotatedToken] = useState<{
+    deviceId: string;
+    token: string;
+  } | null>(null);
   const [commands, setCommands] = useState<FamilyDeviceCommand[]>([]);
   const [commandDeviceId, setCommandDeviceId] = useState<string | null>(null);
 
@@ -194,7 +195,10 @@ export default function DevicesPanel({ familyId }: DevicesPanelProps) {
                 </Tooltip>,
                 <Popconfirm
                   key="revoke"
-                  title={t("family.revokeTokenConfirm", "撤销该设备的活跃令牌？")}
+                  title={t(
+                    "family.revokeTokenConfirm",
+                    "撤销该设备的活跃令牌？",
+                  )}
                   okText={t("family.confirm", "确认")}
                   cancelText={t("family.cancel", "取消")}
                   onConfirm={() => void revoke(device)}
@@ -217,7 +221,9 @@ export default function DevicesPanel({ familyId }: DevicesPanelProps) {
                   <Space>
                     <span>{device.name}</span>
                     <Tag>{device.device_type}</Tag>
-                    {device.platform && <Tag color="blue">{device.platform}</Tag>}
+                    {device.platform && (
+                      <Tag color="blue">{device.platform}</Tag>
+                    )}
                     <Tag color={statusColor(device.status)}>
                       {device.status}
                     </Tag>
@@ -293,21 +299,43 @@ export default function DevicesPanel({ familyId }: DevicesPanelProps) {
             label={t("family.deviceName", "设备名称")}
             rules={[{ required: true, min: 1, max: 100 }]}
           >
-            <Input placeholder={t("family.deviceNamePlaceholder", "如：厨房平板")} />
+            <Input
+              placeholder={t("family.deviceNamePlaceholder", "如：厨房平板")}
+            />
           </Form.Item>
-          <Form.Item name="device_type" label={t("family.deviceType", "设备类型")}>
+          <Form.Item
+            name="device_type"
+            label={t("family.deviceType", "设备类型")}
+          >
             <Select
               options={[
                 { value: "phone", label: t("family.deviceType.phone", "手机") },
-                { value: "tablet", label: t("family.deviceType.tablet", "平板") },
-                { value: "speaker", label: t("family.deviceType.speaker", "音箱") },
-                { value: "display", label: t("family.deviceType.display", "显示屏") },
+                {
+                  value: "tablet",
+                  label: t("family.deviceType.tablet", "平板"),
+                },
+                {
+                  value: "speaker",
+                  label: t("family.deviceType.speaker", "音箱"),
+                },
+                {
+                  value: "display",
+                  label: t("family.deviceType.display", "显示屏"),
+                },
                 { value: "rpi", label: t("family.deviceType.rpi", "树莓派") },
               ]}
             />
           </Form.Item>
-          <Form.Item name="platform" label={t("family.platform", "平台（可选）")}>
-            <Input placeholder={t("family.platformPlaceholder", "android / ios / linux")} />
+          <Form.Item
+            name="platform"
+            label={t("family.platform", "平台（可选）")}
+          >
+            <Input
+              placeholder={t(
+                "family.platformPlaceholder",
+                "android / ios / linux",
+              )}
+            />
           </Form.Item>
           <Form.Item
             name="capabilities"
@@ -328,7 +356,10 @@ export default function DevicesPanel({ familyId }: DevicesPanelProps) {
         {pairing && (
           <div className={styles.inviteTokenBox}>
             <Typography.Text type="secondary">
-              {t("family.pairingShownOnce", "配对码仅展示一次，请立刻交付给设备")}
+              {t(
+                "family.pairingShownOnce",
+                "配对码仅展示一次，请立刻交付给设备",
+              )}
             </Typography.Text>
             <Space.Compact style={{ width: "100%", marginTop: 8 }}>
               <Input value={pairing.code} readOnly />

@@ -222,7 +222,8 @@ export const homeMindPagesApi = {
       asset_ids?: string[];
       config?: AssetJobConfig;
     },
-  ) => request<AssetJob>(`${root}/${familyId}/asset-jobs`, mutate("POST", body)),
+  ) =>
+    request<AssetJob>(`${root}/${familyId}/asset-jobs`, mutate("POST", body)),
   pauseAssetJob: (familyId: string, jobId: string) =>
     request<AssetJob>(
       `${root}/${familyId}/asset-jobs/${jobId}/pause`,
@@ -303,7 +304,9 @@ export const homeMindPagesApi = {
       mutate("POST", { target_memory_id: targetMemoryId }),
     ),
   listMemoryEvidence: (familyId: string, memoryId: string) =>
-    request<MemoryEvidence[]>(`${root}/${familyId}/memories/${memoryId}/evidence`),
+    request<MemoryEvidence[]>(
+      `${root}/${familyId}/memories/${memoryId}/evidence`,
+    ),
   archiveMemory: (familyId: string, memoryId: string) =>
     request<MemoryCandidate>(
       `${root}/${familyId}/memories/${memoryId}/archive`,
@@ -325,7 +328,10 @@ export const homeMindPagesApi = {
       limit?: number;
       visibility?: string;
     } = {},
-  ) => request<IndexedSearchResponse>(`${root}/${familyId}/search/indexed${qs(params)}`),
+  ) =>
+    request<IndexedSearchResponse>(
+      `${root}/${familyId}/search/indexed${qs(params)}`,
+    ),
 };
 
 export const JOB_STATUS_LABELS: Record<string, string> = {

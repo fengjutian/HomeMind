@@ -76,10 +76,12 @@ export default function MemoryCandidateReview({
 
   const visible = useMemo(() => {
     const rows = data ?? [];
-    if (view === "PENDING") return rows.filter((row) => row.status === "PENDING");
+    if (view === "PENDING")
+      return rows.filter((row) => row.status === "PENDING");
     if (view === "CONFLICT")
       return rows.filter((row) => row.status === "CONFLICTED");
-    if (view === "ARCHIVED") return rows.filter((row) => row.status === "ARCHIVED");
+    if (view === "ARCHIVED")
+      return rows.filter((row) => row.status === "ARCHIVED");
     return rows.filter((row) => row.status === "APPROVED");
   }, [data, view]);
 
@@ -121,7 +123,9 @@ export default function MemoryCandidateReview({
           loading={loading}
           dataSource={visible}
           locale={{
-            emptyText: <Empty description={t("family.memory.empty", "暂无记忆")} />,
+            emptyText: (
+              <Empty description={t("family.memory.empty", "暂无记忆")} />
+            ),
           }}
           columns={[
             {

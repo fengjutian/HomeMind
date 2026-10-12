@@ -15,9 +15,7 @@ export default defineConfig({
   // Mirror vite.config.ts so the dev-server port the QR code targets behaves
   // identically under test and in the real build.
   define: {
-    DEV_SERVER_PORT: JSON.stringify(
-      Number(process.env.VITE_DEV_PORT || 5173),
-    ),
+    DEV_SERVER_PORT: JSON.stringify(Number(process.env.VITE_DEV_PORT || 5173)),
   },
   resolve: {
     alias: {

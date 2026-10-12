@@ -1011,6 +1011,17 @@ function ChatPageInner() {
     [messages, wrappedHandleSend, hasPendingHitlPause, t],
   );
 
+  const handleRegenerateMermaid = useCallback(
+    (code: string) => {
+      if (hasPendingHitlPause) {
+        antMessage.warning(t("chat.hitl.finishPendingFirst"));
+        return;
+      }
+      wrappedHandleSend(t("chat.mermaidRegeneratePrompt", { code }));
+    },
+    [wrappedHandleSend, hasPendingHitlPause, t],
+  );
+
   // Edit user message: truncate history from that message onwards, replace
   // its content, and re-send — mirrors Claude / ChatGPT "edit message" behaviour.
   const handleEditUserMessage = useCallback(
@@ -1425,6 +1436,7 @@ function ChatPageInner() {
                     thinkingStartedAt={thinkingStartedAt}
                     sessionKey={activeThreadId ?? undefined}
                     onRegenerate={handleRegenerate}
+                    onRegenerateMermaid={handleRegenerateMermaid}
                     onEditUserMessage={handleEditUserMessage}
                     onForkAssistantMessage={handleForkAssistantMessage}
                     forkDisabled={forkDisabled}

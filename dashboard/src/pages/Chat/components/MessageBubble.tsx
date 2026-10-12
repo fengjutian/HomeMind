@@ -81,6 +81,7 @@ interface MessageBubbleProps {
   agentId?: string | null;
   composerLookups?: ComposerTagLookups;
   onRegenerate?: (messageId: string) => void;
+  onRegenerateMermaid?: (code: string) => void;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
   forkDisabled?: boolean;
@@ -533,6 +534,7 @@ function MessageBubble({
   agentId = null,
   composerLookups,
   onRegenerate,
+  onRegenerateMermaid,
   onEditUserMessage,
   onForkAssistantMessage,
   forkDisabled,
@@ -951,6 +953,7 @@ function MessageBubble({
                   <Markdown
                     content={textContent}
                     isStreaming={isStreaming}
+                    onRegenerateMermaid={onRegenerateMermaid}
                     onRunShellCommand={onRunShellCommand}
                     shellCommandDisabled={shellCommandDisabled}
                     shellCommandDisabledTitle={shellCommandDisabledTitle}

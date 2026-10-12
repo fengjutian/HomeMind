@@ -147,14 +147,22 @@ export const homeMindCalendarApi = {
       mutate("PATCH", body),
     ),
   deleteCalendar: (familyId: string, calendarId: string) =>
-    request<void>(`${root}/${familyId}/calendars/${calendarId}`, mutate("DELETE")),
+    request<void>(
+      `${root}/${familyId}/calendars/${calendarId}`,
+      mutate("DELETE"),
+    ),
 
   listEvents: (familyId: string, calendarId?: string) =>
     request<FamilyCalendarEvent[]>(
-      `${root}/${familyId}/calendar-events${calendarId ? `?calendar_id=${encodeURIComponent(calendarId)}` : ""}`,
+      `${root}/${familyId}/calendar-events${
+        calendarId ? `?calendar_id=${encodeURIComponent(calendarId)}` : ""
+      }`,
     ),
   createEvent: (familyId: string, body: CalendarEventCreateInput) =>
-    request<FamilyCalendarEvent>(`${root}/${familyId}/calendar-events`, json(body)),
+    request<FamilyCalendarEvent>(
+      `${root}/${familyId}/calendar-events`,
+      json(body),
+    ),
   updateEvent: (
     familyId: string,
     eventId: string,
@@ -170,7 +178,10 @@ export const homeMindCalendarApi = {
       json({}),
     ),
   deleteEvent: (familyId: string, eventId: string) =>
-    request<void>(`${root}/${familyId}/calendar-events/${eventId}`, mutate("DELETE")),
+    request<void>(
+      `${root}/${familyId}/calendar-events/${eventId}`,
+      mutate("DELETE"),
+    ),
 
   /**
    * Occurrences overlapping a window. The backend caps both the window
@@ -191,7 +202,9 @@ export const homeMindCalendarApi = {
 
   listReminders: (familyId: string, status?: string) =>
     request<FamilyReminder[]>(
-      `${root}/${familyId}/reminders${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+      `${root}/${familyId}/reminders${
+        status ? `?status=${encodeURIComponent(status)}` : ""
+      }`,
     ),
   createReminder: (
     familyId: string,
@@ -210,5 +223,7 @@ export const homeMindCalendarApi = {
       json({}),
     ),
   reminderSummary: (familyId: string) =>
-    request<{ counts: Record<string, number> }>(`${root}/${familyId}/reminders/summary`),
+    request<{ counts: Record<string, number> }>(
+      `${root}/${familyId}/reminders/summary`,
+    ),
 };

@@ -261,8 +261,7 @@ export default function EventsPanel({
                     <Tag color="blue">{event.event_type}</Tag>
                     {event.location && (
                       <Tag color="geekblue">
-                        {t("family.eventLocation", "地点")}：
-                        {event.location}
+                        {t("family.eventLocation", "地点")}：{event.location}
                       </Tag>
                     )}
                   </Space>
@@ -317,7 +316,9 @@ export default function EventsPanel({
             label={t("family.eventTitle", "标题")}
             rules={[{ required: true, min: 1, max: 200 }]}
           >
-            <Input placeholder={t("family.eventTitlePlaceholder", "如：爷爷生日")} />
+            <Input
+              placeholder={t("family.eventTitlePlaceholder", "如：爷爷生日")}
+            />
           </Form.Item>
           <Form.Item
             name="range"

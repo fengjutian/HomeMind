@@ -114,18 +114,17 @@ export default function BridgeDiagnosticsPanel() {
         />
       )}
 
-      {data &&
-        data.connections.some((c) => c.state === "INCOMPATIBLE") && (
-          <Alert
-            type="error"
-            showIcon
-            className={styles.alert}
-            message={t("advancedSettings.bridge.diagnostics.incompatibleDetail", {
-              count: data.connections.filter((c) => c.state === "INCOMPATIBLE")
-                .length,
-            })}
-          />
-        )}
+      {data && data.connections.some((c) => c.state === "INCOMPATIBLE") && (
+        <Alert
+          type="error"
+          showIcon
+          className={styles.alert}
+          message={t("advancedSettings.bridge.diagnostics.incompatibleDetail", {
+            count: data.connections.filter((c) => c.state === "INCOMPATIBLE")
+              .length,
+          })}
+        />
+      )}
 
       {data && (
         <>

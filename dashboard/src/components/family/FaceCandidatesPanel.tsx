@@ -119,8 +119,14 @@ export default function FaceCandidatesPanel() {
           onChange={(value) => setStatus(String(value) as typeof status)}
           options={[
             { label: t("family.facesPending", "待确认"), value: "PENDING" },
-            { label: t("family.facesConfirmedList", "已确认"), value: "CONFIRMED" },
-            { label: t("family.facesRejectedList", "已忽略"), value: "REJECTED" },
+            {
+              label: t("family.facesConfirmedList", "已确认"),
+              value: "CONFIRMED",
+            },
+            {
+              label: t("family.facesRejectedList", "已忽略"),
+              value: "REJECTED",
+            },
           ]}
         />
       }
@@ -159,8 +165,9 @@ export default function FaceCandidatesPanel() {
                       onError={(event) => {
                         // A missing preview must not hide the row: the
                         // decision is still meaningful without it.
-                        (event.currentTarget as HTMLImageElement).style.display =
-                          "none";
+                        (
+                          event.currentTarget as HTMLImageElement
+                        ).style.display = "none";
                       }}
                     />
                   )
