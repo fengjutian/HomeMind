@@ -39,6 +39,30 @@ vi.mock("antd", async (importOriginal) => {
   };
 });
 
+vi.mock("@videojs/react/video", async () => {
+  const React = await import("react");
+  return {
+    Video: (props: React.VideoHTMLAttributes<HTMLVideoElement>) =>
+      React.createElement("video", props),
+    VideoPlayer: ({ children }: { children?: ReactNode }) =>
+      React.createElement("div", null, children),
+    VideoSkin: ({ children }: { children?: ReactNode }) =>
+      React.createElement("div", null, children),
+  };
+});
+
+vi.mock("@videojs/react/audio", async () => {
+  const React = await import("react");
+  return {
+    Audio: (props: React.AudioHTMLAttributes<HTMLAudioElement>) =>
+      React.createElement("audio", props),
+    AudioPlayer: ({ children }: { children?: ReactNode }) =>
+      React.createElement("div", null, children),
+    AudioSkin: ({ children }: { children?: ReactNode }) =>
+      React.createElement("div", null, children),
+  };
+});
+
 vi.mock("../../api/modules/homeMindFamily", () => ({
   homeMindFamilyApi: { getAssetContentUrl, getAssetThumbnailUrl },
 }));

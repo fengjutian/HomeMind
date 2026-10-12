@@ -84,7 +84,9 @@ export default function FamilyAssetPreview({
     setPlayerOpen(true);
     setMediaLoading(true);
     try {
-      setMediaUrl(await homeMindFamilyApi.getAssetContentUrl(familyId, asset.id));
+      setMediaUrl(
+        await homeMindFamilyApi.getAssetContentUrl(familyId, asset.id),
+      );
     } catch (error) {
       setPlayerOpen(false);
       setMediaLoading(false);
