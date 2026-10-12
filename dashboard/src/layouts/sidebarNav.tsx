@@ -20,6 +20,7 @@ import {
   Shield,
   PanelsTopLeft,
   HouseHeart,
+  Wifi,
 } from "lucide-react";
 import type { OctopUser } from "../api/modules/auth";
 import { navAllowed, userCan } from "../utils/permissions";
@@ -52,6 +53,7 @@ export interface NavSection {
 export const SIDEBAR_NAV_KEYS = [
   "chat",
   "family",
+  "hardware",
   "experts",
   "tasks",
   "token-usage",
@@ -151,6 +153,12 @@ export function buildNavSections(
           path: "/family",
           icon: <HouseHeart size={iconSize} strokeWidth={iconStroke} />,
           labelKey: "nav.family",
+        },
+        {
+          key: "hardware",
+          path: "/smart-home",
+          icon: <Wifi size={iconSize} strokeWidth={iconStroke} />,
+          labelKey: "nav.hardware",
         },
         {
           key: "experts",
