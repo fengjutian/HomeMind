@@ -124,6 +124,19 @@ class FamilyAlbumRepo:
             ).fetchall()
         return [str(row["asset_id"]) for row in rows]
 
+    def list_all_asset_ids(self, family_id: str) -> dict[str, list[str]]:
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT aa.album_id, aa.asset_id FROM homemind_family_album_assets aa "
+                "JOIN homemind_family_albums a ON a.album_id = aa.album_id "
+                "WHERE a.family_id = ? ORDER BY aa.added_at, aa.asset_id",
+                (family_id,),
+            ).fetchall()
+        result: dict[str, list[str]] = {}
+        for row in rows:
+            result.setdefault(str(row["album_id"]), []).append(str(row["asset_id"]))
+        return result
+
     def create_plan(
         self, family_id: str, strategy: str, groups_json: str, created_by: int
     ) -> OrganizationPlanRow:

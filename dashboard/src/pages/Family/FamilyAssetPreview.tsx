@@ -1,13 +1,4 @@
-import {
-  App,
-  Button,
-  Image,
-  Modal,
-  Progress,
-  Space,
-  Spin,
-  Typography,
-} from "antd";
+import { Button, Image, Modal, Progress, Space, Spin, Typography } from "antd";
 import { Film, Music, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -15,13 +6,7 @@ import {
   homeMindFamilyApi,
   type FamilyAsset,
 } from "../../api/modules/homeMindFamily";
-import { formatBytes } from "../../utils/embeddingDownload";
 import styles from "./index.module.less";
-
-interface TransferProgress {
-  loaded: number;
-  total: number;
-}
 
 interface FamilyAssetPreviewProps {
   familyId: string;
@@ -43,10 +28,7 @@ export default function FamilyAssetPreview({
   const [mediaUrl, setMediaUrl] = useState("");
   const [playerOpen, setPlayerOpen] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(false);
-  const [transferProgress, setTransferProgress] =
-    useState<TransferProgress | null>(null);
-  const mediaRequestRef = useRef<AbortController | null>(null);
-  const { message } = App.useApp();
+  const [transferProgress, setTransferProgress] = useState(0);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -69,77 +51,40 @@ export default function FamilyAssetPreview({
 
   useEffect(() => {
     if (!visible || asset.asset_type !== "PHOTO") return;
-    let cancelled = false;
-    setSrc("");
+    setSrc(homeMindFamilyApi.getAssetThumbnailUrl(familyId, asset.id));
     setPreviewFailed(false);
-    void homeMindFamilyApi
-      .getAssetContent(familyId, asset.id)
-      .then(
-        (blob) =>
-          new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result));
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(blob);
-          }),
-      )
-      .then((dataUrl) => {
-        if (!cancelled) setSrc(dataUrl);
-      })
-      .catch(() => {
-        if (!cancelled) setPreviewFailed(true);
-      });
-    return () => {
-      cancelled = true;
-    };
   }, [asset.asset_type, asset.id, familyId, visible]);
 
-  useEffect(
-    () => () => {
-      mediaRequestRef.current?.abort();
-      if (mediaUrl) URL.revokeObjectURL(mediaUrl);
-    },
-    [mediaUrl],
-  );
-
-  const openPlayer = async () => {
-    mediaRequestRef.current?.abort();
-    const controller = new AbortController();
-    mediaRequestRef.current = controller;
+  const openPlayer = () => {
     setPlayerOpen(true);
     setMediaLoading(true);
-    setTransferProgress(null);
-    try {
-      const blob = await homeMindFamilyApi.getAssetContent(
-        familyId,
-        asset.id,
-        (loaded, total) => setTransferProgress({ loaded, total }),
-        { signal: controller.signal },
-      );
-      if (controller.signal.aborted) return;
-      setMediaUrl(URL.createObjectURL(blob));
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      setPlayerOpen(false);
-      message.error(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (mediaRequestRef.current === controller) {
-        mediaRequestRef.current = null;
-        setMediaLoading(false);
-      }
-    }
+    setTransferProgress(0);
+    setMediaUrl(homeMindFamilyApi.getAssetContentUrl(familyId, asset.id));
   };
 
   const closePlayer = () => {
-    mediaRequestRef.current?.abort();
-    mediaRequestRef.current = null;
     setPlayerOpen(false);
     setMediaLoading(false);
-    setTransferProgress(null);
-    setMediaUrl((current) => {
-      if (current) URL.revokeObjectURL(current);
-      return "";
-    });
+    setTransferProgress(0);
+    setMediaUrl("");
+  };
+
+  const updateBufferedProgress = (media: HTMLMediaElement) => {
+    if (
+      !Number.isFinite(media.duration) ||
+      media.duration <= 0 ||
+      media.buffered.length === 0
+    )
+      return;
+    setTransferProgress(
+      Math.min(
+        100,
+        Math.round(
+          (media.buffered.end(media.buffered.length - 1) / media.duration) *
+            100,
+        ),
+      ),
+    );
   };
 
   if (asset.asset_type === "VIDEO" || asset.asset_type === "AUDIO") {
@@ -168,21 +113,9 @@ export default function FamilyAssetPreview({
           onCancel={closePlayer}
         >
           <Spin spinning={mediaLoading}>
-            {mediaLoading && transferProgress && (
+            {mediaLoading && (
               <div className={styles.mediaTransferProgress}>
-                <Progress
-                  percent={Math.min(
-                    100,
-                    Math.round(
-                      (transferProgress.loaded / transferProgress.total) * 100,
-                    ),
-                  )}
-                  status="active"
-                />
-                <Typography.Text type="secondary">
-                  {formatBytes(transferProgress.loaded)} /{" "}
-                  {formatBytes(transferProgress.total)}
-                </Typography.Text>
+                <Progress percent={transferProgress} status="active" />
               </div>
             )}
             {mediaUrl && asset.asset_type === "VIDEO" && (
@@ -191,6 +124,11 @@ export default function FamilyAssetPreview({
                 src={mediaUrl}
                 controls
                 autoPlay
+                preload="metadata"
+                onCanPlay={() => setMediaLoading(false)}
+                onProgress={(event) =>
+                  updateBufferedProgress(event.currentTarget)
+                }
               />
             )}
             {mediaUrl && asset.asset_type === "AUDIO" && (
@@ -199,6 +137,11 @@ export default function FamilyAssetPreview({
                 src={mediaUrl}
                 controls
                 autoPlay
+                preload="metadata"
+                onCanPlay={() => setMediaLoading(false)}
+                onProgress={(event) =>
+                  updateBufferedProgress(event.currentTarget)
+                }
               />
             )}
           </Spin>
@@ -218,6 +161,8 @@ export default function FamilyAssetPreview({
           width={size}
           height={size}
           src={src}
+          fallback={homeMindFamilyApi.getAssetContentUrl(familyId, asset.id)}
+          onError={() => setPreviewFailed(true)}
           alt={asset.name}
           className={styles.assetThumbnail}
         />

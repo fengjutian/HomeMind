@@ -56,24 +56,22 @@ class FamilyAlbumManager:
         self.family.require_access(family_id, user)
         return self.repo.list_albums(family_id)
 
-    def add_asset(
-        self, family_id: str, album_id: str, asset_id: str, user: User
-    ) -> None:
+    def add_asset(self, family_id: str, album_id: str, asset_id: str, user: User) -> None:
         self._album(family_id, album_id, user)
         self.assets.get(family_id, asset_id, user)
         self.repo.add_asset(album_id, asset_id, user.id)
 
-    def remove_asset(
-        self, family_id: str, album_id: str, asset_id: str, user: User
-    ) -> bool:
+    def remove_asset(self, family_id: str, album_id: str, asset_id: str, user: User) -> bool:
         self._album(family_id, album_id, user)
         return self.repo.remove_asset(album_id, asset_id)
 
-    def asset_ids(
-        self, family_id: str, album_id: str, user: User
-    ) -> builtins.list[str]:
+    def asset_ids(self, family_id: str, album_id: str, user: User) -> builtins.list[str]:
         self._album(family_id, album_id, user)
         return self.repo.list_asset_ids(album_id)
+
+    def all_asset_ids(self, family_id: str, user: User) -> dict[str, builtins.list[str]]:
+        self.family.require_access(family_id, user)
+        return self.repo.list_all_asset_ids(family_id)
 
     def plan(
         self, family_id: str, user: User, strategy: OrganizationStrategy
@@ -81,9 +79,7 @@ class FamilyAlbumManager:
         family = self.family.require_access(family_id, user)
         if strategy is OrganizationStrategy.TIME_MONTH:
             buckets: dict[str, list[str]] = {}
-            for asset in self.assets.search(
-                family_id, user, asset_type="PHOTO", limit=500
-            ):
+            for asset in self.assets.search(family_id, user, asset_type="PHOTO", limit=500):
                 if asset.captured_at is None:
                     continue
                 month = datetime.fromtimestamp(
@@ -101,9 +97,7 @@ class FamilyAlbumManager:
                     [asset.id for asset in rows],
                     "identical SHA-256",
                 )
-                for index, rows in enumerate(
-                    self.assets.duplicate_groups(family_id, user), start=1
-                )
+                for index, rows in enumerate(self.assets.duplicate_groups(family_id, user), start=1)
             ]
         payload = json.dumps(
             [
@@ -115,9 +109,7 @@ class FamilyAlbumManager:
         )
         return self.repo.create_plan(family_id, strategy.value, payload, user.id)
 
-    def apply_plan(
-        self, family_id: str, plan_id: str, user: User
-    ) -> OrganizationPlanRow:
+    def apply_plan(self, family_id: str, plan_id: str, user: User) -> OrganizationPlanRow:
         self.family.require_manager(family_id, user)
         plan = self._plan(family_id, plan_id)
         if plan.status != "PLANNED":
@@ -139,9 +131,7 @@ class FamilyAlbumManager:
                 raise RuntimeError("organization plan verification failed")
         return applied
 
-    def get_plan(
-        self, family_id: str, plan_id: str, user: User
-    ) -> OrganizationPlanRow:
+    def get_plan(self, family_id: str, plan_id: str, user: User) -> OrganizationPlanRow:
         self.family.require_access(family_id, user)
         return self._plan(family_id, plan_id)
 

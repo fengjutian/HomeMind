@@ -228,6 +228,13 @@ async def test_family_foundation_api(
     assert response.content == b"duplicate"
     assert response.headers["content-type"].startswith("text/plain")
     assert response.headers["content-disposition"].startswith("inline")
+    response = await client.get(
+        f"/api/homemind/families/{family_id}/assets/{indexed_asset['id']}/content",
+        headers={**auth, "Range": "bytes=0-3"},
+    )
+    assert response.status_code == 206
+    assert response.content == b"dupl"
+    assert response.headers["content-range"] == "bytes 0-3/9"
     (assets_dir / "second.txt").unlink()
     response = await client.post(
         f"/api/homemind/families/{family_id}/asset-sources/{scan_result['source_id']}/scan",

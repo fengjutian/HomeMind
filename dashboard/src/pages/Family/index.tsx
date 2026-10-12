@@ -120,46 +120,52 @@ export default function FamilyPage() {
     if (!familyId) return;
     setLoading(true);
     try {
-      const [
-        nextMembers,
-        nextAlbums,
-        nextTasks,
-        nextMemories,
-        nextRelationships,
-        nextEvents,
-        nextAssets,
-      ] = await Promise.all([
-        homeMindFamilyApi.listMembers(familyId),
-        homeMindFamilyApi.listAlbums(familyId),
-        homeMindFamilyApi.listTasks(familyId),
-        homeMindFamilyApi.listMemories(familyId),
-        homeMindFamilyApi.listRelationships(familyId),
-        homeMindFamilyApi.listEvents(familyId),
-        homeMindFamilyApi.listAssets(familyId),
-      ]);
-      setMembers(nextMembers);
-      setAlbums(nextAlbums);
-      setTasks(nextTasks);
-      setMemories(nextMemories);
-      setRelationships(nextRelationships);
-      setEvents(nextEvents);
-      setAssets(nextAssets);
-      const entries = await Promise.all(
-        nextAlbums.map(
-          async (album) =>
-            [
-              album.id,
-              await homeMindFamilyApi.listAlbumAssets(familyId, album.id),
-            ] as const,
-        ),
-      );
-      setAlbumAssetIds(Object.fromEntries(entries));
+      if (activeTab === "home") {
+        const [nextMembers, nextAlbums, nextTasks, nextMemories] =
+          await Promise.all([
+            homeMindFamilyApi.listMembers(familyId),
+            homeMindFamilyApi.listAlbums(familyId),
+            homeMindFamilyApi.listTasks(familyId),
+            homeMindFamilyApi.listMemories(familyId),
+          ]);
+        setMembers(nextMembers);
+        setAlbums(nextAlbums);
+        setTasks(nextTasks);
+        setMemories(nextMemories);
+      } else if (activeTab === "members") {
+        const [nextMembers, nextRelationships] = await Promise.all([
+          homeMindFamilyApi.listMembers(familyId),
+          homeMindFamilyApi.listRelationships(familyId),
+        ]);
+        setMembers(nextMembers);
+        setRelationships(nextRelationships);
+      } else if (activeTab === "albums") {
+        const [nextAlbums, nextAssets, nextAlbumAssets] = await Promise.all([
+          homeMindFamilyApi.listAlbums(familyId),
+          homeMindFamilyApi.listAssets(familyId),
+          homeMindFamilyApi.listAllAlbumAssets(familyId),
+        ]);
+        setAlbums(nextAlbums);
+        setAssets(nextAssets);
+        setAlbumAssetIds(nextAlbumAssets);
+      } else if (activeTab === "tasks") {
+        const [nextMembers, nextTasks] = await Promise.all([
+          homeMindFamilyApi.listMembers(familyId),
+          homeMindFamilyApi.listTasks(familyId),
+        ]);
+        setMembers(nextMembers);
+        setTasks(nextTasks);
+      } else if (activeTab === "events") {
+        setEvents(await homeMindFamilyApi.listEvents(familyId));
+      } else if (["access", "photos"].includes(activeTab)) {
+        setMembers(await homeMindFamilyApi.listMembers(familyId));
+      }
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }
-  }, [familyId, message]);
+  }, [activeTab, familyId, message]);
 
   const refreshAssets = useCallback(async () => {
     if (!familyId) return;
@@ -167,7 +173,7 @@ export default function FamilyPage() {
   }, [familyId]);
 
   useEffect(() => void loadFamilies(), [loadFamilies]);
-  useEffect(() => void loadFamilyData(), [loadFamilyData, familyId]);
+  useEffect(() => void loadFamilyData(), [loadFamilyData]);
 
   const activeFamily = useMemo(
     () => families.find((family) => family.id === familyId),

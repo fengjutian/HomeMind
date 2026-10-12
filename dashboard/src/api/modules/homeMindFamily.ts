@@ -1,4 +1,14 @@
-import { request, requestBlob } from "../request";
+import { getApiUrl } from "../config";
+import { getAuthToken, request, requestBlob } from "../request";
+
+const authenticatedUrl = (path: string): string => {
+  const url = getApiUrl(path);
+  const token = getAuthToken();
+  if (!token) return url;
+  return `${url}${
+    url.includes("?") ? "&" : "?"
+  }access_token=${encodeURIComponent(token)}`;
+};
 
 export interface HomeMindFamily {
   id: string;
@@ -469,6 +479,8 @@ export const homeMindFamilyApi = {
   ) => request<FamilyAlbum>(`${root}/${familyId}/albums`, json(body)),
   listAlbumAssets: (familyId: string, albumId: string) =>
     request<string[]>(`${root}/${familyId}/albums/${albumId}/assets`),
+  listAllAlbumAssets: (familyId: string) =>
+    request<Record<string, string[]>>(`${root}/${familyId}/album-assets`),
   addAlbumAsset: (familyId: string, albumId: string, assetId: string) =>
     request<void>(
       `${root}/${familyId}/albums/${albumId}/assets`,
@@ -525,6 +537,10 @@ export const homeMindFamilyApi = {
       options,
       onProgress,
     ),
+  getAssetContentUrl: (familyId: string, assetId: string) =>
+    authenticatedUrl(`${root}/${familyId}/assets/${assetId}/content`),
+  getAssetThumbnailUrl: (familyId: string, assetId: string) =>
+    authenticatedUrl(`${root}/${familyId}/assets/${assetId}/thumbnail`),
   analyzePhotoLocal: (familyId: string, assetId: string) =>
     request<PhotoIntelligence>(
       `${root}/${familyId}/photos/${assetId}/analyze-local`,
@@ -564,6 +580,10 @@ export const homeMindFamilyApi = {
     request<FamilyApproval[]>(
       `${root}/${familyId}/approvals?status=${encodeURIComponent(status)}`,
     ),
+  listApprovalDashboard: (familyId: string) =>
+    request<
+      Array<{ approval: FamilyApproval; transaction: FamilyTransaction }>
+    >(`${root}/${familyId}/approval-dashboard`),
   decideApproval: (
     familyId: string,
     approvalId: string,

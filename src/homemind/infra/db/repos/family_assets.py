@@ -226,9 +226,7 @@ class FamilyAssetRepo:
             ).fetchone()
         return FamilyAssetSourceRow.from_row(row) if row else None
 
-    def get_source_by_uri(
-        self, family_id: str, directory_uri: str
-    ) -> FamilyAssetSourceRow | None:
+    def get_source_by_uri(self, family_id: str, directory_uri: str) -> FamilyAssetSourceRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
                 "SELECT * FROM homemind_family_asset_sources WHERE family_id = ? AND directory_uri = ?",
@@ -252,8 +250,7 @@ class FamilyAssetRepo:
         """
         with self._db.connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM homemind_family_asset_sources "
-                "ORDER BY family_id, created_at, id"
+                "SELECT * FROM homemind_family_asset_sources ORDER BY family_id, created_at, id"
             ).fetchall()
         return map_rows(rows, FamilyAssetSourceRow)
 
@@ -381,23 +378,27 @@ class FamilyAssetRepo:
 
     def duplicate_groups(self, family_id: str) -> list[list[FamilyAssetRow]]:
         with self._db.connect() as conn:
-            hashes = conn.execute(
+            rows = conn.execute(
+                "SELECT * FROM homemind_family_assets WHERE family_id = ? AND content_hash IN ("
                 "SELECT content_hash FROM homemind_family_assets WHERE family_id = ? "
-                "GROUP BY content_hash HAVING COUNT(*) > 1 ORDER BY content_hash",
-                (family_id,),
+                "GROUP BY content_hash HAVING COUNT(*) > 1) "
+                "ORDER BY content_hash, id",
+                (family_id, family_id),
             ).fetchall()
-            groups = []
-            for item in hashes:
-                rows = conn.execute(
-                    "SELECT * FROM homemind_family_assets WHERE family_id = ? AND content_hash = ? "
-                    "ORDER BY id",
-                    (family_id, item["content_hash"]),
-                ).fetchall()
-                groups.append(map_rows(rows, FamilyAssetRow))
+        groups: list[list[FamilyAssetRow]] = []
+        current_hash: str | None = None
+        for row in rows:
+            row_hash = str(row["content_hash"])
+            if row_hash != current_hash:
+                groups.append([])
+                current_hash = row_hash
+            groups[-1].append(FamilyAssetRow.from_row(row))
         return groups
 
     def delete(self, asset_id: str) -> bool:
         with self._db.transaction() as conn:
-            cursor = conn.execute("DELETE FROM homemind_family_assets WHERE asset_id = ?", (asset_id,))
+            cursor = conn.execute(
+                "DELETE FROM homemind_family_assets WHERE asset_id = ?", (asset_id,)
+            )
             deleted = int(cursor.rowcount or 0) > 0
         return deleted

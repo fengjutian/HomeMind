@@ -58,6 +58,11 @@ class ApprovalDecisionBody(BaseModel):
     reason: str | None = Field(default=None, max_length=1000)
 
 
+class ApprovalWithTransaction(BaseModel):
+    approval: ApprovalResponse
+    transaction: TransactionResponse
+
+
 class AuditResponse(_RowModel):
     id: str
     family_id: str
@@ -102,6 +107,23 @@ async def list_approvals(
     status: Literal["PENDING", "APPROVED", "REJECTED"] | None = Query(default="PENDING"),
 ) -> object:
     return _manager(server).list_approvals(family_id, user, status)
+
+
+@router.get(
+    "/{family_id}/approval-dashboard",
+    response_model=list[ApprovalWithTransaction],
+    summary="List approvals with their transaction details",
+)
+async def approval_dashboard(family_id: str, server: Server, user: CurrentUser) -> object:
+    manager = _manager(server)
+    approvals = manager.list_approvals(family_id, user, None)
+    return [
+        {
+            "approval": row,
+            "transaction": manager.get_transaction(family_id, row.transaction_id, user),
+        }
+        for row in approvals
+    ]
 
 
 @router.post(

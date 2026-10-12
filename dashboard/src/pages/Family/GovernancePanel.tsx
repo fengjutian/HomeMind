@@ -37,23 +37,20 @@ export default function GovernancePanel({ familyId }: GovernancePanelProps) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [pending, approved, rejected, nextAudit] = await Promise.all([
-        homeMindFamilyApi.listApprovals(familyId, "PENDING"),
-        homeMindFamilyApi.listApprovals(familyId, "APPROVED"),
-        homeMindFamilyApi.listApprovals(familyId, "REJECTED"),
+      const [dashboard, nextAudit] = await Promise.all([
+        homeMindFamilyApi.listApprovalDashboard(familyId),
         homeMindFamilyApi.listAudit(familyId),
       ]);
-      const rows = [...pending, ...approved, ...rejected].sort(
-        (a, b) => b.created_at - a.created_at,
-      );
+      const rows = dashboard
+        .map((item) => item.approval)
+        .sort((a, b) => b.created_at - a.created_at);
       setApprovals(rows);
       setAudit(nextAudit);
-      const details = await Promise.all(
-        rows.map((row) =>
-          homeMindFamilyApi.getTransaction(familyId, row.transaction_id),
+      setTransactions(
+        Object.fromEntries(
+          dashboard.map((item) => [item.transaction.id, item.transaction]),
         ),
       );
-      setTransactions(Object.fromEntries(details.map((row) => [row.id, row])));
     } catch (error) {
       message.error(error instanceof Error ? error.message : String(error));
     } finally {

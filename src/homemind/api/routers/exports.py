@@ -9,6 +9,7 @@ bundle never lands in a live family without a decision.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import shutil
 import tempfile
@@ -36,6 +37,21 @@ CurrentUser = Annotated[User, Depends(current_user)]
 # ZIP stays downloadable for a bounded window and the cleanup sweep
 # removes it afterwards.
 DOWNLOAD_TTL_SECONDS = 24 * 60 * 60
+MAX_IMPORT_BYTES = 512 * 1024 * 1024
+MAX_EXTRACTED_BYTES = 2 * 1024 * 1024 * 1024
+IMPORT_CHUNK_BYTES = 1024 * 1024
+
+
+def _extract_import_bundle(archive: Path, destination: Path) -> None:
+    with zipfile.ZipFile(archive) as handle:
+        entries = handle.infolist()
+        if sum(entry.file_size for entry in entries) > MAX_EXTRACTED_BYTES:
+            raise HTTPException(status_code=413, detail="expanded bundle is too large")
+        for entry in entries:
+            path = Path(entry.filename)
+            if path.is_absolute() or ".." in path.parts:
+                raise HTTPException(status_code=400, detail="bundle contains an unsafe path")
+        handle.extractall(destination)
 
 
 class FamilyExportResponse(BaseModel):
@@ -115,7 +131,9 @@ async def create_export(
     ),
 ) -> FamilyExportResponse:
     result = _manager(server).create_export(
-        family_id, user, include_original_assets=include_original_assets,
+        family_id,
+        user,
+        include_original_assets=include_original_assets,
     )
     manifest = result["manifest"]
     return FamilyExportResponse(
@@ -135,12 +153,11 @@ async def create_export(
     summary="List this family's exports",
 )
 async def list_exports(
-    family_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> list[FamilyExportListItem]:
-    return [
-        FamilyExportListItem(**row)
-        for row in _manager(server).list_exports(family_id, user)
-    ]
+    return [FamilyExportListItem(**row) for row in _manager(server).list_exports(family_id, user)]
 
 
 @router.get(
@@ -193,7 +210,10 @@ async def download_export(
     summary="Delete an export bundle from disk",
 )
 async def delete_export(
-    family_id: str, export_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    export_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> Response:
     _manager(server).delete_export(family_id, export_id, user)
     return Response(status_code=204)
@@ -224,18 +244,24 @@ async def stage_import(
     """
     target = Path(tempfile.gettempdir()) / f"homemind-import-{family_id}-{_stamp()}.zip"
     try:
-        payload = await bundle.read()
-        with zipfile.ZipFile(_bytes_to_zip(payload)) as handle:
-            for entry in handle.namelist():
-                if entry.startswith("/") or ".." in Path(entry).parts:
-                    raise HTTPException(
-                        status_code=400, detail="bundle contains an unsafe path",
-                    )
-            handle.extractall(target.parent / target.stem)
+        size = 0
+        with target.open("wb") as output:
+            while chunk := await bundle.read(IMPORT_CHUNK_BYTES):
+                size += len(chunk)
+                if size > MAX_IMPORT_BYTES:
+                    raise HTTPException(status_code=413, detail="bundle is too large")
+                output.write(chunk)
+        await asyncio.to_thread(_extract_import_bundle, target, target.parent / target.stem)
     except zipfile.BadZipFile as exc:
         raise HTTPException(status_code=400, detail="not a valid zip archive") from exc
+    finally:
+        with contextlib.suppress(OSError):
+            target.unlink()
     staged = _manager(server).stage_import(
-        family_id, user, bundle=target.parent / target.stem, dry_run=dry_run,
+        family_id,
+        user,
+        bundle=target.parent / target.stem,
+        dry_run=dry_run,
     )
     manifest = staged["manifest"]
     return FamilyImportStageResponse(
@@ -265,7 +291,10 @@ async def apply_import(
     user: CurrentUser,
 ) -> dict[str, object]:
     result = _manager(server).apply_import(
-        family_id, import_id, user, bundle=Path(body.bundle_path),
+        family_id,
+        import_id,
+        user,
+        bundle=Path(body.bundle_path),
     )
     return result
 
@@ -275,7 +304,10 @@ async def apply_import(
     summary="Reject a staged import",
 )
 async def reject_import(
-    family_id: str, import_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    import_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> dict[str, object]:
     return _manager(server).reject_import(family_id, import_id, user)
 
@@ -284,17 +316,6 @@ def _stamp() -> str:
     import time  # noqa: PLC0415
 
     return str(int(time.time() * 1000))
-
-
-def _bytes_to_zip(payload: bytes) -> Path:
-    import tempfile as _tempfile  # noqa: PLC0415
-
-    handle = _tempfile.NamedTemporaryFile(  # noqa: SIM115
-        suffix=".zip", delete=False,
-    )
-    handle.write(payload)
-    handle.close()
-    return Path(handle.name)
 
 
 def _cleanup(path: Path) -> None:

@@ -1,18 +1,17 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { App } from "antd";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import FamilyAssetPreview from "./FamilyAssetPreview";
 
-const { getAssetContent } = vi.hoisted(() => ({
-  getAssetContent: vi.fn(),
+const { getAssetContentUrl, getAssetThumbnailUrl } = vi.hoisted(() => ({
+  getAssetContentUrl: vi.fn(
+    () => "https://server.test/video.mp4?access_token=short",
+  ),
+  getAssetThumbnailUrl: vi.fn(
+    () => "https://server.test/thumb.webp?access_token=short",
+  ),
 }));
 
 vi.mock("antd", async (importOriginal) => {
@@ -34,31 +33,23 @@ vi.mock("antd", async (importOriginal) => {
     Progress: ({ percent }: { percent: number }) =>
       React.createElement("span", null, `${percent}%`),
     Space: container("div"),
-    Spin: container("div"),
+    Spin: ({ children }: { children?: ReactNode }) =>
+      React.createElement("div", null, children),
     Typography: { Text: container("span") },
   };
 });
 
 vi.mock("../../api/modules/homeMindFamily", () => ({
-  homeMindFamilyApi: { getAssetContent },
+  homeMindFamilyApi: { getAssetContentUrl, getAssetThumbnailUrl },
 }));
 
 describe("FamilyAssetPreview", () => {
-  beforeEach(() => getAssetContent.mockReset());
+  beforeEach(() => {
+    getAssetContentUrl.mockClear();
+    getAssetThumbnailUrl.mockClear();
+  });
 
-  it("shows byte progress while a video is transferred", async () => {
-    let reportProgress: ((loaded: number, total: number) => void) | undefined;
-    getAssetContent.mockImplementation(
-      (
-        _familyId: string,
-        _assetId: string,
-        onProgress?: (loaded: number, total: number) => void,
-      ) => {
-        reportProgress = onProgress;
-        return new Promise<Blob>(() => undefined);
-      },
-    );
-
+  it("gives the video element a direct range-capable URL", () => {
     render(
       <App>
         <FamilyAssetPreview
@@ -69,10 +60,10 @@ describe("FamilyAssetPreview", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "trip.mp4" }));
-    await waitFor(() => expect(reportProgress).toBeDefined());
-    act(() => reportProgress?.(5 * 1024 * 1024, 10 * 1024 * 1024));
-
-    expect(await screen.findByText("50%")).toBeInTheDocument();
-    expect(screen.getByText("5.00 MB / 10.0 MB")).toBeInTheDocument();
+    expect(document.querySelector("video")).toHaveAttribute(
+      "src",
+      "https://server.test/video.mp4?access_token=short",
+    );
+    expect(getAssetContentUrl).toHaveBeenCalledWith("family-1", "video-1");
   });
 });

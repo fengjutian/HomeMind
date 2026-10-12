@@ -118,6 +118,15 @@ async def list_album_assets(
     return _manager(server).asset_ids(family_id, album_id, user)
 
 
+@router.get(
+    "/{family_id}/album-assets",
+    response_model=dict[str, list[str]],
+    summary="List asset ids for every family album",
+)
+async def list_all_album_assets(family_id: str, server: Server, user: CurrentUser) -> object:
+    return _manager(server).all_asset_ids(family_id, user)
+
+
 @router.post(
     "/{family_id}/albums/{album_id}/assets",
     status_code=204,
