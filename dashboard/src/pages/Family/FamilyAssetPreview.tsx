@@ -1,4 +1,8 @@
-import { App, Button, Image, Modal, Progress, Space, Spin, Typography } from "antd";
+import { Audio, AudioPlayer, AudioSkin } from "@videojs/react/audio";
+import "@videojs/react/audio/skin.css";
+import { Video, VideoPlayer, VideoSkin } from "@videojs/react/video";
+import "@videojs/react/video/skin.css";
+import { App, Button, Image, Modal, Space, Spin, Typography } from "antd";
 import { Film, Music, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -30,7 +34,6 @@ export default function FamilyAssetPreview({
   const [mediaUrl, setMediaUrl] = useState("");
   const [playerOpen, setPlayerOpen] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(false);
-  const [transferProgress, setTransferProgress] = useState(0);
   const { message } = App.useApp();
   const { t } = useTranslation();
 
@@ -80,7 +83,6 @@ export default function FamilyAssetPreview({
   const openPlayer = async () => {
     setPlayerOpen(true);
     setMediaLoading(true);
-    setTransferProgress(0);
     try {
       setMediaUrl(await homeMindFamilyApi.getAssetContentUrl(familyId, asset.id));
     } catch (error) {
@@ -92,33 +94,13 @@ export default function FamilyAssetPreview({
 
   const handleMediaError = () => {
     setMediaLoading(false);
-    setTransferProgress(0);
     message.error(t("family.mediaLoadFailed", "媒体加载失败"));
   };
 
   const closePlayer = () => {
     setPlayerOpen(false);
     setMediaLoading(false);
-    setTransferProgress(0);
     setMediaUrl("");
-  };
-
-  const updateBufferedProgress = (media: HTMLMediaElement) => {
-    if (
-      !Number.isFinite(media.duration) ||
-      media.duration <= 0 ||
-      media.buffered.length === 0
-    )
-      return;
-    setTransferProgress(
-      Math.min(
-        100,
-        Math.round(
-          (media.buffered.end(media.buffered.length - 1) / media.duration) *
-            100,
-        ),
-      ),
-    );
   };
 
   if (asset.asset_type === "VIDEO" || asset.asset_type === "AUDIO") {
@@ -147,38 +129,32 @@ export default function FamilyAssetPreview({
           onCancel={closePlayer}
         >
           <Spin spinning={mediaLoading}>
-            {mediaLoading && mediaUrl && (
-              <div className={styles.mediaTransferProgress}>
-                <Progress percent={transferProgress} status="active" />
-              </div>
-            )}
             {mediaUrl && asset.asset_type === "VIDEO" && (
-              <video
-                className={styles.mediaPlayer}
-                src={mediaUrl}
-                controls
-                autoPlay
-                preload="metadata"
-                onCanPlay={() => setMediaLoading(false)}
-                onError={handleMediaError}
-                onProgress={(event) =>
-                  updateBufferedProgress(event.currentTarget)
-                }
-              />
+              <VideoPlayer>
+                <VideoSkin className={styles.mediaPlayer}>
+                  <Video
+                    src={mediaUrl}
+                    autoPlay
+                    playsInline
+                    preload="metadata"
+                    onCanPlay={() => setMediaLoading(false)}
+                    onError={handleMediaError}
+                  />
+                </VideoSkin>
+              </VideoPlayer>
             )}
             {mediaUrl && asset.asset_type === "AUDIO" && (
-              <audio
-                className={styles.mediaPlayer}
-                src={mediaUrl}
-                controls
-                autoPlay
-                preload="metadata"
-                onCanPlay={() => setMediaLoading(false)}
-                onError={handleMediaError}
-                onProgress={(event) =>
-                  updateBufferedProgress(event.currentTarget)
-                }
-              />
+              <AudioPlayer>
+                <AudioSkin className={styles.mediaPlayer}>
+                  <Audio
+                    src={mediaUrl}
+                    autoPlay
+                    preload="metadata"
+                    onCanPlay={() => setMediaLoading(false)}
+                    onError={handleMediaError}
+                  />
+                </AudioSkin>
+              </AudioPlayer>
             )}
           </Spin>
         </Modal>
