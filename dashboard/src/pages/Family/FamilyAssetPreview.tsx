@@ -1,4 +1,13 @@
-import { App, Button, Image, Modal, Space, Spin, Typography } from "antd";
+import {
+  App,
+  Button,
+  Image,
+  Modal,
+  Progress,
+  Space,
+  Spin,
+  Typography,
+} from "antd";
 import { Film, Music, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -6,7 +15,13 @@ import {
   homeMindFamilyApi,
   type FamilyAsset,
 } from "../../api/modules/homeMindFamily";
+import { formatBytes } from "../../utils/embeddingDownload";
 import styles from "./index.module.less";
+
+interface TransferProgress {
+  loaded: number;
+  total: number;
+}
 
 interface FamilyAssetPreviewProps {
   familyId: string;
@@ -28,6 +43,9 @@ export default function FamilyAssetPreview({
   const [mediaUrl, setMediaUrl] = useState("");
   const [playerOpen, setPlayerOpen] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(false);
+  const [transferProgress, setTransferProgress] =
+    useState<TransferProgress | null>(null);
+  const mediaRequestRef = useRef<AbortController | null>(null);
   const { message } = App.useApp();
 
   useEffect(() => {
@@ -78,27 +96,46 @@ export default function FamilyAssetPreview({
 
   useEffect(
     () => () => {
+      mediaRequestRef.current?.abort();
       if (mediaUrl) URL.revokeObjectURL(mediaUrl);
     },
     [mediaUrl],
   );
 
   const openPlayer = async () => {
+    mediaRequestRef.current?.abort();
+    const controller = new AbortController();
+    mediaRequestRef.current = controller;
     setPlayerOpen(true);
     setMediaLoading(true);
+    setTransferProgress(null);
     try {
-      const blob = await homeMindFamilyApi.getAssetContent(familyId, asset.id);
+      const blob = await homeMindFamilyApi.getAssetContent(
+        familyId,
+        asset.id,
+        (loaded, total) => setTransferProgress({ loaded, total }),
+        { signal: controller.signal },
+      );
+      if (controller.signal.aborted) return;
       setMediaUrl(URL.createObjectURL(blob));
     } catch (error) {
+      if (controller.signal.aborted) return;
       setPlayerOpen(false);
       message.error(error instanceof Error ? error.message : String(error));
     } finally {
-      setMediaLoading(false);
+      if (mediaRequestRef.current === controller) {
+        mediaRequestRef.current = null;
+        setMediaLoading(false);
+      }
     }
   };
 
   const closePlayer = () => {
+    mediaRequestRef.current?.abort();
+    mediaRequestRef.current = null;
     setPlayerOpen(false);
+    setMediaLoading(false);
+    setTransferProgress(null);
     setMediaUrl((current) => {
       if (current) URL.revokeObjectURL(current);
       return "";
@@ -131,6 +168,23 @@ export default function FamilyAssetPreview({
           onCancel={closePlayer}
         >
           <Spin spinning={mediaLoading}>
+            {mediaLoading && transferProgress && (
+              <div className={styles.mediaTransferProgress}>
+                <Progress
+                  percent={Math.min(
+                    100,
+                    Math.round(
+                      (transferProgress.loaded / transferProgress.total) * 100,
+                    ),
+                  )}
+                  status="active"
+                />
+                <Typography.Text type="secondary">
+                  {formatBytes(transferProgress.loaded)} /{" "}
+                  {formatBytes(transferProgress.total)}
+                </Typography.Text>
+              </div>
+            )}
             {mediaUrl && asset.asset_type === "VIDEO" && (
               <video
                 className={styles.mediaPlayer}

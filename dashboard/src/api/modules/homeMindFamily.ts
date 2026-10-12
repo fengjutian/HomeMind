@@ -375,15 +375,9 @@ export const homeMindFamilyApi = {
       json(body),
     ),
   revokeInvite: (familyId: string, inviteId: string) =>
-    request<void>(
-      `${root}/${familyId}/invites/${inviteId}`,
-      mutate("DELETE"),
-    ),
+    request<void>(`${root}/${familyId}/invites/${inviteId}`, mutate("DELETE")),
   redeemInvite: (body: { token: string }) =>
-    request<FamilyInviteRedeemResponse>(
-      `${root}/invites/redeem`,
-      json(body),
-    ),
+    request<FamilyInviteRedeemResponse>(`${root}/invites/redeem`, json(body)),
   listDevices: (familyId: string) =>
     request<FamilyDevice[]>(`${root}/${familyId}/devices`),
   getDevice: (familyId: string, deviceId: string) =>
@@ -415,20 +409,16 @@ export const homeMindFamilyApi = {
       mutate("PATCH", body),
     ),
   deleteDevice: (familyId: string, deviceId: string) =>
-    request<void>(
-      `${root}/${familyId}/devices/${deviceId}`,
-      mutate("DELETE"),
-    ),
+    request<void>(`${root}/${familyId}/devices/${deviceId}`, mutate("DELETE")),
   rotateDeviceToken: (familyId: string, deviceId: string) =>
     request<{ token: string }>(
       `${root}/${familyId}/devices/${deviceId}/rotate-token`,
       { method: "POST" },
     ),
   revokeDeviceToken: (familyId: string, deviceId: string) =>
-    request<void>(
-      `${root}/${familyId}/devices/${deviceId}/revoke-token`,
-      { method: "POST" },
-    ),
+    request<void>(`${root}/${familyId}/devices/${deviceId}/revoke-token`, {
+      method: "POST",
+    }),
   listDeviceCommands: (familyId: string, deviceId: string) =>
     request<FamilyDeviceCommand[]>(
       `${root}/${familyId}/devices/${deviceId}/commands`,
@@ -524,8 +514,17 @@ export const homeMindFamilyApi = {
     request<FamilyAsset[][]>(`${root}/${familyId}/assets/duplicates`),
   deleteAssetIndex: (familyId: string, assetId: string) =>
     request<void>(`${root}/${familyId}/assets/${assetId}`, mutate("DELETE")),
-  getAssetContent: (familyId: string, assetId: string) =>
-    requestBlob(`${root}/${familyId}/assets/${assetId}/content`),
+  getAssetContent: (
+    familyId: string,
+    assetId: string,
+    onProgress?: (loaded: number, total: number) => void,
+    options?: RequestInit,
+  ) =>
+    requestBlob(
+      `${root}/${familyId}/assets/${assetId}/content`,
+      options,
+      onProgress,
+    ),
   analyzePhotoLocal: (familyId: string, assetId: string) =>
     request<PhotoIntelligence>(
       `${root}/${familyId}/photos/${assetId}/analyze-local`,
@@ -578,7 +577,9 @@ export const homeMindFamilyApi = {
   listTransactions: (familyId: string, status?: string) =>
     request<FamilyTransaction[]>(
       status
-        ? `${root}/${familyId}/transactions?status=${encodeURIComponent(status)}`
+        ? `${root}/${familyId}/transactions?status=${encodeURIComponent(
+            status,
+          )}`
         : `${root}/${familyId}/transactions`,
     ),
   getTransaction: (familyId: string, transactionId: string) =>
@@ -737,13 +738,12 @@ export const homeMindFamilyApi = {
       mutate("PATCH", body),
     ),
   deleteMemory: (familyId: string, memoryId: string) =>
-    request<void>(
-      `${root}/${familyId}/memories/${memoryId}`,
-      mutate("DELETE"),
-    ),
+    request<void>(`${root}/${familyId}/memories/${memoryId}`, mutate("DELETE")),
   searchMemoriesFts: (familyId: string, query: string, limit = 20) =>
     request<FamilyMemory[]>(
-      `${root}/${familyId}/memories/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+      `${root}/${familyId}/memories/search?q=${encodeURIComponent(
+        query,
+      )}&limit=${limit}`,
     ),
   search: (familyId: string, query: string) =>
     request<FamilySearchResult[]>(
