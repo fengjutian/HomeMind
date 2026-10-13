@@ -14,6 +14,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 )
 
 //go:embed assets/*
@@ -29,15 +30,18 @@ const (
 
 // App is the Wails service bound to the shell UI.
 type App struct {
-	app            *application.App
-	window         *application.WebviewWindow
-	settingsWindow *application.WebviewWindow
-	store          *settingsStore
-	sleep          *sleepGuard
-	cmd            *exec.Cmd
-	monitorCancel  context.CancelFunc
-	mu             sync.Mutex
-	quitting       bool
+	app                *application.App
+	window             *application.WebviewWindow
+	settingsWindow     *application.WebviewWindow
+	store              *settingsStore
+	sleep              *sleepGuard
+	cmd                *exec.Cmd
+	monitorCancel      context.CancelFunc
+	notifications      *notifications.NotificationService
+	notificationMu     sync.Mutex
+	notificationRoutes map[string]string
+	mu                 sync.Mutex
+	quitting           bool
 
 	trayClickMu    sync.Mutex
 	lastTrayClick  time.Time
@@ -397,10 +401,13 @@ func (a *App) requestQuit() {
 }
 
 func main() {
+	notifier := notifications.New()
 	store := &settingsStore{cur: loadSettings()}
 	api := &App{
-		store: store,
-		sleep: &sleepGuard{},
+		store:              store,
+		sleep:              &sleepGuard{},
+		notifications:      notifier,
+		notificationRoutes: make(map[string]string),
 	}
 
 	app := application.New(application.Options{
@@ -408,6 +415,7 @@ func main() {
 		Description: "HomeMind desktop",
 		Services: []application.Service{
 			application.NewService(api),
+			application.NewService(notifier),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.BundledAssetFileServer(assets),
@@ -424,6 +432,12 @@ func main() {
 	})
 	api.app = app
 	attachOpenURLEventListener(app, api.OpenExternal)
+	attachDesktopNotificationListener(app, api.showDesktopNotification)
+	notifier.OnNotificationResponse(func(result notifications.NotificationResult) {
+		if result.Error == nil {
+			api.activateNotification(result.Response.ID)
+		}
+	})
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(_ *application.ApplicationEvent) {
 		applyAppIcon(app)
 	})

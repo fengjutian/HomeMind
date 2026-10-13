@@ -16,6 +16,10 @@ import {
   truncatePushText,
 } from "../utils/dashboardPushToast";
 import styles from "./useDashboardPushToast.module.less";
+import {
+  hasDesktopNotificationBridge,
+  sendDesktopNotification,
+} from "../utils/desktopNotificationBridge";
 
 const PING_INTERVAL_MS = 25_000;
 const MAX_RETRY_MS = 15_000;
@@ -102,6 +106,9 @@ export function useDashboardPushToast(): void {
       ws = socket;
       socket.onopen = () => {
         retry = 0;
+        if (hasDesktopNotificationBridge()) {
+          socket.send(JSON.stringify({ type: "desktop_ready" }));
+        }
       };
       socket.onmessage = (event) => {
         let raw: unknown;
@@ -137,6 +144,15 @@ export function useDashboardPushToast(): void {
         const title = parsed.agent_name
           ? tRef.current("chat.pushToast.title", { name: parsed.agent_name })
           : tRef.current("chat.pushToast.titleFallback");
+        const sentToDesktop = sendDesktopNotification(parsed, title);
+        if (sentToDesktop && parsed.notification_id) {
+          socket.send(
+            JSON.stringify({
+              type: "desktop_notification_ack",
+              notification_id: parsed.notification_id,
+            }),
+          );
+        }
         const noticeKey = `dash-push-${parsed.thread_id}-${Date.now()}`;
         notificationRef.current.open({
           key: noticeKey,

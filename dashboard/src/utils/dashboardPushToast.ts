@@ -4,6 +4,7 @@ export type DashboardPushEvent = {
   thread_id: string;
   text: string;
   agent_name?: string;
+  notification_id?: string;
 };
 
 export function parseDashboardPushFrame(
@@ -18,12 +19,15 @@ export function parseDashboardPushFrame(
   const text = typeof obj.text === "string" ? obj.text : "";
   if (!agentId || !threadId || !text.trim()) return null;
   const name = typeof obj.agent_name === "string" ? obj.agent_name.trim() : "";
+  const notificationId =
+    typeof obj.notification_id === "string" ? obj.notification_id.trim() : "";
   return {
     type: "dashboard_push",
     agent_id: agentId,
     thread_id: threadId,
     text,
     ...(name ? { agent_name: name } : {}),
+    ...(notificationId ? { notification_id: notificationId } : {}),
   };
 }
 

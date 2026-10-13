@@ -1,0 +1,17 @@
+-- Persist desktop notifications until the desktop client accepts them.
+
+CREATE TABLE IF NOT EXISTS desktop_notifications (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  notification_id  TEXT NOT NULL UNIQUE,
+  user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  agent_id          TEXT NOT NULL,
+  thread_id         TEXT NOT NULL,
+  agent_name        TEXT NOT NULL,
+  body              TEXT NOT NULL,
+  created_at        INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_desktop_notifications_user_created
+  ON desktop_notifications(user_id, created_at);
+
+UPDATE _schema_version SET version = 24;

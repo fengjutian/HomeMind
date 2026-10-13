@@ -152,10 +152,7 @@ func TestSettingsWindowSizeFitsContent(t *testing.T) {
 	if settingsWindowWidth != 400 {
 		t.Fatalf("settings width is %d, expected 400", settingsWindowWidth)
 	}
-	if settingsWindowHeight >= 500 {
-		t.Fatalf("settings height %d leaves empty space under the form", settingsWindowHeight)
-	}
-	if settingsWindowHeight < 456 {
+	if settingsWindowHeight < 660 {
 		t.Fatalf("settings height %d clips the bottom padding", settingsWindowHeight)
 	}
 	if settingsWindowWindowsExtraHeight < 16 {

@@ -42,6 +42,32 @@ async def test_notifications_ws_missing_token_rejected(env: Any) -> None:
             pass
 
 
+async def test_desktop_ready_replays_and_acknowledges_pending_push(env: Any) -> None:
+    c, srv, alice_auth, _bob_auth = env
+    user = srv.user_manager.get("alice")
+    assert user is not None
+    repo = srv.services.desktop_notification_repo
+    repo.insert(
+        notification_id="notice-1",
+        user_id=user.id,
+        agent_id="agent-1",
+        thread_id="thread-1",
+        agent_name="Helper",
+        body="Reminder",
+    )
+
+    async with _notifications_ws(c, alice_auth) as ws:
+        await ws.send_json({"type": "desktop_ready"})
+        frame = await ws.receive_json()
+        assert frame["notification_id"] == "notice-1"
+        assert frame["text"] == "Reminder"
+        await ws.send_json({"type": "desktop_notification_ack", "notification_id": "notice-1"})
+        await ws.send_json({"type": "ping"})
+        assert await ws.receive_json() == {"type": "pong"}
+
+    assert repo.list_pending(user.id) == []
+
+
 async def test_notifications_ws_receives_user_push(env: Any) -> None:
     c, srv, alice_auth, _bob_auth = env
     user = srv.user_manager.get("alice")

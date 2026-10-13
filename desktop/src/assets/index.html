@@ -541,6 +541,18 @@
               <span></span>
             </label>
           </div>
+          <div class="row">
+            <div><div class="label">桌面通知 / Desktop notifications</div><small>仅在 HomeMind 隐藏或未聚焦时显示</small></div>
+            <label class="switch"><input type="checkbox" id="desktop-notifications" /><span></span></label>
+          </div>
+          <div class="row">
+            <div><div class="label">显示通知正文 / Show message body</div><small>关闭后仅提示打开 HomeMind 查看</small></div>
+            <label class="switch"><input type="checkbox" id="notification-body" /><span></span></label>
+          </div>
+          <div class="row">
+            <div><div class="label">静默时段 / Quiet hours</div><small>开始与结束相同表示关闭</small></div>
+            <div><input type="time" id="quiet-from" /> <span>–</span> <input type="time" id="quiet-to" /></div>
+          </div>
         </div>
         <div class="actions">
           <button class="primary" id="show-main">显示 HomeMind</button>
@@ -672,6 +684,10 @@
           locale: document.getElementById("locale").value,
           autostart: document.getElementById("autostart").checked,
           preventSleep: document.getElementById("sleep").checked,
+          desktopNotifications: document.getElementById("desktop-notifications").checked,
+          notificationShowBody: document.getElementById("notification-body").checked,
+          notificationQuietFrom: document.getElementById("quiet-from").value,
+          notificationQuietTo: document.getElementById("quiet-to").value,
         };
       }
 
@@ -718,8 +734,12 @@
         document.getElementById("locale").value = locale;
         document.getElementById("autostart").checked = !!s.autostart;
         document.getElementById("sleep").checked = !!s.preventSleep;
+        document.getElementById("desktop-notifications").checked = !!s.desktopNotifications;
+        document.getElementById("notification-body").checked = !!s.notificationShowBody;
+        document.getElementById("quiet-from").value = s.notificationQuietFrom || "22:00";
+        document.getElementById("quiet-to").value = s.notificationQuietTo || "07:00";
 
-        for (const id of ["locale", "autostart", "sleep"]) {
+        for (const id of ["locale", "autostart", "sleep", "desktop-notifications", "notification-body", "quiet-from", "quiet-to"]) {
           document.getElementById(id).addEventListener("change", persist);
         }
         document

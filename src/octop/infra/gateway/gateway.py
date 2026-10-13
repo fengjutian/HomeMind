@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import time
+import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -489,6 +490,15 @@ class Gateway:
         row = self._agent_manager.get_row(agent_id)
         name = getattr(row, "name", None) if row is not None else None
         agent_name = str(name).strip() if isinstance(name, str) and name.strip() else agent_id
+        notification_id = uuid.uuid4().hex
+        self._repos.desktop_notification_repo.insert(
+            notification_id=notification_id,
+            user_id=session.user_id,
+            agent_id=agent_id,
+            thread_id=session.thread_id,
+            agent_name=agent_name,
+            body=text,
+        )
         await self._ws_hub.push_to_user(
             session.user_id,
             {
@@ -497,6 +507,7 @@ class Gateway:
                 "thread_id": session.thread_id,
                 "text": text,
                 "agent_name": agent_name,
+                "notification_id": notification_id,
             },
         )
 

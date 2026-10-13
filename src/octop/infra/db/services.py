@@ -14,6 +14,7 @@ from octop.infra.db.repos.care_push import CarePushRepo
 from octop.infra.db.repos.channels import ChannelRepo
 from octop.infra.db.repos.connectors import ConnectorRepo
 from octop.infra.db.repos.cron import CronJobRepo
+from octop.infra.db.repos.desktop_notifications import DesktopNotificationRepo
 from octop.infra.db.repos.invites import InviteRepo
 from octop.infra.db.repos.knowledge import KnowledgeRepo
 from octop.infra.db.repos.proactive_care_config import ProactiveCareConfigRepo
@@ -46,6 +47,7 @@ class RepoBundle:
     provider_repo: ProviderRepo
     channel_repo: ChannelRepo
     cron_repo: CronJobRepo
+    desktop_notification_repo: DesktopNotificationRepo
     session_repo: SessionRepo
     thread_repo: ThreadRepo
     thread_message_repo: ThreadMessageRepo
@@ -77,6 +79,7 @@ class RepoBundle:
             provider_repo=ProviderRepo(db),
             channel_repo=ChannelRepo(db),
             cron_repo=CronJobRepo(db),
+            desktop_notification_repo=DesktopNotificationRepo(db),
             session_repo=SessionRepo(db),
             thread_repo=ThreadRepo(db),
             thread_message_repo=ThreadMessageRepo(db),
@@ -136,6 +139,10 @@ class SharedServices:
     @property
     def cron_repo(self) -> CronJobRepo:
         return self.repos.cron_repo
+
+    @property
+    def desktop_notification_repo(self) -> DesktopNotificationRepo:
+        return self.repos.desktop_notification_repo
 
     @property
     def session_repo(self) -> SessionRepo:

@@ -40,6 +40,7 @@ async def dashboard_notifications_ws(
     if server.app_runtime is None:
         await websocket.close(code=1011, reason="server not ready")
         return
+    assert server.services is not None
     hub = server.app_runtime.gateway.ws_hub
 
     connection_id = uuid.uuid4().hex
@@ -65,6 +66,13 @@ async def dashboard_notifications_ws(
                 continue
             if str(payload.get("type") or "") == "ping":
                 await send_frame({"type": "pong"})
+            elif str(payload.get("type") or "") == "desktop_ready":
+                for pending in server.services.desktop_notification_repo.list_pending(user.id):
+                    await send_frame(pending.to_frame())
+            elif str(payload.get("type") or "") == "desktop_notification_ack":
+                notification_id = payload.get("notification_id")
+                if isinstance(notification_id, str) and notification_id:
+                    server.services.desktop_notification_repo.acknowledge(user.id, notification_id)
     except WebSocketDisconnect:
         pass
     except Exception:

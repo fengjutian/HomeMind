@@ -17,18 +17,26 @@ const (
 
 // Settings is persisted at ~/.octop/desktop-settings.json
 type Settings struct {
-	Locale       Locale `json:"locale"`
-	Autostart    bool   `json:"autostart"`
-	PreventSleep bool   `json:"preventSleep"`
-	Port         int    `json:"port,omitempty"`
+	Locale                Locale `json:"locale"`
+	Autostart             bool   `json:"autostart"`
+	PreventSleep          bool   `json:"preventSleep"`
+	DesktopNotifications  bool   `json:"desktopNotifications"`
+	NotificationShowBody  bool   `json:"notificationShowBody"`
+	NotificationQuietFrom string `json:"notificationQuietFrom,omitempty"`
+	NotificationQuietTo   string `json:"notificationQuietTo,omitempty"`
+	Port                  int    `json:"port,omitempty"`
 }
 
 func defaultSettings() Settings {
 	return Settings{
-		Locale:       LocaleEN,
-		Autostart:    false,
-		PreventSleep: false,
-		Port:         8088,
+		Locale:                LocaleEN,
+		Autostart:             false,
+		PreventSleep:          false,
+		DesktopNotifications:  true,
+		NotificationShowBody:  true,
+		NotificationQuietFrom: "22:00",
+		NotificationQuietTo:   "07:00",
+		Port:                  8088,
 	}
 }
 
