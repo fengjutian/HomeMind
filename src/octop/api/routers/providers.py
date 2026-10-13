@@ -60,6 +60,7 @@ class ProviderPatchBody(BaseModel):
     base_url: str | None = None
     api_key: str | None = None
     extra_json: str | None = None
+    stream_usage: bool | None = None
     models: list[dict[str, Any]] | None = None
     note: str | None = None
     enabled: bool | None = None
@@ -67,7 +68,7 @@ class ProviderPatchBody(BaseModel):
 
 # Fields that affect harness factory / agent runtime when patched.
 _PROVIDER_REHYDRATE_FIELDS = frozenset(
-    {"kind", "base_url", "api_key", "extra_json", "models", "enabled"}
+    {"kind", "base_url", "api_key", "extra_json", "stream_usage", "models", "enabled"}
 )
 
 
