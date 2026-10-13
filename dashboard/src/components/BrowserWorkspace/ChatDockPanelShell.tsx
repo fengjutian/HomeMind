@@ -135,6 +135,8 @@ const ChatDockPanelShell: React.FC<ChatDockPanelShellProps> = ({
     (isDesktopShell() ? resolveDesktopChromeStyle() : null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const prevModeRef = useRef<PanelMode>(mode);
+  const styleRef = useRef(style);
+  styleRef.current = style;
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -182,9 +184,9 @@ const ChatDockPanelShell: React.FC<ChatDockPanelShellProps> = ({
     setPopupFullscreen(false);
     setLayoutMenuOpen(false);
     if (prev === "popup") {
-      clearWhenLeavingPopup(panelRef.current, style);
+      clearWhenLeavingPopup(panelRef.current, styleRef.current);
     }
-  }, [mode, style]);
+  }, [mode]);
 
   // Esc exits fullscreen only (keeps popup open).
   useEffect(() => {

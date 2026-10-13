@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DesktopChromeProvider } from "../../hooks/useDesktopChrome";
 import {
@@ -64,6 +64,40 @@ describe("ChatDockPanelShell chrome inset", () => {
     expect(
       container.querySelector(`[${WINDOW_CONTROLS_SPACER_ATTR}]`),
     ).toBeNull();
+  });
+
+  it("keeps the layout menu open when the dock style refreshes", async () => {
+    const { container, rerender } = render(
+      <DesktopChromeProvider value={null}>
+        <ChatDockPanelShell
+          {...baseProps}
+          mode="right"
+          style={{ width: 640 }}
+        />
+      </DesktopChromeProvider>,
+    );
+    const layoutButton = container.querySelector("button") as HTMLButtonElement;
+
+    fireEvent.click(layoutButton);
+    await waitFor(() => {
+      expect(
+        document.querySelector(".ant-dropdown:not(.ant-dropdown-hidden)"),
+      ).not.toBeNull();
+    });
+
+    rerender(
+      <DesktopChromeProvider value={null}>
+        <ChatDockPanelShell
+          {...baseProps}
+          mode="right"
+          style={{ width: 641 }}
+        />
+      </DesktopChromeProvider>,
+    );
+
+    expect(
+      document.querySelector(".ant-dropdown:not(.ant-dropdown-hidden)"),
+    ).not.toBeNull();
   });
 
   it("disables popup mask while an overlay menu is open", () => {
