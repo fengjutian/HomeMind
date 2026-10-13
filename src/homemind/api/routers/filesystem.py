@@ -12,9 +12,11 @@ from pydantic import BaseModel, Field, model_validator
 from homemind.api.routers.transactions import ApprovalResponse, TransactionResponse
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
+from homemind.infra.family.assets import FamilyAssetManager
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.filesystem import FamilyFilesystemManager
 from homemind.infra.family.manager import FamilyManager
+from homemind.infra.family.search_indexer import FamilySearchIndexer
 from homemind.infra.family.tasks import FamilyTaskManager
 from homemind.infra.family.transactions import FamilyTransactionManager
 from octop.api.deps import current_user, get_server
@@ -72,6 +74,24 @@ def _filesystem(server: OctopServer) -> FamilyFilesystemManager:
         FamilyManager(services.family_repo),
         services.family_asset_repo,
         services.family_transaction_repo,
+    )
+
+
+def _assets(server: OctopServer) -> FamilyAssetManager:
+    services = _services(server)
+    indexer = FamilySearchIndexer(
+        services.search_index_repo,
+        family_repo=services.family_repo,
+        context_repo=services.family_context_repo,
+        asset_repo=services.family_asset_repo,
+        album_repo=services.family_album_repo,
+        photo_repo=services.photo_intelligence_repo,
+    )
+    return FamilyAssetManager(
+        services.family_repo,
+        services.family_asset_repo,
+        search_indexer=indexer,
+        transfer_repo=services.asset_transfer_repo,
     )
 
 
@@ -217,7 +237,15 @@ async def upload_file(
         path=destination,
         content=upload.file,
     )
-    return await asyncio.to_thread(call)
+    entry = await asyncio.to_thread(call)
+    await asyncio.to_thread(
+        _assets(server).index_uploaded_file,
+        family_id,
+        source_id,
+        entry.path,
+        user,
+    )
+    return entry
 
 
 @router.post(

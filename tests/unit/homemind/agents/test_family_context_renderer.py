@@ -8,7 +8,6 @@ from homemind.infra.agents.family_context_renderer import (
     FamilySummary,
     MemberSummary,
     MemorySummary,
-    RelationshipSummary,
     render_family_context,
     render_no_active_family_hint,
 )

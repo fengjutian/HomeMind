@@ -130,7 +130,7 @@ class TestCapabilityNegotiation:
         assert negotiate(_hello(capabilities=42)).peer_capabilities == frozenset()
 
     def test_local_capabilities_are_a_subset_of_the_enum(self) -> None:
-        assert LOCAL_CAPABILITIES <= set(Capability)
+        assert set(Capability) >= LOCAL_CAPABILITIES
 
 
 class TestHelloFrame:

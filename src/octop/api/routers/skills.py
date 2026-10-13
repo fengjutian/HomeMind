@@ -1361,6 +1361,49 @@ async def hub_search_skills_global(
     return await _hub_search(request, q=q, limit=limit)
 
 
+@router.get("/skills/skills-sh/search", summary="Search the skills.sh marketplace")
+async def skills_sh_search_global(
+    q: str = "",
+    limit: int = 50,
+    _user: Any = Depends(current_user),
+) -> list[dict[str, Any]]:
+    """Search skills.sh using the public endpoint used by its official CLI."""
+    from fastapi import HTTPException  # noqa: PLC0415
+
+    from octop.infra.skills.skills_sh_market import (  # noqa: PLC0415
+        SkillsShMarketError,
+        SkillsShMarketTimeout,
+        search_skills_sh,
+    )
+
+    try:
+        return await search_skills_sh(q, limit=limit)
+    except SkillsShMarketTimeout as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
+    except SkillsShMarketError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get("/skills/qoder-community/search", summary="Search Qoder Community skills")
+async def qoder_community_search_global(
+    q: str = "",
+    limit: int = 100,
+    _user: Any = Depends(current_user),
+) -> list[dict[str, Any]]:
+    """Browse the curated Qoder Community catalog hosted on GitHub."""
+    from fastapi import HTTPException  # noqa: PLC0415
+
+    from octop.infra.skills.qoder_market import (  # noqa: PLC0415
+        QoderMarketError,
+        search_qoder_market,
+    )
+
+    try:
+        return await search_qoder_market(q, limit=limit)
+    except QoderMarketError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 @router.get("/skills/hub/rankings", summary="SkillHub rankings without an agent")
 async def hub_rankings_global(
     type: str = "all",

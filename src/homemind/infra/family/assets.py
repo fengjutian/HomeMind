@@ -351,6 +351,34 @@ class FamilyAssetManager:
         self._reindex_asset(family_id, asset)
         return asset
 
+    def index_uploaded_file(
+        self,
+        family_id: str,
+        source_id: str,
+        relative_path: str,
+        user: User,
+    ) -> FamilyAssetRow:
+        """Index one newly uploaded file without rescanning its source."""
+        self.family.require_access(family_id, user)
+        source = self.repo.get_source(source_id)
+        if source is None or source.family_id != family_id:
+            raise OctopError(ErrorCode.NOT_FOUND, "family asset source not found")
+        root = self._source_root(source).resolve()
+        target = (root / relative_path).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError as exc:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID,
+                "uploaded asset path leaves its source",
+            ) from exc
+        return self.index_path_for_job(
+            family_id=family_id,
+            path=str(target),
+            created_by_user_id=user.id,
+            source_id=source_id,
+        )
+
     def _reindex_asset(self, family_id: str, asset: FamilyAssetRow) -> None:
         """Push a freshly indexed asset into the unified search index.
 

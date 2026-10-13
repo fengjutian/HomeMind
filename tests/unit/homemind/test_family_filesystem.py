@@ -108,6 +108,28 @@ def test_upload_is_bounded_audited_and_never_overwrites(tmp_path: Path) -> None:
     assert len(transactions.list_audit(family.id, user)) == 1
 
 
+def test_uploaded_file_can_be_indexed_without_rescanning(tmp_path: Path) -> None:
+    families, filesystem, _, family, user, root, source_id = _setup(tmp_path)
+    entry = filesystem.upload(
+        family.id,
+        user,
+        source_id=source_id,
+        path="documents/plan.pdf",
+        content=BytesIO(b"pdf"),
+    )
+
+    asset = FamilyAssetManager(families.repo, filesystem.assets).index_uploaded_file(
+        family.id,
+        source_id,
+        entry.path,
+        user,
+    )
+
+    assert asset.name == "plan.pdf"
+    assert asset.asset_type == "DOCUMENT"
+    assert asset.uri == (root / "documents" / "plan.pdf").resolve().as_uri()
+
+
 def test_delete_requires_approval_and_is_recoverable(tmp_path: Path) -> None:
     families, _, transactions, family, user, root, source_id = _setup(tmp_path)
     owner = families.repo.list_members(family.id)[0]

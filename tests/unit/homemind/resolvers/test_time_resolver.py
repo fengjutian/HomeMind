@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from homemind.infra.family.resolvers.time_range import TimeRangeResolver
-
 
 FROZEN_NOW = datetime(2026, 4, 15, 10, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
 

@@ -69,6 +69,7 @@ import {
   type ZipImportSummary,
 } from "../Agent/Skills/components/SkillImportModal";
 import SkillHubTab from "../Agent/Skills/components/SkillHubTab";
+import SkillsShTab from "../Agent/Skills/components/SkillsShTab";
 import skillStyles from "../Agent/Skills/index.module.less";
 import type { ParsedZipSkill } from "../Agent/Skills/components/parseSkillZip";
 import {
@@ -173,6 +174,8 @@ export default function SkillPackagesPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
+  const [skillsShOpen, setSkillsShOpen] = useState(false);
+  const [qoderCommunityOpen, setQoderCommunityOpen] = useState(false);
   const [skillsetHubOpen, setSkillsetHubOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
@@ -906,6 +909,22 @@ export default function SkillPackagesPage() {
                             <button
                               type="button"
                               className={skillStyles.toolbarBtn}
+                              onClick={() => setSkillsShOpen(true)}
+                            >
+                              <Store size={14} />
+                              {t("skills.skillsSh")}
+                            </button>
+                            <button
+                              type="button"
+                              className={skillStyles.toolbarBtn}
+                              onClick={() => setQoderCommunityOpen(true)}
+                            >
+                              <Store size={14} />
+                              {t("skills.qoderCommunity")}
+                            </button>
+                            <button
+                              type="button"
+                              className={skillStyles.toolbarBtn}
                               onClick={() => setImportModalOpen(true)}
                             >
                               <Download size={14} />
@@ -1051,6 +1070,14 @@ export default function SkillPackagesPage() {
           if (isMobile) setMobilePane("detail");
           setSkillsetHubOpen(false);
           message.success(t("skillPackages.created"));
+          if (pkg.skipped_skills && pkg.skipped_skills.length > 0) {
+            message.warning(
+              t("skillPackages.importedWithSkipped", {
+                count: pkg.skipped_skills.length,
+                skills: pkg.skipped_skills.join(", "),
+              }),
+            );
+          }
         }}
       />
 
@@ -1086,6 +1113,35 @@ export default function SkillPackagesPage() {
         {selected ? (
           <SkillHubTab
             target={{ type: "package", packageId: selected.id }}
+            onInstalled={() => void refreshSelected()}
+          />
+        ) : null}
+      </Drawer>
+      <Drawer
+        title={t("skills.skillsSh")}
+        open={skillsShOpen}
+        onClose={() => setSkillsShOpen(false)}
+        width={860}
+        destroyOnHidden
+      >
+        {selected ? (
+          <SkillsShTab
+            target={{ type: "package", packageId: selected.id }}
+            onInstalled={() => void refreshSelected()}
+          />
+        ) : null}
+      </Drawer>
+      <Drawer
+        title={t("skills.qoderCommunity")}
+        open={qoderCommunityOpen}
+        onClose={() => setQoderCommunityOpen(false)}
+        width={860}
+        destroyOnHidden
+      >
+        {selected ? (
+          <SkillsShTab
+            target={{ type: "package", packageId: selected.id }}
+            source="qoder-community"
             onInstalled={() => void refreshSelected()}
           />
         ) : null}

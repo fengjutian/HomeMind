@@ -506,6 +506,23 @@
   object-fit: contain;
 }
 
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.importConflicts {
+  max-height: 260px;
+  margin-top: 16px;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  background: var(--ant-color-fill-quaternary);
+  border-radius: 8px;
+}
+
 @media (max-width: 767px) {
   .familySelect {
     width: 148px;
@@ -589,6 +606,10 @@
   .twoColumnGrid,
   .permissionFormGrid {
     grid-template-columns: 1fr;
+  }
+
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .scanStats {

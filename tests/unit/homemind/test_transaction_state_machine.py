@@ -11,15 +11,15 @@ from homemind.infra.db.repos.family_transactions import FamilyTransactionRepo
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.manager import FamilyManager, PermissionEffect
 from homemind.infra.family.tasks import FamilyTaskManager
-from homemind.infra.family.transactions import (
-    DEFAULT_LEASE_TTL_SECONDS,
-    TransactionStatus,
-    FamilyTransactionManager,
-)
-from homemind.infra.family.transaction_actions.tasks import TaskCreateHandler
 from homemind.infra.family.transaction_actions.registry import (
     FamilyActionRegistry,
     build_default_action_registry,
+)
+from homemind.infra.family.transaction_actions.tasks import TaskCreateHandler
+from homemind.infra.family.transactions import (
+    DEFAULT_LEASE_TTL_SECONDS,
+    FamilyTransactionManager,
+    TransactionStatus,
 )
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
@@ -135,6 +135,7 @@ def test_cancel_only_works_from_open_states(tmp_path: Path) -> None:
     completed = manager.approve(family_id, approval.id, user)
     assert completed.status == TransactionStatus.COMPLETED.value
     import pytest
+
     from homemind.infra.errors import HomeMindError
     with pytest.raises(HomeMindError):
         manager.cancel(family_id, completed.id, user)
@@ -240,7 +241,6 @@ def test_retry_resets_failed_transaction_and_runs_handler(tmp_path: Path) -> Non
 def test_handler_protocol_validation() -> None:
     """Reject malformed payloads before any side effect."""
     from homemind.infra.family.transaction_actions.base import ActionContext
-    from homemind.infra.family.transaction_actions.tasks import TaskCreateHandler
 
     handler = TaskCreateHandler(family=None, tasks=None)  # type: ignore[arg-type]
     with __import__("pytest").raises(Exception):

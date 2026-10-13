@@ -11,9 +11,9 @@ from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
 from homemind.infra.db.repos.family_invites import FamilyInviteRepo
 from homemind.infra.errors import HomeMindError
 from homemind.infra.family.invites import (
-    FamilyInviteManager,
     MAX_INVITE_TTL_SECONDS,
     MIN_INVITE_TTL_SECONDS,
+    FamilyInviteManager,
     clamp_invite_ttl,
     hash_invite_token,
     mint_invite_token,

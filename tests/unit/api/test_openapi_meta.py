@@ -27,5 +27,7 @@ async def test_openapi_has_bearer_security_and_descriptions(tmp_octop_home: Path
         me = spec["paths"]["/api/auth/me"]["get"]
         assert "BearerAuth" in me["security"][0]
         assert "security" not in spec["paths"]["/api/setup/status"]["get"]
+        assert "/api/skills/skills-sh/search" in spec["paths"]
+        assert "/api/skills/qoder-community/search" in spec["paths"]
     finally:
         await srv.stop()

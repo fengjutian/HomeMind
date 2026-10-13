@@ -19,17 +19,30 @@ import TabBar, {
 import InstalledSkillsTab from "./InstalledSkillsTab";
 import SkillPackagesTab from "./SkillPackagesTab";
 import SkillHubTab from "./SkillHubTab";
+import SkillsShTab from "./SkillsShTab";
 import { useSkills } from "../useSkills";
 import styles from "../index.module.less";
 import { useCurrentUser } from "../../../../hooks/useCurrentUser";
 import { userCanAny, PERM } from "../../../../utils/permissions";
 
-type SkillsTab = "custom" | "builtin" | "skillhub" | "packages";
+type SkillsTab =
+  | "custom"
+  | "builtin"
+  | "skillhub"
+  | "skills-sh"
+  | "qoder-community"
+  | "packages";
 
 const SKILL_TABS: TabBarItem<SkillsTab>[] = [
   { key: "custom", labelKey: "skills.customizedSkills", icon: Sparkles },
   { key: "builtin", labelKey: "skills.builtinSkills", icon: Blocks },
   { key: "skillhub", labelKey: "skills.tencentSkillHub", icon: Store },
+  { key: "skills-sh", labelKey: "skills.skillsSh", icon: Store },
+  {
+    key: "qoder-community",
+    labelKey: "skills.qoderCommunity",
+    icon: Store,
+  },
   { key: "packages", labelKey: "skills.skillPackages", icon: Package },
 ];
 
@@ -87,6 +100,14 @@ export default function SkillsTabs({ agentId }: SkillsTabsProps) {
           )
         ) : resolvedTab === "skillhub" && agentId ? (
           <SkillHubTab key={agentId} target={{ type: "agent", agentId }} />
+        ) : resolvedTab === "skills-sh" && agentId ? (
+          <SkillsShTab key={agentId} target={{ type: "agent", agentId }} />
+        ) : resolvedTab === "qoder-community" && agentId ? (
+          <SkillsShTab
+            key={agentId}
+            target={{ type: "agent", agentId }}
+            source="qoder-community"
+          />
         ) : resolvedTab === "packages" && agentId && canSkillPackages ? (
           <SkillPackagesTab
             key={agentId}

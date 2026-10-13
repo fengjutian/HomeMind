@@ -15,12 +15,12 @@ from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
 from homemind.infra.db.repos.family_context import FamilyContextRepo
 from homemind.infra.db.repos.family_tasks import FamilyTaskRepo
 from homemind.infra.db.repos.family_transactions import FamilyTransactionRepo
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.manager import FamilyManager, MemberRole
 from homemind.infra.family.permissions import PermissionEffect
 from homemind.infra.family.tasks import FamilyTaskManager
 from homemind.infra.family.transactions import FamilyTransactionManager
-from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
 from octop.infra.db.repos.users import UserRepo

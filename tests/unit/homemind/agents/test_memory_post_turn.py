@@ -6,10 +6,11 @@ from pathlib import Path
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from homemind.infra.agents._request_helpers import ResolvedTurnUser
 from homemind.infra.agents.memory_post_turn import run_for_turn
 from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
-from homemind.infra.db.repos.memory_candidates import MemoryCandidateRepo
 from homemind.infra.db.repos.family_context import FamilyContextRepo
+from homemind.infra.db.repos.memory_candidates import MemoryCandidateRepo
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.manager import FamilyManager, MemberRole
 from homemind.infra.family.memory_lifecycle import MemoryLifecycleManager
@@ -17,7 +18,6 @@ from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
 from octop.infra.db.repos.users import UserRepo
 from octop.infra.users.identity import Role, User
-from homemind.infra.agents._request_helpers import ResolvedTurnUser
 
 
 def _bootstrap(tmp_path: Path):

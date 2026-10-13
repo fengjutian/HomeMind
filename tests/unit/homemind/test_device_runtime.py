@@ -73,6 +73,7 @@ def test_pairing_exchanges_code_for_token(tmp_path: Path) -> None:
     assert token
     # Second use of the same code must fail.
     import pytest
+
     from homemind.infra.errors import HomeMindError
     with pytest.raises(HomeMindError):
         runtime.complete_pairing(pairing.code, address=None)
@@ -91,6 +92,7 @@ def test_pairing_code_expires(tmp_path: Path) -> None:
     with device_runtime._PAIRING_LOCK:  # type: ignore[attr-defined]
         device_runtime._PAIRING_STORE[pairing.code].expires_at = 1  # type: ignore[attr-defined]
     import pytest
+
     from homemind.infra.errors import HomeMindError
     with pytest.raises(HomeMindError):
         runtime.complete_pairing(pairing.code, address=None)
@@ -110,6 +112,7 @@ def test_heartbeat_uses_token_hash(tmp_path: Path) -> None:
 def test_heartbeat_rejects_unknown_token(tmp_path: Path) -> None:
     pool, runtime, family, user, family_id = _bootstrap(tmp_path)
     import pytest
+
     from homemind.infra.errors import HomeMindError
     with pytest.raises(HomeMindError):
         runtime.heartbeat("definitely-not-real", address=None)
@@ -124,6 +127,7 @@ def test_rotate_token_revokes_previous(tmp_path: Path) -> None:
     new_token = runtime.rotate_token(family_id, device.id, user)
     assert new_token != first_token
     import pytest
+
     from homemind.infra.errors import HomeMindError
     with pytest.raises(HomeMindError):
         runtime.heartbeat(first_token, address=None)
@@ -137,6 +141,7 @@ def test_revoke_token_disables_all_credentials(tmp_path: Path) -> None:
     revoked = runtime.revoke_token(family_id, device.id, user)
     assert revoked == 1
     import pytest
+
     from homemind.infra.errors import HomeMindError
     with pytest.raises(HomeMindError):
         runtime.heartbeat(token, address=None)
@@ -157,6 +162,7 @@ def test_enqueue_command_requires_declared_capability(tmp_path: Path) -> None:
     )
     assert command.status == "PENDING"
     import pytest
+
     from homemind.infra.errors import HomeMindError
     with pytest.raises(HomeMindError):
         runtime.enqueue_command(

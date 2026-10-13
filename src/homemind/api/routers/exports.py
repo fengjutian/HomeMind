@@ -21,6 +21,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from starlette.background import BackgroundTask
 
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.services import HomeMindServices
@@ -177,7 +178,11 @@ async def download_export(
     """
     manager = _manager(server)
     bundle = manager.download_path(family_id, export_id, user)
-    archive = Path(tempfile.gettempdir()) / f"homemind-export-{export_id}.zip"
+    descriptor, archive_name = tempfile.mkstemp(
+        prefix=f"homemind-export-{export_id}-", suffix=".zip"
+    )
+    os.close(descriptor)
+    archive = Path(archive_name)
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as handle:
         for path in sorted(bundle.rglob("*")):
             if not path.is_file():
@@ -186,11 +191,12 @@ async def download_export(
             # ``PurePosixPath`` + an explicit separator check keeps the
             # entry name inside the archive even if a future change lets
             # an odd filename through.
-            handle.write(path, f"{family_id}/{export_id}/{relative.as_posix()}")
+            handle.write(path, relative.as_posix())
     return FileResponse(
         archive,
         media_type="application/zip",
         filename=f"homemind-family-{export_id}.zip",
+        background=BackgroundTask(_cleanup, archive),
     )
 
 

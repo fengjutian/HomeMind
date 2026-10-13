@@ -379,6 +379,43 @@ export interface FilesystemMutationResult {
   approval: FamilyApproval | null;
 }
 
+export interface FamilyReminder {
+  id: string;
+  family_id: string;
+  target_type: string;
+  target_id: string;
+  recipient_member_id: string | null;
+  recipient_user_id: number | null;
+  remind_at: number;
+  channel: string;
+  status: string;
+  attempt_count: number;
+  last_error: string | null;
+  occurrence_key: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface FamilyExportItem {
+  export_id: string;
+  status: string;
+  format_version: number;
+  includes_original_assets: boolean;
+  byte_size: number;
+  created_at: number;
+  finished_at: number | null;
+  expires_at: number | null;
+}
+
+export interface FamilyImportStage {
+  import_id: string;
+  family_id: string;
+  dry_run: boolean;
+  format: string;
+  version: number;
+  conflicts: Array<Record<string, unknown>>;
+}
+
 const root = "/homemind/families";
 const json = (body: unknown): RequestInit => ({
   method: "POST",
@@ -738,6 +775,60 @@ export const homeMindFamilyApi = {
       body,
     );
   },
+  listReminders: (familyId: string, status?: string) =>
+    request<FamilyReminder[]>(
+      `${root}/${familyId}/reminders${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+    ),
+  reminderSummary: (familyId: string) =>
+    request<{ counts: Record<string, number> }>(
+      `${root}/${familyId}/reminders/summary`,
+    ),
+  createReminder: (
+    familyId: string,
+    body: {
+      target_type: string;
+      target_id: string;
+      remind_at: number;
+      recipient_member_id?: string;
+      lead_seconds?: number;
+    },
+  ) => request<FamilyReminder>(`${root}/${familyId}/reminders`, json(body)),
+  cancelReminder: (familyId: string, reminderId: string) =>
+    request<FamilyReminder>(
+      `${root}/${familyId}/reminders/${reminderId}/cancel`,
+      { method: "POST" },
+    ),
+  listExports: (familyId: string) =>
+    request<FamilyExportItem[]>(`${root}/${familyId}/exports`),
+  createExport: (familyId: string, includeOriginalAssets: boolean) =>
+    request<{ export_id: string }>(
+      `${root}/${familyId}/exports?include_original_assets=${includeOriginalAssets}`,
+      { method: "POST" },
+    ),
+  downloadExport: (familyId: string, exportId: string) =>
+    requestBlob(`${root}/${familyId}/exports/${exportId}/download`),
+  deleteExport: (familyId: string, exportId: string) =>
+    request<void>(`${root}/${familyId}/exports/${exportId}`, {
+      method: "DELETE",
+    }),
+  stageImport: (familyId: string, file: File) => {
+    const body = new FormData();
+    body.append("bundle", file, file.name);
+    return requestUpload<FamilyImportStage>(
+      `${root}/${familyId}/imports?dry_run=true`,
+      body,
+    );
+  },
+  applyImport: (familyId: string, importId: string) =>
+    request<Record<string, unknown>>(
+      `${root}/${familyId}/imports/${importId}/apply`,
+      { method: "POST" },
+    ),
+  rejectImport: (familyId: string, importId: string) =>
+    request<Record<string, unknown>>(
+      `${root}/${familyId}/imports/${importId}/reject`,
+      { method: "POST" },
+    ),
   readFile: (familyId: string, sourceId: string, path: string) =>
     request<{ path: string; content: string }>(
       `${root}/${familyId}/filesystem/read?source_id=${encodeURIComponent(

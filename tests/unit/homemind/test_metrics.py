@@ -8,7 +8,7 @@ from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
 from homemind.infra.db.repos.family_invites import FamilyInviteRepo
 from homemind.infra.family.invites import FamilyInviteManager
 from homemind.infra.family.manager import FamilyManager
-from homemind.infra.metrics import HomeMindMetrics, METRICS
+from homemind.infra.metrics import METRICS, HomeMindMetrics
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
 from octop.infra.users.identity import Role, User
@@ -81,6 +81,7 @@ def test_invite_metrics_track_lifecycle(tmp_path: Path) -> None:
 
     # Bad token increments rejected counter.
     import pytest
+
     from homemind.infra.errors import HomeMindError
 
     with pytest.raises(HomeMindError):

@@ -8,15 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from octop.i18n import error_message
-from octop.infra.errors import ErrorCode, OctopError
-from octop.infra.utils.locale import resolve_request_locale
-
 from homemind.infra.errors import (
     DEFAULT_MESSAGES,
     HomeMindError,
     HomeMindErrorCode,
 )
+from octop.i18n import error_message
+from octop.infra.errors import ErrorCode, OctopError
+from octop.infra.utils.locale import resolve_request_locale
 
 
 def test_every_error_code_has_i18n_entry():

@@ -9,21 +9,20 @@ we can assert which fields end up in the rewritten system message.
 from __future__ import annotations
 
 import asyncio
-import homemind.infra.agents.family_context_middleware  # noqa: F401 — exposes the patch hook
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+import homemind.infra.agents.family_context_middleware  # noqa: F401 — exposes the patch hook
 from homemind.infra.active_family import ActiveFamilyResolver
 from homemind.infra.agents.family_context_middleware import FamilyContextMiddleware
+from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
 from homemind.infra.db.repos.family_context import FamilyContextRepo
 from homemind.infra.family.context import FamilyContextManager
 from homemind.infra.family.manager import FamilyManager, MemberRole, RelationshipType
 from homemind.infra.family.permissions import FamilyPermissionEvaluator
-from homemind.infra.db.migrate import run_migrations as run_homemind_migrations
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
 from octop.infra.db.repos.users import UserRepo
@@ -37,7 +36,7 @@ class _StubRequest:
     system_message: SystemMessage | None = None
     messages: list[Any] = field(default_factory=list)
 
-    def override(self, **kwargs: Any) -> "_StubRequest":
+    def override(self, **kwargs: Any) -> _StubRequest:
         new = _StubRequest(
             system_message=kwargs.get("system_message", self.system_message),
             messages=list(kwargs.get("messages", self.messages)),
@@ -96,8 +95,8 @@ class _SettingsRepo:
 def _run_middleware(middleware: FamilyContextMiddleware, request: _StubRequest, configurable: dict[str, Any]) -> _StubRequest:
     """Drive ``awrap_model_call`` with a stubbed ``get_config``."""
 
+
     import homemind.infra.agents.family_context_middleware as mw_mod
-    from langgraph.config import get_config as _real_get_config
 
     captured: dict[str, _StubRequest] = {}
 

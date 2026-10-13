@@ -45,8 +45,10 @@ import FamilyAssetPreview from "./FamilyAssetPreview";
 import FileManagerPanel from "./FileManagerPanel";
 import GovernancePanel from "./GovernancePanel";
 import InvitesPanel from "./InvitesPanel";
+import ImportExportPanel from "./ImportExportPanel";
 import MemoryPanel from "./MemoryPanel";
 import PhotoIntelligencePanel from "./PhotoIntelligencePanel";
+import RemindersPanel from "./RemindersPanel";
 import TaskPanel from "./TaskPanel";
 
 import {
@@ -73,6 +75,8 @@ const MORE_TAB_KEYS = new Set([
   "photos",
   "files",
   "governance",
+  "reminders",
+  "transfer",
   "search",
 ]);
 
@@ -161,7 +165,7 @@ export default function FamilyPage() {
         setTasks(nextTasks);
       } else if (activeTab === "events") {
         setEvents(await homeMindFamilyApi.listEvents(familyId));
-      } else if (["access", "photos"].includes(activeTab)) {
+      } else if (["access", "photos", "reminders"].includes(activeTab)) {
         setMembers(await homeMindFamilyApi.listMembers(familyId));
       }
     } catch (error) {
@@ -318,6 +322,14 @@ export default function FamilyPage() {
                   {
                     key: "files",
                     label: t("family.tabs.files", "家庭文件"),
+                  },
+                  {
+                    key: "reminders",
+                    label: t("family.tabs.reminders", "提醒管理"),
+                  },
+                  {
+                    key: "transfer",
+                    label: t("family.tabs.transfer", "导入与导出"),
                   },
                   { type: "divider" },
                   {
@@ -867,6 +879,18 @@ export default function FamilyPage() {
               key: "files",
               label: t("family.tabs.files", "家庭文件"),
               children: <FileManagerPanel familyId={familyId} />,
+            },
+            {
+              key: "reminders",
+              label: t("family.tabs.reminders", "提醒管理"),
+              children: (
+                <RemindersPanel familyId={familyId} members={members} />
+              ),
+            },
+            {
+              key: "transfer",
+              label: t("family.tabs.transfer", "导入与导出"),
+              children: <ImportExportPanel familyId={familyId} />,
             },
             {
               key: "governance",

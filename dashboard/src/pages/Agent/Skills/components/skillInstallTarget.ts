@@ -40,6 +40,16 @@ export function skillHubInstallPath(target: SkillInstallTarget): string {
   return `/skill-packages/${target.packageId}/skills/hub/install`;
 }
 
+export function skillImportPath(target: SkillInstallTarget): string {
+  if (target.type === "browse") {
+    throw new Error("Browse target cannot install skills");
+  }
+  if (target.type === "agent") {
+    return `/agents/${target.agentId}/skills/import`;
+  }
+  return `/skill-packages/${target.packageId}/skills/import`;
+}
+
 export function skillListPath(target: SkillInstallTarget): string {
   if (target.type === "browse") {
     throw new Error("SkillHub browse target has no installed list");

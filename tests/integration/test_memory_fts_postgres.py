@@ -8,9 +8,6 @@ machines stays green.
 from __future__ import annotations
 
 import os
-import time
-import uuid
-from pathlib import Path
 
 import pytest
 
@@ -21,9 +18,7 @@ from homemind.infra.family.manager import FamilyManager
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import PostgresPool
 from octop.infra.users.identity import Role, User
-
 from tests.support.postgresql import requires_postgresql
-
 
 pytestmark = [requires_postgresql, pytest.mark.asyncio]
 
