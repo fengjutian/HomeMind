@@ -2,11 +2,9 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 )
 
@@ -29,18 +27,25 @@ func startOctop(root string, port int) (*exec.Cmd, error) {
 		"PYTHONPATH":           "",
 	})
 	configureProcGroup(cmd)
-	if runtime.GOOS == "linux" {
-		// The Linux desktop release has no server terminal; the shell owns status
-		// presentation just like the Windows GUI executable.
-		cmd.Stdout = io.Discard
-		cmd.Stderr = io.Discard
-	} else if runtime.GOOS != "windows" {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+	logDir := filepath.Join(octopHome(), "logs")
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
+		return nil, fmt.Errorf("create desktop log directory: %w", err)
 	}
+	output, err := os.OpenFile(
+		filepath.Join(logDir, "desktop-backend.log"),
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+		0o600,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("open desktop backend log: %w", err)
+	}
+	cmd.Stdout = output
+	cmd.Stderr = output
 	if err := cmd.Start(); err != nil {
+		_ = output.Close()
 		return nil, err
 	}
+	_ = output.Close()
 	return cmd, nil
 }
 

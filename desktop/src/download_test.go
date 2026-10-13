@@ -587,6 +587,32 @@ func TestWaitHealthSucceedsOnOK(t *testing.T) {
 	}
 }
 
+func TestHealthReadyAcceptsHealthyAndStartingResponses(t *testing.T) {
+	for _, status := range []int{http.StatusOK, http.StatusBadRequest} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(status)
+		}))
+		if !healthReady(srv.URL) {
+			t.Fatalf("status %d should be treated as reachable", status)
+		}
+		srv.Close()
+	}
+}
+
+func TestHealthReadyRejectsServerFailureAndConnectionFailure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	if healthReady(srv.URL) {
+		t.Fatal("503 should not be treated as healthy")
+	}
+	base := srv.URL
+	srv.Close()
+	if healthReady(base) {
+		t.Fatal("a closed listener should not be treated as healthy")
+	}
+}
+
 func TestWaitHealthTimesOutWithFriendlyMessage(t *testing.T) {
 	err := waitHealth(LocaleEN, "http://127.0.0.1:1", 50*time.Millisecond)
 	if err == nil {

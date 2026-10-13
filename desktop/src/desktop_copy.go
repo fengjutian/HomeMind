@@ -7,6 +7,9 @@ const (
 	copyStatusCheckingRuntime  = "status.checking_runtime"
 	copyStatusStartingService  = "status.starting_service"
 	copyStatusReady            = "status.ready"
+	copyStatusServiceLost      = "status.service_lost"
+	copyStatusRestarting       = "status.restarting"
+	copyStatusRestartFailed    = "status.restart_failed"
 	copyStatusUsingRuntime     = "status.using_runtime"
 	copyStatusBackupDatabase   = "status.backup_database"
 	copyStatusInstallingUpdate = "status.installing_update"
@@ -30,6 +33,9 @@ var desktopCopy = map[Locale]map[string]string{
 		copyStatusCheckingRuntime:  "Checking the runtime…",
 		copyStatusStartingService:  "Starting the HomeMind service…",
 		copyStatusReady:            "HomeMind is ready",
+		copyStatusServiceLost:      "The HomeMind service stopped responding. Recovering...",
+		copyStatusRestarting:       "Restarting the HomeMind service (%d/%d)...",
+		copyStatusRestartFailed:    "HomeMind could not recover after %d attempts. Restart the desktop app or inspect ~/.octop/logs/desktop-backend.log.",
 		copyStatusUsingRuntime:     "Using the existing runtime…",
 		copyStatusBackupDatabase:   "Desktop update %s found. Backing up the database…",
 		copyStatusInstallingUpdate: "Installing the bundled desktop update…",
@@ -47,6 +53,9 @@ var desktopCopy = map[Locale]map[string]string{
 		copyHealthNotReady:         "HomeMind did not become ready within %s (%s). Make sure HomeMind is running at this address, or check the terminal logs.",
 	},
 	LocaleZH: {
+		copyStatusServiceLost:      "HomeMind 服务已停止响应，正在恢复…",
+		copyStatusRestarting:       "正在重启 HomeMind 服务（%d/%d）…",
+		copyStatusRestartFailed:    "HomeMind 连续重启 %d 次仍未恢复。请重启桌面客户端，或检查 ~/.octop/logs/desktop-backend.log。",
 		copyStatusConnecting:       "正在连接 HomeMind…",
 		copyStatusCheckingRuntime:  "正在检查运行环境…",
 		copyStatusStartingService:  "正在启动 HomeMind 服务…",

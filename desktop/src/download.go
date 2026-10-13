@@ -371,6 +371,16 @@ func waitHealth(locale Locale, base string, timeout time.Duration) error {
 	return formatHealthWaitError(locale, base, timeout, lastErr, lastStatus)
 }
 
+func healthReady(base string) bool {
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get(strings.TrimRight(base, "/") + "/api/health")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode >= 200 && resp.StatusCode < 500
+}
+
 func formatWaitDuration(locale Locale, d time.Duration) string {
 	sec := int(d.Round(time.Second) / time.Second)
 	if sec < 1 {

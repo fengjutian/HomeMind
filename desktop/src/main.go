@@ -21,6 +21,12 @@ var assets embed.FS
 
 const trayDoubleClick = 400 * time.Millisecond
 
+const (
+	healthPollInterval        = 5 * time.Second
+	healthFailureThreshold    = 3
+	maxBackendRestartAttempts = 3
+)
+
 // App is the Wails service bound to the shell UI.
 type App struct {
 	app            *application.App
@@ -29,6 +35,7 @@ type App struct {
 	store          *settingsStore
 	sleep          *sleepGuard
 	cmd            *exec.Cmd
+	monitorCancel  context.CancelFunc
 	mu             sync.Mutex
 	quitting       bool
 
@@ -44,6 +51,10 @@ func (a *App) ServiceStartup(context.Context, application.ServiceOptions) error 
 func (a *App) ServiceShutdown() error {
 	a.sleep.stop()
 	a.mu.Lock()
+	if a.monitorCancel != nil {
+		a.monitorCancel()
+		a.monitorCancel = nil
+	}
 	cmd := a.cmd
 	a.cmd = nil
 	a.mu.Unlock()
@@ -193,6 +204,105 @@ func (a *App) boot() {
 		return
 	}
 	a.showDashboard(base)
+	a.startBackendMonitor(root, base, s.Port, locale)
+}
+
+func (a *App) startBackendMonitor(root, base string, port int, locale Locale) {
+	a.mu.Lock()
+	if a.monitorCancel != nil {
+		a.monitorCancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	a.monitorCancel = cancel
+	a.mu.Unlock()
+
+	go a.monitorBackend(ctx, root, base, port, locale)
+}
+
+func (a *App) monitorBackend(ctx context.Context, root, base string, port int, locale Locale) {
+	ticker := time.NewTicker(healthPollInterval)
+	defer ticker.Stop()
+	failures := 0
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if healthReady(base) {
+				failures = 0
+				continue
+			}
+			failures++
+			if failures < healthFailureThreshold {
+				continue
+			}
+			a.recoverBackend(ctx, root, base, port, locale)
+			return
+		}
+	}
+}
+
+func (a *App) recoverBackend(ctx context.Context, root, base string, port int, locale Locale) {
+	if a.window != nil {
+		a.window.SetURL("/")
+	}
+	a.setStatus(desktopText(locale, copyStatusServiceLost))
+
+	for attempt := 1; attempt <= maxBackendRestartAttempts; attempt++ {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		a.setStatus(desktopText(locale, copyStatusRestarting, attempt, maxBackendRestartAttempts))
+
+		a.mu.Lock()
+		if a.quitting {
+			a.mu.Unlock()
+			return
+		}
+		old := a.cmd
+		a.cmd = nil
+		a.mu.Unlock()
+		stopOctop(old)
+
+		cmd, err := startOctop(root, port)
+		if err == nil {
+			a.mu.Lock()
+			stopping := a.quitting || ctx.Err() != nil
+			if !stopping {
+				a.cmd = cmd
+			}
+			a.mu.Unlock()
+			if stopping {
+				stopOctop(cmd)
+				return
+			}
+			if waitHealth(locale, base, 30*time.Second) == nil {
+				if ctx.Err() != nil {
+					return
+				}
+				a.showDashboard(base)
+				a.startBackendMonitor(root, base, port, locale)
+				return
+			}
+		}
+		if attempt < maxBackendRestartAttempts {
+			timer := time.NewTimer(time.Duration(attempt) * 2 * time.Second)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+		}
+	}
+	a.mu.Lock()
+	failed := a.cmd
+	a.cmd = nil
+	a.mu.Unlock()
+	stopOctop(failed)
+	a.setStatus(desktopText(locale, copyStatusRestartFailed, maxBackendRestartAttempts))
 }
 
 func (a *App) showDashboard(base string) {

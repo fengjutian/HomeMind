@@ -3,7 +3,6 @@
 package main
 
 import (
-	"io"
 	"os/exec"
 	"strconv"
 	"syscall"
@@ -20,8 +19,6 @@ func hideConsole(cmd *exec.Cmd) {
 
 func configureProcGroup(cmd *exec.Cmd) {
 	hideConsole(cmd)
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
 }
 
 func killProcessTree(cmd *exec.Cmd) {
