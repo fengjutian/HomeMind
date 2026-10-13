@@ -12,6 +12,8 @@ from collections.abc import Awaitable, Callable, Coroutine
 from contextlib import suppress
 from typing import Any
 
+from octop.infra.bridge.send_queue import PrioritySendQueue
+
 logger = logging.getLogger(__name__)
 
 SendText = Callable[[str], Awaitable[None]]
@@ -110,6 +112,12 @@ class BridgeSession:
         self._heartbeat_task: asyncio.Task[None] | None = None
         self._bg_tasks: set[asyncio.Task[None]] = set()
         self.close_reason: str | None = None
+        self._send_queue = PrioritySendQueue(
+            send_text,
+            dumps=lambda payload: json.dumps(
+                payload, ensure_ascii=False, default=bridge_json_default
+            ),
+        )
 
     @property
     def closed(self) -> bool:
@@ -198,9 +206,7 @@ class BridgeSession:
         if self.closed:
             raise ConnectionError("bridge session closed")
         try:
-            await self._send_text(
-                json.dumps(payload, ensure_ascii=False, default=bridge_json_default),
-            )
+            await self._send_queue.send(payload)
         except Exception:
             await self.close(reason="send failed")
             raise
@@ -420,6 +426,7 @@ class BridgeSession:
         headers: dict[str, str] | None = None,
         body: bytes | None = None,
         timeout: float = 120.0,
+        audit_fields: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if self.closed:
             raise ConnectionError("bridge session closed")
@@ -427,15 +434,19 @@ class BridgeSession:
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
         self._pending[req_id] = fut
         try:
+            fields: dict[str, Any] = {
+                "method": method.upper(),
+                "path": path,
+                "query": query or "",
+                "headers": headers or {},
+            }
+            audit = (audit_fields or {}).get("audit")
+            if audit is not None:
+                fields.update(audit.as_frame_fields())
             await self._send_body_frames(
                 frame_type="tunnel.request",
                 req_id=req_id,
-                fields={
-                    "method": method.upper(),
-                    "path": path,
-                    "query": query or "",
-                    "headers": headers or {},
-                },
+                fields=fields,
                 body=body,
             )
             return await asyncio.wait_for(fut, timeout=timeout)

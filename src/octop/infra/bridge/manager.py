@@ -48,7 +48,15 @@ from octop.infra.bridge.token_refresh import (
     classify_login_failure,
     should_refresh,
 )
-from octop.infra.bridge.transport import BridgeSession
+from octop.infra.bridge.transport import (
+    ADVERTISED_BRIDGE_FEATURES,
+    BRIDGE_TUNNEL_CHUNKED_MAX_BODY_BYTES,
+    BRIDGE_TUNNEL_MAX_BODY_BYTES,
+    BRIDGE_WS_MAX_BYTES,
+    FEATURE_BODY_CHUNKS,
+    BridgeSession,
+    peer_feature_set,
+)
 from octop.infra.db.repos.bridge_connections import BridgeConnectionRepo, BridgeConnectionRow
 from octop.infra.db.repos.secrets import SecretRepo
 from octop.infra.db.repos.users import UserRepo
@@ -432,6 +440,7 @@ class BridgeManager:
             "updated_at": row.updated_at,
             "has_password": bool(row.credential_blob),
             "inbound": _is_inbound(row),
+            "peer_client_host": row.peer_client_host,
         }
 
     async def probe_peer(
@@ -1129,7 +1138,13 @@ class BridgeManager:
         url = peer_ws_url(peer_base_url, token=token)
         session: BridgeSession | None = None
         try:
-            async with websockets.connect(url, open_timeout=20, max_size=32 * 1024 * 1024) as ws:
+            async with websockets.connect(
+                url,
+                open_timeout=20,
+                max_size=BRIDGE_WS_MAX_BYTES,
+                ping_interval=20,
+                ping_timeout=20,
+            ) as ws:
                 owner = self._repo.get(connection_id)
                 local_user = self._users.get(owner.owner_user_id) if owner is not None else None
                 hello = build_hello(
@@ -1141,6 +1156,7 @@ class BridgeManager:
                     instance_id=self._instance_id,
                     octop_version=_local_version(),
                 )
+                hello["features"] = list(ADVERTISED_BRIDGE_FEATURES)
                 await ws.send(json.dumps(hello, ensure_ascii=False))
 
                 # Wait for hello_ack before advertising the session as connected.
@@ -1159,6 +1175,12 @@ class BridgeManager:
                         continue
                     if str(ack.get("type") or "") != "hello_ack":
                         continue
+                    ack_id = str(ack.get("connection_id") or "").strip()
+                    if ack_id and ack_id != connection_id:
+                        raise OctopError(
+                            ErrorCode.BRIDGE_PEER_UNREACHABLE,
+                            "peer rebound this link onto another connection",
+                        )
                     try:
                         negotiated = negotiate(ack)
                     except ProtocolIncompatible as exc:
@@ -1185,6 +1207,7 @@ class BridgeManager:
                 session = BridgeSession(
                     connection_id=connection_id,
                     send_text=ws.send,
+                    peer_features=peer_feature_set(ack),
                     on_tunnel_request=lambda p: self._handle_inbound_tunnel(connection_id, p),
                     on_turn_frame=lambda p: self._handle_inbound_turn(connection_id, p),
                     on_browser_frame=lambda p: self._handle_inbound_browser(connection_id, p),
@@ -1212,7 +1235,8 @@ class BridgeManager:
             logger.warning("bridge outbound closed connection=%s: %s", connection_id, exc)
             raise
         finally:
-            await self._unregister_session(connection_id)
+            if session is not None:
+                await self._unregister_session(connection_id, expected=session)
 
     # -- inbound WS (peer dials us) ------------------------------------------
 
@@ -1252,7 +1276,6 @@ class BridgeManager:
         self._negotiated[connection_id] = negotiated
         advertise_base = str(payload.get("advertise_base_url") or "").strip() or "http://127.0.0.1"
         advertise_user = str(payload.get("advertise_username") or "").strip() or "peer"
-        preferred_name = str(payload.get("display_name") or "").strip()
         try:
             advertise_base = normalize_peer_base_url(advertise_base)
         except OctopError:
@@ -1262,9 +1285,11 @@ class BridgeManager:
         if existing is not None and int(existing.owner_user_id) != int(user.id):
             await websocket.close(code=4003, reason="connection owned by another user")
             return
+        client_host = observe_ws_client_host(websocket)
         preferred = inbound_default_display_name(
             connection_id=connection_id,
-            preferred_name=preferred_name,
+            client_host=client_host,
+            advertise_base_url=advertise_base,
             peer_username=advertise_user,
             existing_name=existing.display_name if existing is not None else None,
         )
@@ -1281,11 +1306,13 @@ class BridgeManager:
             peer_username=advertise_user,
             display_name=display_name,
             status="connected",
+            peer_client_host=client_host or None,
         )
 
         session = BridgeSession(
             connection_id=connection_id,
             send_text=send_text,
+            peer_features=peer_feature_set(payload),
             on_tunnel_request=lambda p: self._handle_inbound_tunnel(connection_id, p),
             on_turn_frame=lambda p: self._handle_inbound_turn(connection_id, p),
             on_browser_frame=lambda p: self._handle_inbound_browser(connection_id, p),
@@ -1309,6 +1336,7 @@ class BridgeManager:
                 "octop_version": _local_version(),
                 "connection_id": connection_id,
                 "peer_username": user.username,
+                "features": list(ADVERTISED_BRIDGE_FEATURES),
             }
         )
         try:
@@ -1360,13 +1388,18 @@ class BridgeManager:
             await old.close()
         self._sessions[connection_id] = session
 
-    async def _unregister_session(self, connection_id: str) -> None:
+    async def _unregister_session(
+        self, connection_id: str, *, expected: BridgeSession | None = None
+    ) -> None:
+        sess = self._sessions.get(connection_id)
+        if expected is not None and sess is not expected:
+            return
         sess = self._sessions.pop(connection_id, None)
         if sess is not None:
             await sess.close()
 
     async def _finalize_inbound(self, connection_id: str, session: BridgeSession | None) -> None:
-        await self._unregister_session(connection_id)
+        await self._unregister_session(connection_id, expected=session)
         if session is not None and session.close_reason == "deleted":
             self._repo.delete(connection_id)
             return
@@ -1402,6 +1435,20 @@ class BridgeManager:
                 "This action is not available through the remote bridge. Manage it on the peer Octop.",
             )
         sess = self.require_session(connection_id)
+        if body:
+            chunked = FEATURE_BODY_CHUNKS in sess.peer_features
+            limit = (
+                BRIDGE_TUNNEL_CHUNKED_MAX_BODY_BYTES
+                if chunked
+                else BRIDGE_TUNNEL_MAX_BODY_BYTES
+            )
+            if len(body) > limit:
+                max_mb = max(1, limit // (1024 * 1024))
+                raise OctopError(
+                    ErrorCode.ATTACHMENT_TOO_LARGE,
+                    f"file too large (max {max_mb}MB)",
+                    details={"max_mb": max_mb},
+                )
         from octop.infra.db.repos._base import now_ts
 
         audit = new_audit(
