@@ -18,6 +18,7 @@ from homemind.infra.db.repos.memory_candidates import (
     MemoryEvidenceRepo,
 )
 from homemind.infra.db.services import HomeMindServices
+from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.asset_job_runner import AssetJobRunner
 from homemind.infra.family.asset_jobs import AssetJobManager
 from homemind.infra.family.assets import FamilyAssetManager
@@ -173,6 +174,18 @@ class HomeMindServer(OctopServer):
 
     async def start(self) -> None:
         await super().start()
+        if self.services is not None and self.user_manager is not None:
+            run_migrations(self.services.db)
+            family_repo = HomeMindServices.from_pool(self.services.db).family_repo
+
+            def protect_family_user(user_id: int) -> None:
+                if family_repo.list_for_user(user_id):
+                    raise HomeMindError(
+                        HomeMindErrorCode.FAMILY_CONFLICT,
+                        "remove the user from every family before deleting the account",
+                    )
+
+            self.user_manager.set_delete_guard(protect_family_user)
         self._start_asset_scan_job()
         self._start_family_event_bus()
         await self._start_smart_home_subscriptions()

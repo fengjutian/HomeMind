@@ -338,6 +338,19 @@ class UserRepo:
         with self._db.transaction() as conn:
             conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
+    def assert_deletable(self, user_id: int) -> None:
+        """Exercise foreign-key deletion inside a transaction that always rolls back."""
+
+        class _RollbackDelete(Exception):
+            pass
+
+        try:
+            with self._db.transaction() as conn:
+                conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                raise _RollbackDelete
+        except _RollbackDelete:
+            pass
+
     def count(self) -> int:
         with self._db.connect() as conn:
             return int(conn.execute("SELECT COUNT(*) FROM users").fetchone()[0])

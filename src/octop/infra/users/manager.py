@@ -11,7 +11,7 @@ import shutil
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 try:
     from psycopg import errors as pg_errors
@@ -92,6 +92,11 @@ class UserManager:
         self._lock = asyncio.Lock()
         self._login_max_attempts = max(1, services.config.login_max_attempts)
         self._login_lockout_seconds = max(60, services.config.login_lockout_seconds)
+        self._delete_guard: Callable[[int], None] | None = None
+
+    def set_delete_guard(self, guard: Callable[[int], None] | None) -> None:
+        """Install an application-specific preflight before destructive cleanup."""
+        self._delete_guard = guard
 
     def replace_services(self, services: SharedServices) -> None:
         """Point at a new SharedServices (control-plane DB rebind during setup)."""
@@ -776,6 +781,9 @@ class UserManager:
         row = self._services.user_repo.get_by_username(username)
         if row is None:
             raise OctopError(ErrorCode.NOT_FOUND, "user not found")
+        if self._delete_guard is not None:
+            self._delete_guard(row.id)
+        self._services.user_repo.assert_deletable(row.id)
         owned = self._services.agent_repo.list_by_user(row.id)
         owned_ids = {agent.agent_id for agent in owned}
         if agent_manager is not None:

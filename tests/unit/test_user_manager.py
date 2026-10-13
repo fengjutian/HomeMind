@@ -432,6 +432,50 @@ async def test_remove_deletes_db_and_dir(manager: UserManager, tmp_path: Path):
     assert manager.get("a") is None
 
 
+async def test_remove_guard_runs_before_destructive_cleanup(
+    manager: UserManager, tmp_path: Path
+):
+    await manager.create(username="a", password="TestPass12", role=Role.USER)
+    user_dir = tmp_path / ".octop" / "users" / "a"
+    user_dir.mkdir(parents=True, exist_ok=True)
+    marker = user_dir / "keep.txt"
+    marker.write_text("family data still references this user", encoding="utf-8")
+
+    def reject(_user_id: int) -> None:
+        raise RuntimeError("user still belongs to a family")
+
+    manager.set_delete_guard(reject)
+    with pytest.raises(RuntimeError, match="still belongs"):
+        await manager.remove("a")
+
+    assert manager.get("a") is not None
+    assert marker.exists()
+
+
+async def test_remove_checks_foreign_keys_before_destructive_cleanup(
+    manager: UserManager, tmp_path: Path
+):
+    await manager.create(username="a", password="TestPass12", role=Role.USER)
+    user = manager.get("a")
+    assert user is not None
+    user_dir = tmp_path / ".octop" / "users" / "a"
+    user_dir.mkdir(parents=True, exist_ok=True)
+    marker = user_dir / "keep.txt"
+    marker.write_text("referenced family data", encoding="utf-8")
+    with manager._services.db.connect() as conn:
+        conn.execute(
+            "CREATE TABLE deletion_guard_test ("
+            "user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT)"
+        )
+        conn.execute("INSERT INTO deletion_guard_test(user_id) VALUES (?)", (user.id,))
+
+    with pytest.raises(sqlite3.IntegrityError):
+        await manager.remove("a")
+
+    assert manager.get("a") is not None
+    assert marker.exists()
+
+
 async def test_count(manager: UserManager):
     assert manager.count() == 0
     await manager.create(username="a", password="TestPass12", role=Role.USER)
