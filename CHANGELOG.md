@@ -6,6 +6,7 @@
 
 ## [Unreleased]
 - 暗色主题下专家 / 技能 / 子智能体 Markdown 编辑器白底：Monaco 未跟随应用主题渲染为亮色 `vs`；编辑器现按应用明暗模式切换主题（工作区文件编辑器同样改为读取应用主题，而非仅系统偏好）（Fixes #1355）
+- 知识库与对话附件支持 WPS Writer（`.wps`）及旧版 Word（`.doc`）：用 `firecrawl-anydoc` 抽成 Markdown 入库 / 注入模型上下文（OLE 二进制按内容识别，不依赖本机安装 WPS）（#1345）
 
 ### 变更
 - 运行轨迹弹框中 ASSISTANT 摘要显示所用模型

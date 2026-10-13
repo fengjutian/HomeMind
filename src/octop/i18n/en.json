@@ -734,6 +734,7 @@
     "path": "Workspace path: {path}",
     "mime": "MIME: {media_type}",
     "size": "Size: {size} bytes",
+    "extracted_header": "[Attachment text: {filename}]",
     "empty_message": "[empty message]",
     "empty_image": "User sent an image.",
     "image_unavailable": "[Attachment] Image could not be loaded for the model."

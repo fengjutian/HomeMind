@@ -734,6 +734,7 @@
     "path": "工作区路径：{path}",
     "mime": "MIME：{media_type}",
     "size": "大小：{size} 字节",
+    "extracted_header": "[附件正文：{filename}]",
     "empty_message": "[空消息]",
     "empty_image": "用户发送了图片。",
     "image_unavailable": "[附件] 图片无法加载到模型。"
