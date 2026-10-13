@@ -82,9 +82,7 @@ async def search_family(
         if not embedding_model:
             raise ValueError("embedding_model is required with embedding_provider_id")
         assert server.services is not None
-        provider = require_provider(
-            server.services.provider_repo.get(embedding_provider_id)
-        )
+        provider = require_provider(server.services.provider_repo.get(embedding_provider_id))
         embedding = OpenAICompatibleEmbeddingProvider(provider, embedding_model)
     return await asyncio.to_thread(
         build_search_manager(server).search,

@@ -104,7 +104,8 @@ class FamilyInviteManager:
     ) -> list[FamilyInviteRow]:
         self.family.require_manager(family_id, user)
         return self.repo.list_for_family(
-            family_id, include_redeemed=include_redeemed,
+            family_id,
+            include_redeemed=include_redeemed,
         )
 
     def revoke_invite(
@@ -117,7 +118,8 @@ class FamilyInviteManager:
         row = self.repo.get(invite_id)
         if row is None or row.family_id != family_id:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "invite not found",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "invite not found",
             )
         revoked = self.repo.revoke(invite_id)
         if revoked:
@@ -131,7 +133,8 @@ class FamilyInviteManager:
         if row is None:
             _hm_inc("invite_rejected_total")
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "invite token is invalid",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "invite token is invalid",
             )
         if row.redeemed_at is not None:
             _hm_inc("invite_rejected_total")
@@ -142,7 +145,8 @@ class FamilyInviteManager:
         if row.expires_at < int(time.time()):
             _hm_inc("invite_rejected_total")
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "invite has expired",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "invite has expired",
             )
         # ``create_member`` enforces ``require_manager`` which a brand
         # new redeemer does not have. The invite IS the authorization,

@@ -55,7 +55,8 @@ def _server(server: OctopServer) -> HomeMindMcpServer:
     return HomeMindMcpServer(
         services,
         active_family_resolver=ActiveFamilyResolver(
-            SettingsRepo(server.services.db), family_manager,
+            SettingsRepo(server.services.db),
+            family_manager,
         ),
     )
 
@@ -130,25 +131,35 @@ async def homemind_mcp(
         if not isinstance(arguments, dict):
             return JSONResponse(
                 content=_error(
-                    request_id, RPC_INVALID_PARAMS, "arguments must be an object",
+                    request_id,
+                    RPC_INVALID_PARAMS,
+                    "arguments must be an object",
                 ),
             )
         outcome = _server(server).call_tool(
-            name, arguments, _principal(user, request),
+            name,
+            arguments,
+            _principal(user, request),
         )
         payload = outcome.as_payload()
         if payload.get("ok"):
             return JSONResponse(
-                content=_result(request_id, {
-                    "content": [{"type": "text", "text": _dump(payload["data"])}],
-                    "isError": False,
-                }),
+                content=_result(
+                    request_id,
+                    {
+                        "content": [{"type": "text", "text": _dump(payload["data"])}],
+                        "isError": False,
+                    },
+                ),
             )
         return JSONResponse(
-            content=_result(request_id, {
-                "content": [{"type": "text", "text": _dump(payload["error"])}],
-                "isError": True,
-            }),
+            content=_result(
+                request_id,
+                {
+                    "content": [{"type": "text", "text": _dump(payload["error"])}],
+                    "isError": True,
+                },
+            ),
         )
 
     if method == "ping":

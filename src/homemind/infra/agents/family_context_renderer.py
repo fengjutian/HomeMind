@@ -107,16 +107,22 @@ def render_family_context(
         if current_member is not None:
             parts.append("  <current_member>")
             parts.append(f"    <id>{html.escape(current_member.id)}</id>")
-            parts.append(f"    <display_name>{html.escape(current_member.display_name)}</display_name>")
+            parts.append(
+                f"    <display_name>{html.escape(current_member.display_name)}</display_name>"
+            )
             if current_member.role:
                 parts.append(f"    <role>{html.escape(current_member.role)}</role>")
             parts.append("  </current_member>")
 
         parts.append("  <resolved_query>")
-        if time_range is not None and (time_range.start_at or time_range.end_at or time_range.expression):
-            parts.append("    <time_expression>{}</time_expression>".format(
-                html.escape(time_range.expression or "")
-            ))
+        if time_range is not None and (
+            time_range.start_at or time_range.end_at or time_range.expression
+        ):
+            parts.append(
+                "    <time_expression>{}</time_expression>".format(
+                    html.escape(time_range.expression or "")
+                )
+            )
             if time_range.start_at is not None:
                 parts.append(f"    <start_at>{int(time_range.start_at)}</start_at>")
             if time_range.end_at is not None:

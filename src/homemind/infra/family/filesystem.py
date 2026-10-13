@@ -72,7 +72,9 @@ class FamilyFilesystemManager:
         target = self._resolve(root, path, must_exist=True)
         if not target.is_dir():
             raise self._invalid("filesystem path is not a directory")
-        rows = [self._entry(root, item) for item in sorted(target.iterdir()) if not item.is_symlink()]
+        rows = [
+            self._entry(root, item) for item in sorted(target.iterdir()) if not item.is_symlink()
+        ]
         self._audit(family_id, user, "filesystem.list", path, {"count": len(rows)})
         return rows
 
@@ -85,7 +87,7 @@ class FamilyFilesystemManager:
         query: str,
         path: str = ".",
         limit: int = 100,
-    ) -> list[FilesystemEntry]:
+    ) -> builtins.list[FilesystemEntry]:
         if not 1 <= limit <= 500:
             raise self._invalid("filesystem search limit must be between 1 and 500")
         root = self._root(family_id, user, source_id)
@@ -181,7 +183,9 @@ class FamilyFilesystemManager:
                     source.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(recovery), str(source))
                 raise RuntimeError("filesystem delete verification failed")
-            return FilesystemMutationResult(action, source_text, None, True, recovery.relative_to(root).as_posix())
+            return FilesystemMutationResult(
+                action, source_text, None, True, recovery.relative_to(root).as_posix()
+            )
 
         destination_text = str(payload["destination"])
         destination = self._resolve(root, destination_text, must_exist=False)
@@ -191,13 +195,21 @@ class FamilyFilesystemManager:
         before_hash = self._sha256(source)
         if action == "filesystem.copy":
             shutil.copy2(source, destination)
-            verified = source.is_file() and destination.is_file() and self._sha256(destination) == before_hash
+            verified = (
+                source.is_file()
+                and destination.is_file()
+                and self._sha256(destination) == before_hash
+            )
             if not verified:
                 destination.unlink(missing_ok=True)
                 raise RuntimeError("filesystem copy verification failed")
         elif action in {"filesystem.move", "filesystem.rename"}:
             shutil.move(str(source), str(destination))
-            verified = not source.exists() and destination.is_file() and self._sha256(destination) == before_hash
+            verified = (
+                not source.exists()
+                and destination.is_file()
+                and self._sha256(destination) == before_hash
+            )
             if not verified:
                 if destination.exists() and not source.exists():
                     source.parent.mkdir(parents=True, exist_ok=True)
@@ -227,7 +239,9 @@ class FamilyFilesystemManager:
     def _source_path(source: FamilyAssetSourceRow) -> Path:
         parsed = urlparse(source.directory_uri)
         if parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}:
-            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "asset source is not a local directory")
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_INVALID, "asset source is not a local directory"
+            )
         root = Path(url2pathname(unquote(parsed.path))).resolve(strict=True)
         if not root.is_dir() or root.is_symlink():
             raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "asset source root is invalid")
@@ -244,7 +258,9 @@ class FamilyFilesystemManager:
         candidate = root.joinpath(*raw.parts)
         check = candidate if candidate.exists() else candidate.parent
         resolved = check.resolve(strict=True)
-        if not resolved.is_relative_to(root) or any(part.is_symlink() for part in self._parents(root, check)):
+        if not resolved.is_relative_to(root) or any(
+            part.is_symlink() for part in self._parents(root, check)
+        ):
             raise self._invalid("filesystem path escapes the registered source")
         if must_exist and not candidate.exists():
             raise OctopError(ErrorCode.NOT_FOUND, "filesystem path not found")
@@ -264,7 +280,11 @@ class FamilyFilesystemManager:
 
     @staticmethod
     def _entry(root: Path, path: Path) -> FilesystemEntry:
-        return FilesystemEntry(path.relative_to(root).as_posix(), "directory" if path.is_dir() else "file", path.stat().st_size if path.is_file() else None)
+        return FilesystemEntry(
+            path.relative_to(root).as_posix(),
+            "directory" if path.is_dir() else "file",
+            path.stat().st_size if path.is_file() else None,
+        )
 
     @staticmethod
     def _sha256(path: Path) -> str:
@@ -274,8 +294,18 @@ class FamilyFilesystemManager:
                 digest.update(chunk)
         return digest.hexdigest()
 
-    def _audit(self, family_id: str, user: User, action: str, target: str, detail: dict[str, object]) -> None:
-        self.audit.add_audit(family_id, user.id, action, "SUCCESS", transaction_id=None, target=target, detail_json=json.dumps(detail, sort_keys=True))
+    def _audit(
+        self, family_id: str, user: User, action: str, target: str, detail: dict[str, object]
+    ) -> None:
+        self.audit.add_audit(
+            family_id,
+            user.id,
+            action,
+            "SUCCESS",
+            transaction_id=None,
+            target=target,
+            detail_json=json.dumps(detail, sort_keys=True),
+        )
 
     @staticmethod
     def _invalid(message: str) -> HomeMindError:

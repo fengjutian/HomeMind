@@ -288,8 +288,7 @@ class SearchIndexRepo:
                     document_id,
                 ]
                 conn.execute(
-                    f"UPDATE homemind_search_documents SET {', '.join(sets)} "
-                    "WHERE document_id = ?",
+                    f"UPDATE homemind_search_documents SET {', '.join(sets)} WHERE document_id = ?",
                     params,
                 )
         return document_id
@@ -298,8 +297,7 @@ class SearchIndexRepo:
         document_id = document_id_for(family_id, kind, entity_id)
         with self._db.transaction() as conn:
             cursor = conn.execute(
-                "DELETE FROM homemind_search_documents "
-                "WHERE document_id = ? AND family_id = ?",
+                "DELETE FROM homemind_search_documents WHERE document_id = ? AND family_id = ?",
                 (document_id, family_id),
             )
         return int(cursor.rowcount or 0) > 0
@@ -316,21 +314,21 @@ class SearchIndexRepo:
     def count_documents(self, family_id: str | None = None) -> int:
         if family_id is None:
             with self._db.connect() as conn:
-                row = conn.execute(
-                    "SELECT COUNT(*) AS n FROM homemind_search_documents"
-                ).fetchone()
+                row = conn.execute("SELECT COUNT(*) AS n FROM homemind_search_documents").fetchone()
         else:
             with self._db.connect() as conn:
                 row = conn.execute(
-                    "SELECT COUNT(*) AS n FROM homemind_search_documents "
-                    "WHERE family_id = ?",
+                    "SELECT COUNT(*) AS n FROM homemind_search_documents WHERE family_id = ?",
                     (family_id,),
                 ).fetchone()
         data = {key: row[key] for key in row.keys()}  # noqa: SIM118
         return int(data["n"])
 
     def clear_embeddings(
-        self, family_id: str | None = None, *, model: str | None = None,
+        self,
+        family_id: str | None = None,
+        *,
+        model: str | None = None,
     ) -> int:
         """Drop vectors so a REINDEX job can rebuild them cleanly.
 
@@ -414,7 +412,9 @@ class SearchIndexRepo:
             time_clause += " AND (d.captured_at IS NULL OR d.captured_at <= ?)"
 
         visibility_clause, visibility_params = self._visibility_predicate(
-            visible_visibility, owner_member_id, allow_private,
+            visible_visibility,
+            owner_member_id,
+            allow_private,
         )
         # Time bounds sit between the kind list and the visibility
         # predicate in the SQL text, so their params are appended in
@@ -437,10 +437,10 @@ class SearchIndexRepo:
                 "ORDER BY rank DESC, d.updated_at DESC, d.id DESC LIMIT ?"
             )
             params = [
-                needle,            # similarity(..., ?)
+                needle,  # similarity(..., ?)
                 family_id,
                 *kinds,
-                needle,            # ... % ?
+                needle,  # ... % ?
                 *time_params,
                 *visibility_params,
                 limit,
@@ -466,9 +466,7 @@ class SearchIndexRepo:
             "  WHERE homemind_search_fts MATCH ?"
             ") m ON m.document_id = d.document_id "
             f"WHERE d.family_id = ? AND d.kind IN ({kind_placeholders}) "
-            "  AND d.status = 'ACTIVE' "
-            + time_clause
-            + f" AND {visibility_clause} "
+            "  AND d.status = 'ACTIVE' " + time_clause + f" AND {visibility_clause} "
             "ORDER BY m.rank LIMIT ?"
         )
         params = [needle, family_id, *kinds, *time_params, *visibility_params, limit]
@@ -502,7 +500,9 @@ class SearchIndexRepo:
             params.append(end_at)
             time_clause += " AND (d.captured_at IS NULL OR d.captured_at <= ?)"
         visibility_clause, visibility_params = self._visibility_predicate(
-            visible_visibility, owner_member_id, allow_private,
+            visible_visibility,
+            owner_member_id,
+            allow_private,
         )
         params.extend(visibility_params)
         params.append(limit)
@@ -511,9 +511,7 @@ class SearchIndexRepo:
             "FROM homemind_search_documents d "
             f"WHERE d.family_id = ? AND d.kind IN ({kind_placeholders}) "
             "  AND d.status = 'ACTIVE' "
-            "  AND (d.text LIKE ? OR d.title LIKE ?) "
-            + time_clause
-            + f" AND {visibility_clause} "
+            "  AND (d.text LIKE ? OR d.title LIKE ?) " + time_clause + f" AND {visibility_clause} "
             "ORDER BY rank DESC, d.updated_at DESC, d.id DESC LIMIT ?"
         )
         # The leading CASE placeholder, then family / kinds, then the
@@ -615,7 +613,11 @@ class SearchIndexRepo:
     # -------------------------------------------------------------- cursors
 
     def store_cursor(
-        self, family_id: str, *, created_by: int, ttl_seconds: int = 3600,
+        self,
+        family_id: str,
+        *,
+        created_by: int,
+        ttl_seconds: int = 3600,
     ) -> str:
         """Persist an opaque cursor key so the client cannot forge one.
 
@@ -656,7 +658,8 @@ class SearchIndexRepo:
     def purge_expired_cursors(self) -> int:
         with self._db.transaction() as conn:
             cursor = conn.execute(
-                "DELETE FROM homemind_search_cursors WHERE expires_at <= ?", (now_ts(),),
+                "DELETE FROM homemind_search_cursors WHERE expires_at <= ?",
+                (now_ts(),),
             )
         return int(cursor.rowcount or 0)
 
@@ -722,7 +725,9 @@ def verify_token(token: str, *, secret: bytes) -> str | None:
         return None
     payload, _, signature = token.rpartition(".")
     expected = hmac.new(
-        secret, payload.encode("utf-8"), hashlib.sha256,
+        secret,
+        payload.encode("utf-8"),
+        hashlib.sha256,
     ).hexdigest()[:32]
     if not hmac.compare_digest(signature, expected):
         return None

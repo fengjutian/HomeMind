@@ -137,6 +137,14 @@ class SmartDeviceCommandHandler:
             "confirmed": confirmation,
         }
 
+    def compensate(self, context: ActionContext, result: dict[str, Any]) -> dict[str, Any]:
+        """Do not guess an inverse physical-device command."""
+        return {
+            "compensated": False,
+            "reason": "smart device commands require manual compensation",
+            "entity_id": result.get("entity_id"),
+        }
+
     def _entity(self, entity_id: str, family_id: str) -> Any:
         """Fetch the entity, refusing cross-family access."""
         entity = self.smart_home.repo.get_entity(entity_id)

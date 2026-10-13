@@ -111,9 +111,7 @@ async def search_family_indexed(
         FamilySearchQuery(
             text=query,
             kinds=frozenset(
-                part.strip().upper()
-                for part in (kinds or "").split(",")
-                if part.strip()
+                part.strip().upper() for part in (kinds or "").split(",") if part.strip()
             ),
             member_ids=tuple(member_id or ()),
             event_ids=tuple(event_id or ()),

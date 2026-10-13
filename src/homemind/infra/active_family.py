@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from homemind.infra.family.manager import FamilyManager
 from octop.infra.db.repos.settings import SettingsRepo
-from octop.infra.errors import ErrorCode, OctopError
+from octop.infra.errors import OctopError
 from octop.infra.users.identity import User
 
 _ACTIVE_FAMILY_KEY_PREFIX = "homemind.active_family_id::"

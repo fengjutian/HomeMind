@@ -5,9 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from octop.infra.db.pool import DatabasePool
-from octop.infra.db.repos._base import DbRow, map_rows, now_ts, optional_updates
+from octop.infra.db.repos._base import DbRow, map_rows, now_ts
 from octop.infra.utils.ulid import new_ulid
-
 
 # Status values for memory candidates. APPROVED = merged into a real memory.
 # MERGED is recorded for clarity when an explicit merge happens; the canonical
@@ -190,8 +189,7 @@ class MemoryCandidateRepo:
         params.append(candidate_id)
         with self._db.transaction() as conn:
             conn.execute(
-                f"UPDATE homemind_memory_candidates SET {', '.join(fields)} "
-                "WHERE candidate_id = ?",
+                f"UPDATE homemind_memory_candidates SET {', '.join(fields)} WHERE candidate_id = ?",
                 params,
             )
         return self.get(candidate_id)

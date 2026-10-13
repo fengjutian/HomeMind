@@ -50,7 +50,8 @@ class ActiveFamilySetBody(BaseModel):
     summary="Read the current active family for the caller",
 )
 async def get_active_family(
-    server: Server, user: CurrentUser,
+    server: Server,
+    user: CurrentUser,
 ) -> ActiveFamilyResponse:
     family_id = _resolver(server).get(user)
     return ActiveFamilyResponse(family_id=family_id)
@@ -76,7 +77,8 @@ async def set_active_family(
     summary="Clear the caller's active family",
 )
 async def clear_active_family(
-    server: Server, user: CurrentUser,
+    server: Server,
+    user: CurrentUser,
 ) -> ActiveFamilyResponse:
     _resolver(server).clear(user)
     return ActiveFamilyResponse(family_id=None)

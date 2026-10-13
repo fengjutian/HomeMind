@@ -53,7 +53,6 @@ STATUS_DELETED = "DELETED"
 # from being invisible to every search.
 
 
-
 def _member_visibility(member: FamilyMemberRow) -> str:
     return VISIBILITY_PRIVATE if member.status != "ACTIVE" else VISIBILITY_FAMILY
 
@@ -134,11 +133,7 @@ class FamilySearchIndexer:
     # -------------------------------------------------------------- memories
 
     def index_memory(self, family_id: str, memory: FamilyMemoryRow) -> str:
-        visibility = (
-            VISIBILITY_PRIVATE
-            if memory.visibility == "PRIVATE"
-            else VISIBILITY_FAMILY
-        )
+        visibility = VISIBILITY_PRIVATE if memory.visibility == "PRIVATE" else VISIBILITY_FAMILY
         return self.index.upsert_document(
             family_id,
             kind=KIND_MEMORY,
@@ -180,9 +175,7 @@ class FamilySearchIndexer:
             entity_id=asset.id,
             title=asset.asset_type,
             text=text,
-            visibility=(
-                VISIBILITY_PRIVATE if asset.visibility == "PRIVATE" else VISIBILITY_FAMILY
-            ),
+            visibility=(VISIBILITY_PRIVATE if asset.visibility == "PRIVATE" else VISIBILITY_FAMILY),
             status=STATUS_INDEXED if asset.status == "INDEXED" else STATUS_ARCHIVED,
             space_id=asset.space_id,
             captured_at=asset.captured_at,
@@ -266,7 +259,8 @@ class FamilySearchIndexer:
         from homemind.infra.db.repos.search_index import document_id_for  # noqa: PLC0415
 
         return self.index.mark_document_status(
-            document_id_for(family_id, KIND_ASSET, asset_id), STATUS_ARCHIVED,
+            document_id_for(family_id, KIND_ASSET, asset_id),
+            STATUS_ARCHIVED,
         )
 
     # --------------------------------------------------------------- albums
@@ -277,9 +271,7 @@ class FamilySearchIndexer:
             kind=KIND_ALBUM,
             entity_id=album.id,
             title=str(album.name),
-            text=" ".join(
-                part for part in (album.name, album.description or "") if part
-            ),
+            text=" ".join(part for part in (album.name, album.description or "") if part),
             visibility=VISIBILITY_FAMILY,
             status=STATUS_INDEXED,
             updated_at=getattr(album, "updated_at", 0),

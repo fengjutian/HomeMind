@@ -24,8 +24,8 @@ from homemind.infra.family.resolvers.models import (
     ResolvedTimeRange,
 )
 from homemind.infra.family.resolvers.relationship import (
-    RelationshipResolver,
     SUPPORTED_RELATION_TERMS,
+    RelationshipResolver,
 )
 from homemind.infra.family.resolvers.time_range import TimeRangeResolver
 

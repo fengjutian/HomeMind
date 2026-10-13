@@ -48,7 +48,12 @@ class FamilyQueryInput(BaseModel):
 
     family_id: str
     target: Literal[
-        "members", "events", "memories", "assets", "tasks", "devices",
+        "members",
+        "events",
+        "memories",
+        "assets",
+        "tasks",
+        "devices",
     ] = "members"
     query: str | None = Field(default=None, max_length=200)
     limit: int = Field(default=20, ge=1, le=200)
@@ -143,12 +148,16 @@ class McpFamilyToolkit:
             rows = managers["context"].list_events(payload.family_id, user)
         elif payload.target == "memories":
             rows = managers["context"].search_memories(
-                payload.family_id, user, payload.query,
+                payload.family_id,
+                user,
+                payload.query,
             )
         elif payload.target == "assets":
             rows = managers["assets"].search(
-                payload.family_id, user,
-                query=payload.query, limit=payload.limit,
+                payload.family_id,
+                user,
+                query=payload.query,
+                limit=payload.limit,
             )
         elif payload.target == "tasks":
             rows = managers["tasks"].list(payload.family_id, user)
@@ -168,7 +177,9 @@ class McpFamilyToolkit:
         managers = self._managers(services)
         user = _resolve_user(self._user_repo())
         resolved = managers["context"].resolve(
-            payload.family_id, user, payload.query,
+            payload.family_id,
+            user,
+            payload.query,
         )
         return _envelope(
             "context_resolve",
@@ -223,7 +234,9 @@ class McpFamilyToolkit:
                 reason="memory flagged sensitive; requires manager review",
             )
         lifecycle.approve_candidate(
-            payload.family_id, candidate.id, reviewer=user,
+            payload.family_id,
+            candidate.id,
+            reviewer=user,
         )
         return _envelope(
             "memory_commit",
@@ -265,6 +278,7 @@ class McpFamilyToolkit:
 
     def _user_repo(self) -> Any:
         from octop.infra.db.repos.users import UserRepo
+
         return UserRepo(self._db)
 
 

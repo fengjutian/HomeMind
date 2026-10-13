@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from octop.infra.db.pool import DatabasePool
-from octop.infra.db.repos._base import DbRow, map_rows, now_ts, optional_updates
+from octop.infra.db.repos._base import DbRow, map_rows, now_ts
 from octop.infra.utils.ulid import new_ulid
 
 
@@ -62,7 +62,16 @@ class FamilyInviteRepo:
                 "INSERT INTO homemind_family_invites(invite_id, family_id, role, "
                 "display_name, token_hash, created_by, created_at, expires_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (invite_id, family_id, role, display_name.strip(), token_hash, created_by, ts, expires_at),
+                (
+                    invite_id,
+                    family_id,
+                    role,
+                    display_name.strip(),
+                    token_hash,
+                    created_by,
+                    ts,
+                    expires_at,
+                ),
             )
         return self.get(invite_id)  # type: ignore[return-value]
 
@@ -101,8 +110,7 @@ class FamilyInviteRepo:
     def revoke(self, invite_id: str) -> bool:
         with self._db.transaction() as conn:
             cursor = conn.execute(
-                "DELETE FROM homemind_family_invites "
-                "WHERE invite_id = ? AND redeemed_at IS NULL",
+                "DELETE FROM homemind_family_invites WHERE invite_id = ? AND redeemed_at IS NULL",
                 (invite_id,),
             )
         return int(cursor.rowcount or 0) > 0

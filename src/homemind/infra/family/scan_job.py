@@ -15,6 +15,7 @@ V0.1 trade-off: the interval is hard-coded to ``DEFAULT_INTERVAL_SECONDS``
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import time
@@ -25,8 +26,8 @@ from homemind.infra.errors import HomeMindError
 from homemind.infra.metrics import inc as _hm_inc
 
 if TYPE_CHECKING:
-    from homemind.infra.db.repos.family_assets import FamilyAssetRepo
     from homemind.infra.db.repos.families import FamilyRepo
+    from homemind.infra.db.repos.family_assets import FamilyAssetRepo
     from homemind.infra.family.assets import FamilyAssetManager
 
 logger = logging.getLogger(__name__)
@@ -69,9 +70,9 @@ class FamilyAssetScanJob:
     def __init__(
         self,
         *,
-        asset_manager: "FamilyAssetManager",
-        asset_repo: "FamilyAssetRepo",
-        family_repo: "FamilyRepo",
+        asset_manager: FamilyAssetManager,
+        asset_repo: FamilyAssetRepo,
+        family_repo: FamilyRepo,
         interval_seconds: int | None = None,
     ) -> None:
         self._manager = asset_manager
@@ -115,10 +116,8 @@ class FamilyAssetScanJob:
         if task is None or task.done():
             return
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError, Exception):
             await task
-        except (asyncio.CancelledError, Exception):  # noqa: BLE001
-            pass
 
     async def run_once(self) -> AssetScanReport:
         """Run one full sweep across every source. Safe to call directly."""

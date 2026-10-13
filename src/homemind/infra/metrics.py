@@ -149,14 +149,14 @@ class HomeMindMetrics:
         with self._lock:
             return {
                 key: getattr(self, key)
-                for key in self.__dataclass_fields__  # type: ignore[attr-defined]
+                for key in self.__dataclass_fields__
                 if not key.startswith("_")
             }
 
     def reset(self) -> None:
         """Clear all counters. Test-only convenience."""
         with self._lock:
-            for key in self.__dataclass_fields__:  # type: ignore[attr-defined]
+            for key in self.__dataclass_fields__:
                 if key.startswith("_"):
                     continue
                 setattr(self, key, 0)

@@ -11,6 +11,7 @@ from homemind.infra.family.knowledge import KnowledgeManager
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.smart_home_manager import FamilySmartHomeManager
 from homemind.infra.family.tasks import FamilyTaskManager
+from homemind.infra.family.transaction_actions.base import FamilyActionHandler
 from homemind.infra.family.transaction_actions.events import EventCreateHandler
 from homemind.infra.family.transaction_actions.filesystem import (
     FilesystemCopyHandler,
@@ -50,12 +51,12 @@ class FamilyActionRegistry:
     """Resolve an action name to its handler instance."""
 
     def __init__(self) -> None:
-        self._handlers: dict[str, object] = {}
+        self._handlers: dict[str, FamilyActionHandler] = {}
 
-    def register(self, action: str, handler: object) -> None:
+    def register(self, action: str, handler: FamilyActionHandler) -> None:
         self._handlers[action] = handler
 
-    def get(self, action: str) -> object | None:
+    def get(self, action: str) -> FamilyActionHandler | None:
         return self._handlers.get(action)
 
     def actions(self) -> list[str]:
@@ -78,6 +79,8 @@ def build_default_action_registry(
     inject fakes for specific actions."""
     registry = FamilyActionRegistry()
     if tasks is not None:
+        if family is None:
+            raise ValueError("family manager is required when task actions are enabled")
         registry.register("task.create", TaskCreateHandler(family, tasks))
         registry.register("task.update", TaskUpdateHandler(tasks))
         registry.register("task.cancel", TaskCancelHandler(tasks))

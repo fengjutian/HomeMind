@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from octop.infra.db.pool import DatabasePool
 from octop.infra.db.repos._base import DbRow, map_rows, now_ts, optional_updates
@@ -227,11 +228,14 @@ class FamilyRepo:
 
     def get_membership(self, family_id: str, user_id: int) -> DbRow | None:
         with self._db.connect() as conn:
-            return conn.execute(
-                "SELECT * FROM homemind_family_memberships WHERE family_id = ? AND user_id = ? "
-                "AND status = 'ACTIVE'",
-                (family_id, user_id),
-            ).fetchone()
+            return cast(
+                DbRow | None,
+                conn.execute(
+                    "SELECT * FROM homemind_family_memberships WHERE family_id = ? AND user_id = ? "
+                    "AND status = 'ACTIVE'",
+                    (family_id, user_id),
+                ).fetchone(),
+            )
 
     def user_exists(self, user_id: int) -> bool:
         with self._db.connect() as conn:
@@ -291,7 +295,8 @@ class FamilyRepo:
             params.extend((now_ts(), member_id))
             with self._db.transaction() as conn:
                 conn.execute(
-                    f"UPDATE homemind_family_members SET {', '.join(fields)} WHERE member_id = ?", params
+                    f"UPDATE homemind_family_members SET {', '.join(fields)} WHERE member_id = ?",
+                    params,
                 )
                 membership_values = {
                     key: values[key] for key in ("role", "status") if key in values
@@ -324,7 +329,10 @@ class FamilyRepo:
         return FamilyMemberRow.from_row(row) if row else None
 
     def update_family_owner(
-        self, family_id: str, previous_owner_user_id: int, new_owner_user_id: int,
+        self,
+        family_id: str,
+        previous_owner_user_id: int,
+        new_owner_user_id: int,
     ) -> bool:
         """Repoint ``owner_user_id`` after an ownership transfer.
 
@@ -403,9 +411,7 @@ class FamilyRepo:
             ).fetchall()
         return map_rows(rows, FamilyRelationshipRow)
 
-    def list_relationships_for_member(
-        self, member_id: str
-    ) -> list[FamilyRelationshipRow]:
+    def list_relationships_for_member(self, member_id: str) -> list[FamilyRelationshipRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM homemind_family_relationships "
@@ -415,9 +421,7 @@ class FamilyRepo:
             ).fetchall()
         return map_rows(rows, FamilyRelationshipRow)
 
-    def list_members_by_display_name(
-        self, display_name: str
-    ) -> list[FamilyMemberRow]:
+    def list_members_by_display_name(self, display_name: str) -> list[FamilyMemberRow]:
         with self._db.connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM homemind_family_members "
@@ -468,13 +472,16 @@ class FamilyRepo:
             params.extend((now_ts(), space_id))
             with self._db.transaction() as conn:
                 conn.execute(
-                    f"UPDATE homemind_family_spaces SET {', '.join(fields)} WHERE space_id = ?", params
+                    f"UPDATE homemind_family_spaces SET {', '.join(fields)} WHERE space_id = ?",
+                    params,
                 )
         return self.get_space(space_id)
 
     def delete_space(self, space_id: str) -> bool:
         with self._db.transaction() as conn:
-            cursor = conn.execute("DELETE FROM homemind_family_spaces WHERE space_id = ?", (space_id,))
+            cursor = conn.execute(
+                "DELETE FROM homemind_family_spaces WHERE space_id = ?", (space_id,)
+            )
         return int(cursor.rowcount or 0) > 0
 
     def create_permission(
@@ -510,7 +517,8 @@ class FamilyRepo:
             )
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM homemind_family_permissions WHERE permission_id = ?", (permission_id,)
+                "SELECT * FROM homemind_family_permissions WHERE permission_id = ?",
+                (permission_id,),
             ).fetchone()
         if row is None:
             raise RuntimeError("family permission insert failed")
@@ -527,7 +535,8 @@ class FamilyRepo:
     def get_permission(self, permission_id: str) -> FamilyPermissionRow | None:
         with self._db.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM homemind_family_permissions WHERE permission_id = ?", (permission_id,)
+                "SELECT * FROM homemind_family_permissions WHERE permission_id = ?",
+                (permission_id,),
             ).fetchone()
         return FamilyPermissionRow.from_row(row) if row else None
 

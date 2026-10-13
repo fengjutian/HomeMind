@@ -165,8 +165,8 @@ class FamilyTransactionManager:
             self._audit(transaction, user.id, "IDEMPOTENT_REPLAY")
             if transaction.status == TransactionStatus.WAITING_APPROVAL.value:
                 approval = self.repo.get_approval_for_transaction(transaction.id)
-                return transaction, approval  # type: ignore[return-value]
-            return transaction, None  # type: ignore[return-value]
+                return transaction, approval
+            return transaction, None
         # Build a preview so the row carries useful context for audit
         # even if execution never runs.
         try:
@@ -181,12 +181,18 @@ class FamilyTransactionManager:
             )
         except Exception as exc:  # noqa: BLE001 — handler is on the hook
             preview = {"preview_error": str(exc)}
-        transaction = self.repo.transition(
+        updated = self.repo.transition(
             transaction.id,
             from_status=TransactionStatus.PLANNED,
             to_status=TransactionStatus.PLANNED,
             result_json=json.dumps(preview, ensure_ascii=False, sort_keys=True, default=str),
         )
+        if updated is None:
+            raise HomeMindError(
+                HomeMindErrorCode.FAMILY_CONFLICT,
+                "family transaction changed while planning",
+            )
+        transaction = updated
         decision = self.permissions.evaluate(
             family_id=family_id,
             user=user,
@@ -195,19 +201,31 @@ class FamilyTransactionManager:
         )
         effect = decision.effect
         if effect is PermissionEffect.DENY:
-            transaction = self.repo.transition(
+            updated = self.repo.transition(
                 transaction.id,
                 from_status=TransactionStatus.PLANNED,
                 to_status=TransactionStatus.DENIED,
             )
+            if updated is None:
+                raise HomeMindError(
+                    HomeMindErrorCode.FAMILY_CONFLICT,
+                    "family transaction changed while denying",
+                )
+            transaction = updated
             self._audit(transaction, user.id, "DENIED", approval="DENY")
-            return transaction, None  # type: ignore[return-value]
+            return transaction, None
         if effect is PermissionEffect.REQUIRE_CONFIRMATION:
-            transaction = self.repo.transition(
+            updated = self.repo.transition(
                 transaction.id,
                 from_status=TransactionStatus.PLANNED,
                 to_status=TransactionStatus.WAITING_APPROVAL,
             )
+            if updated is None:
+                raise HomeMindError(
+                    HomeMindErrorCode.FAMILY_CONFLICT,
+                    "family transaction changed while requesting approval",
+                )
+            transaction = updated
             # Default 24 h approval window so the dashboard can show a
             # concrete deadline and the daily sweep has something to
             # expire. Callers can override via ``approval_ttl_seconds``.
@@ -218,7 +236,7 @@ class FamilyTransactionManager:
                 approval_expires_at=expires_at,
             )
             self._audit(transaction, user.id, "WAITING_APPROVAL", approval="PENDING")
-            return transaction, approval  # type: ignore[return-value]
+            return transaction, approval
         # Auto-allow: transition to EXECUTING then drive through VERIFYING.
         _hm_inc("transaction_plan_total")
         return self._run_handler(transaction, user, payload), None
@@ -248,14 +266,20 @@ class FamilyTransactionManager:
                     HomeMindErrorCode.FAMILY_CONFLICT,
                     "family approval is already decided",
                 ) from exc
-            transaction = self.repo.transition(
+            updated = self.repo.transition(
                 transaction.id,
                 from_status=TransactionStatus.WAITING_APPROVAL,
                 to_status=TransactionStatus.DENIED,
                 approved_at=None,
             )
+            if updated is None:
+                raise HomeMindError(
+                    HomeMindErrorCode.FAMILY_CONFLICT,
+                    "family transaction changed while denying approval",
+                )
+            transaction = updated
             self._audit(transaction, user.id, "DENIED", approval="REJECTED")
-            return transaction  # type: ignore[return-value]
+            return transaction
         # Atomic transition WAITING_APPROVAL → APPROVED. If another
         # approver already moved the row, the CAS returns ``None`` and we
         # surface a conflict.
@@ -603,9 +627,10 @@ class FamilyTransactionManager:
             self._audit(failed or transaction, requester.id, "FAILED")
             return failed or transaction
 
+        expires_at = result.get("expires_at") if isinstance(result, dict) else None
         deadline = (
-            int(result.get("expires_at"))
-            if isinstance(result, dict) and result.get("expires_at") is not None
+            int(expires_at)
+            if isinstance(expires_at, (int, str))
             else executed_at + self.device_await_ttl_seconds
         )
         parked = self.repo.transition(

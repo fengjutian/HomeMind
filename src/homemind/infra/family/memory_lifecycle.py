@@ -192,7 +192,9 @@ class MemoryLifecycleManager:
             status=CANDIDATE_STATUS_REJECTED,
             reviewer_id=reviewer.id,
             rejection_reason=reason,
-        )  # type: ignore[return-value]
+        )
+        if updated is None:
+            raise OctopError(ErrorCode.NOT_FOUND, "memory candidate not found")
         _hm_inc("memory_candidate_reject_total")
         return updated
 
@@ -338,7 +340,7 @@ class MemoryLifecycleManager:
             if not tokens:
                 continue
             cluster: list[FamilyMemoryRow] = []
-            for other in rows[index + 1:]:
+            for other in rows[index + 1 :]:
                 if other.memory_type != candidate.memory_type:
                     continue
                 if other.subject_type != candidate.subject_type:
@@ -346,9 +348,7 @@ class MemoryLifecycleManager:
                 other_tokens = set(_tokenize(other.content.casefold()))
                 if not other_tokens:
                     continue
-                overlap = len(tokens & other_tokens) / max(
-                    len(tokens), len(other_tokens)
-                )
+                overlap = len(tokens & other_tokens) / max(len(tokens), len(other_tokens))
                 if overlap >= 0.7:
                     cluster.append(other)
             if cluster:
@@ -391,9 +391,7 @@ def _tokenize(text: str) -> list[str]:
         for particle in present:
             new_segments: list[str] = []
             for segment in segments:
-                new_segments.extend(
-                    part for part in segment.split(particle) if part
-                )
+                new_segments.extend(part for part in segment.split(particle) if part)
             segments = new_segments
         out.extend(segment.casefold() for segment in segments)
     return [token for token in out if len(token) >= 1]

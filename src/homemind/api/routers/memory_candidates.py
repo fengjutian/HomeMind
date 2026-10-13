@@ -171,7 +171,9 @@ async def list_memory_candidates(
     family_id: str,
     server: Server,
     user: CurrentUser,
-    status: str | None = Query(default=None, description="PENDING / APPROVED / REJECTED / MERGED / EXPIRED"),
+    status: str | None = Query(
+        default=None, description="PENDING / APPROVED / REJECTED / MERGED / EXPIRED"
+    ),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> list[MemoryCandidateResponse]:
     services = _services(server)
@@ -194,7 +196,10 @@ async def list_memory_candidates(
     summary="Fetch a single memory candidate",
 )
 async def get_memory_candidate(
-    family_id: str, candidate_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    candidate_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> MemoryCandidateResponse:
     services = _services(server)
     lifecycle = _lifecycle(services)
@@ -213,14 +218,19 @@ async def get_memory_candidate(
     summary="Approve a memory candidate and promote it to a real memory",
 )
 async def approve_memory_candidate(
-    family_id: str, candidate_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    candidate_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> MemoryCandidateApproveResponse:
     lifecycle = _lifecycle(_services(server))
     family = _family(_services(server))
     family.require_manager(family_id, user)
     _load_candidate(lifecycle, family_id, candidate_id)
     updated, memory = lifecycle.approve_candidate(
-        family_id, candidate_id, reviewer=user,
+        family_id,
+        candidate_id,
+        reviewer=user,
     )
     return MemoryCandidateApproveResponse(
         candidate=_candidate_response(updated),
@@ -245,7 +255,10 @@ async def reject_memory_candidate(
     family.require_manager(family_id, user)
     _load_candidate(lifecycle, family_id, candidate_id)
     updated = lifecycle.reject_candidate(
-        family_id, candidate_id, reviewer=user, reason=body.reason,
+        family_id,
+        candidate_id,
+        reviewer=user,
+        reason=body.reason,
     )
     return _candidate_response(updated)
 
@@ -267,7 +280,10 @@ async def merge_memory_candidate(
     family.require_manager(family_id, user)
     _load_candidate(lifecycle, family_id, candidate_id)
     updated, target = lifecycle.merge_candidate(
-        family_id, candidate_id, body.target_memory_id, reviewer=user,
+        family_id,
+        candidate_id,
+        body.target_memory_id,
+        reviewer=user,
     )
     return MemoryCandidateApproveResponse(
         candidate=_candidate_response(updated),
@@ -281,7 +297,10 @@ async def merge_memory_candidate(
     summary="List evidence rows that produced or reinforced a memory",
 )
 async def list_memory_evidence(
-    family_id: str, memory_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    memory_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> list[MemoryEvidenceResponse]:
     lifecycle = _lifecycle(_services(server))
     family = _family(_services(server))
@@ -289,9 +308,7 @@ async def list_memory_evidence(
     memory = lifecycle.context.repo.get_memory(memory_id)
     if memory is None or memory.family_id != family_id:
         raise OctopError(ErrorCode.NOT_FOUND, "memory not found")
-    return [
-        _evidence_response(row) for row in lifecycle.evidence.list_for_memory(memory_id)
-    ]
+    return [_evidence_response(row) for row in lifecycle.evidence.list_for_memory(memory_id)]
 
 
 @router.post(
@@ -306,7 +323,10 @@ async def list_memory_evidence(
     ),
 )
 async def archive_memory(
-    family_id: str, memory_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    memory_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> MemoryCandidateResponse:
     family = _family(_services(server))
     family.require_manager(family_id, user)
@@ -315,7 +335,8 @@ async def archive_memory(
     if memory is None or memory.family_id != family_id:
         raise OctopError(ErrorCode.NOT_FOUND, "memory not found")
     updated = services.family_context_repo.update_memory(
-        memory_id, status="ARCHIVED",
+        memory_id,
+        status="ARCHIVED",
     )
     return _candidate_response(updated) if updated is not None else _candidate_response(memory)  # type: ignore[arg-type]
 
@@ -326,7 +347,10 @@ async def archive_memory(
     summary="Restore an archived memory to ACTIVE",
 )
 async def restore_memory(
-    family_id: str, memory_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    memory_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> MemoryCandidateResponse:
     family = _family(_services(server))
     family.require_manager(family_id, user)
@@ -335,7 +359,8 @@ async def restore_memory(
     if memory is None or memory.family_id != family_id:
         raise OctopError(ErrorCode.NOT_FOUND, "memory not found")
     updated = services.family_context_repo.update_memory(
-        memory_id, status="ACTIVE",
+        memory_id,
+        status="ACTIVE",
     )
     return _candidate_response(updated) if updated is not None else _candidate_response(memory)  # type: ignore[arg-type]
 

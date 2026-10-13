@@ -46,9 +46,10 @@ class FamilyTransactionRow:
         # legacy schemas (e.g. before migration 004) hydrate cleanly
         # without raising ``KeyError``.
         if hasattr(row, "keys"):
-            row_dict: dict[str, Any] = {key: row[key] for key in row.keys()}
+            keys = row.keys()
+            row_dict: dict[str, Any] = {key: row[key] for key in keys}
         else:
-            row_dict = dict(row)  # type: ignore[arg-type]
+            row_dict = dict(row)
 
         def _int(value: Any) -> int | None:
             return int(value) if value is not None else None
@@ -78,35 +79,6 @@ class FamilyTransactionRow:
             device_deadline_at=_int(row_dict.get("device_deadline_at")),
         )
 
-        # ``from_row`` is shared by every read path. Defensive defaults
-        # let older schemas (e.g. a DB created before migration 004 added
-        # ``preview_json`` / ``verification_json`` / ``attempt_count``
-        # / ``lease_owner`` / ``lease_expires_at`` / ``approved_at``
-        # / ``executed_at`` / ``verified_at`` / ``cancelled_at``) still
-        # hydrate without raising ``KeyError``.
-        return cls(
-            id=str(row["transaction_id"]),
-            family_id=str(row["family_id"]),
-            requested_by=int(row["requested_by"]),
-            action=str(row["action"]),
-            payload_json=str(row["payload_json"]),
-            status=str(row["status"]),
-            result_json=row["result_json"],
-            error=row["error"],
-            created_at=int(row["created_at"]),
-            updated_at=int(row["updated_at"]),
-            idempotency_key=row["idempotency_key"],
-            preview_json=_col("preview_json", "{}") or "{}",
-            verification_json=_col("verification_json"),
-            attempt_count=int(_col("attempt_count", 0) or 0),
-            lease_owner=_col("lease_owner"),
-            lease_expires_at=_int(_col("lease_expires_at")),
-            approved_at=_int(_col("approved_at")),
-            executed_at=_int(_col("executed_at")),
-            verified_at=_int(_col("verified_at")),
-            cancelled_at=_int(_col("cancelled_at")),
-        )
-
 
 @dataclass(frozen=True)
 class FamilyApprovalRow:
@@ -125,7 +97,7 @@ class FamilyApprovalRow:
     def from_row(cls, row: DbRow) -> FamilyApprovalRow:
         expires = (
             row.get("approval_expires_at") if hasattr(row, "get") else row["approval_expires_at"]
-        )  # type: ignore[index]
+        )
         expires_int: int | None = None
         if expires is not None:
             try:
@@ -454,7 +426,7 @@ class FamilyTransactionRepo:
         self,
         transaction_id: str,
         *,
-        from_status: str,
+        from_status: str | tuple[str, ...],
         owner: str,
         ttl_seconds: int,
     ) -> FamilyTransactionRow | None:

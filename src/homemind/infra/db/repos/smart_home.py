@@ -114,9 +114,7 @@ class SmartProviderRow:
             ),
             subscription_error_code=data.get("subscription_error_code"),
             last_command_at=(
-                int(data["last_command_at"])
-                if data.get("last_command_at") is not None
-                else None
+                int(data["last_command_at"]) if data.get("last_command_at") is not None else None
             ),
             last_command_duration_ms=(
                 int(data["last_command_duration_ms"])

@@ -6,7 +6,6 @@ import sqlite3
 import time
 from collections.abc import Callable
 from enum import StrEnum
-from typing import TypeVar
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 try:
@@ -66,10 +65,7 @@ __all__ = [
 ]
 
 
-T = TypeVar("T")
-
-
-def _write(call: Callable[[], T]) -> T:
+def _write[T](call: Callable[[], T]) -> T:
     try:
         return call()
     except Exception as exc:
@@ -142,9 +138,7 @@ class FamilyManager:
             return family
         raise OctopError(ErrorCode.FORBIDDEN, "family manager required")
 
-    def update_family(
-        self, family_id: str, user: User, changes: dict[str, object]
-    ) -> FamilyRow:
+    def update_family(self, family_id: str, user: User, changes: dict[str, object]) -> FamilyRow:
         self.require_manager(family_id, user)
         _reject_null(changes, {"name", "timezone", "locale"})
         if "timezone" in changes:
@@ -175,9 +169,7 @@ class FamilyManager:
     ) -> FamilyMemberRow:
         self.require_manager(family_id, user)
         if role is MemberRole.OWNER:
-            raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "family can have only one owner"
-            )
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "family can have only one owner")
         if user_id is not None and not self.repo.user_exists(user_id):
             raise OctopError(ErrorCode.NOT_FOUND, "linked user not found")
         return _write(
@@ -207,9 +199,7 @@ class FamilyManager:
         in-app member creation.
         """
         if role is MemberRole.OWNER:
-            raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "family can have only one owner"
-            )
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "family can have only one owner")
         if not self.repo.user_exists(user_id):
             raise OctopError(ErrorCode.NOT_FOUND, "linked user not found")
         return _write(
@@ -232,11 +222,10 @@ class FamilyManager:
         if member.role == MemberRole.OWNER:
             raise OctopError(ErrorCode.FORBIDDEN, "family owner cannot be changed")
         if changes.get("role") == MemberRole.OWNER:
-            raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "family can have only one owner"
-            )
-        if isinstance(changes.get("role"), MemberRole):
-            changes["role"] = changes["role"].value
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "family can have only one owner")
+        role = changes.get("role")
+        if isinstance(role, MemberRole):
+            changes["role"] = role.value
         if "display_name" in changes:
             changes["display_name"] = str(changes["display_name"]).strip()
         row = _write(lambda: self.repo.update_member(member_id, **changes))
@@ -281,9 +270,7 @@ class FamilyManager:
             raise OctopError(ErrorCode.FORBIDDEN, "only the family owner can transfer ownership")
         target = self._require_member(family_id, to_member_id)
         if target.id == str(membership["member_id"]):
-            raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "member already owns this family"
-            )
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "member already owns this family")
         if target.role not in {MemberRole.OWNER, MemberRole.ADMIN, MemberRole.MEMBER}:
             raise HomeMindError(
                 HomeMindErrorCode.FAMILY_INVALID,
@@ -300,7 +287,8 @@ class FamilyManager:
             )
         _write(
             lambda: self.repo.update_member(
-                str(membership["member_id"]), role=MemberRole.ADMIN.value,
+                str(membership["member_id"]),
+                role=MemberRole.ADMIN.value,
             )
         )
         # ``update_member`` cascades the role onto the membership row,
@@ -366,14 +354,10 @@ class FamilyManager:
                 HomeMindErrorCode.FAMILY_CONFLICT,
                 "member is already bound to a different user",
             )
-        row = _write(
-            lambda: self.repo.update_member(member.id, user_id=target_user_id)
-        )
+        row = _write(lambda: self.repo.update_member(member.id, user_id=target_user_id))
         return self._require_member(family_id, row.id if row else member.id)
 
-    def unbind_user(
-        self, family_id: str, member_id: str, user: User
-    ) -> FamilyMemberRow:
+    def unbind_user(self, family_id: str, member_id: str, user: User) -> FamilyMemberRow:
         """Detach a member from its platform account."""
         self.require_manager(family_id, user)
         self._require_member(family_id, member_id)
@@ -385,8 +369,7 @@ class FamilyManager:
         managers = [
             member
             for member in self.repo.list_members(family_id)
-            if member.role in {MemberRole.OWNER, MemberRole.ADMIN}
-            and member.id != member_id
+            if member.role in {MemberRole.OWNER, MemberRole.ADMIN} and member.id != member_id
         ]
         return not managers
 
@@ -435,9 +418,7 @@ class FamilyManager:
         if owner_member_id is not None:
             self._require_member(family_id, owner_member_id)
         if space_type is SpaceType.PRIVATE and owner_member_id is None:
-            raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "private space requires an owner"
-            )
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "private space requires an owner")
         return _write(
             lambda: self.repo.create_space(
                 family_id,
@@ -463,9 +444,7 @@ class FamilyManager:
         if owner_member_id is not None:
             self._require_member(family_id, str(owner_member_id))
         if space_type == SpaceType.PRIVATE and owner_member_id is None:
-            raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "private space requires an owner"
-            )
+            raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "private space requires an owner")
         if "name" in changes:
             changes["name"] = str(changes["name"]).strip()
         row = _write(lambda: self.repo.update_space(space_id, **changes))
@@ -526,8 +505,9 @@ class FamilyManager:
             space = self.repo.get_space(str(space_id))
             if space is None or space.family_id != family_id:
                 raise OctopError(ErrorCode.NOT_FOUND, "family space not found")
-        if isinstance(changes.get("effect"), PermissionEffect):
-            changes["effect"] = changes["effect"].value
+        effect = changes.get("effect")
+        if isinstance(effect, PermissionEffect):
+            changes["effect"] = effect.value
         if "action" in changes:
             changes["action"] = str(changes["action"]).strip()
         row = _write(lambda: self.repo.update_permission(permission_id, **changes))

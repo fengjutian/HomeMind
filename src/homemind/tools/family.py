@@ -195,9 +195,7 @@ def build_family_tools(
 
     def family_search_memory(family_id: str, query: str = "") -> str:
         try:
-            rows = context.search_memories(
-                family_id, _current_user(user_repo), query or None
-            )
+            rows = context.search_memories(family_id, _current_user(user_repo), query or None)
             return _ok([asdict(row) for row in rows])
         except Exception as exc:
             return _error(exc)
@@ -438,13 +436,9 @@ def build_family_tools(
             embedding = None
             if embedding_provider_id is not None:
                 if not embedding_model:
-                    raise ValueError(
-                        "embedding_model is required with embedding_provider_id"
-                    )
+                    raise ValueError("embedding_model is required with embedding_provider_id")
                 provider = require_provider(providers.get(embedding_provider_id))
-                embedding = OpenAICompatibleEmbeddingProvider(
-                    provider, embedding_model
-                )
+                embedding = OpenAICompatibleEmbeddingProvider(provider, embedding_model)
             rows = search.search(
                 family_id,
                 _current_user(user_repo),
@@ -523,26 +517,14 @@ def build_family_tools(
         except Exception as exc:
             return _error(exc)
 
-    def filesystem_copy(
-        family_id: str, source_id: str, path: str, destination: str
-    ) -> str:
-        return filesystem_mutation(
-            "filesystem.copy", family_id, source_id, path, destination
-        )
+    def filesystem_copy(family_id: str, source_id: str, path: str, destination: str) -> str:
+        return filesystem_mutation("filesystem.copy", family_id, source_id, path, destination)
 
-    def filesystem_move(
-        family_id: str, source_id: str, path: str, destination: str
-    ) -> str:
-        return filesystem_mutation(
-            "filesystem.move", family_id, source_id, path, destination
-        )
+    def filesystem_move(family_id: str, source_id: str, path: str, destination: str) -> str:
+        return filesystem_mutation("filesystem.move", family_id, source_id, path, destination)
 
-    def filesystem_rename(
-        family_id: str, source_id: str, path: str, destination: str
-    ) -> str:
-        return filesystem_mutation(
-            "filesystem.rename", family_id, source_id, path, destination
-        )
+    def filesystem_rename(family_id: str, source_id: str, path: str, destination: str) -> str:
+        return filesystem_mutation("filesystem.rename", family_id, source_id, path, destination)
 
     def filesystem_delete(family_id: str, source_id: str, path: str) -> str:
         return filesystem_mutation("filesystem.delete", family_id, source_id, path)
@@ -554,9 +536,7 @@ def build_family_tools(
         except Exception as exc:
             return _error(exc)
 
-    def family_create_album(
-        family_id: str, name: str, description: str = ""
-    ) -> str:
+    def family_create_album(family_id: str, name: str, description: str = "") -> str:
         try:
             row = albums.create(
                 family_id,
@@ -568,13 +548,9 @@ def build_family_tools(
         except Exception as exc:
             return _error(exc)
 
-    def family_add_album_asset(
-        family_id: str, album_id: str, asset_id: str
-    ) -> str:
+    def family_add_album_asset(family_id: str, album_id: str, asset_id: str) -> str:
         try:
-            albums.add_asset(
-                family_id, album_id, asset_id, _current_user(user_repo)
-            )
+            albums.add_asset(family_id, album_id, asset_id, _current_user(user_repo))
             return _ok({"album_id": album_id, "asset_id": asset_id, "added": True})
         except Exception as exc:
             return _error(exc)
@@ -595,18 +571,14 @@ def build_family_tools(
 
     def family_apply_photo_organization(family_id: str, plan_id: str) -> str:
         try:
-            row = albums.apply_plan(
-                family_id, plan_id, _current_user(user_repo)
-            )
+            row = albums.apply_plan(family_id, plan_id, _current_user(user_repo))
             return _ok(asdict(row))
         except Exception as exc:
             return _error(exc)
 
     def family_analyze_photo_local(family_id: str, asset_id: str) -> str:
         try:
-            row = photos.analyze(
-                family_id, asset_id, _current_user(user_repo)
-            )
+            row = photos.analyze(family_id, asset_id, _current_user(user_repo))
             return _ok(asdict(row))
         except Exception as exc:
             return _error(exc)
@@ -627,33 +599,23 @@ def build_family_tools(
             embedding = None
             if embedding_provider_id is not None:
                 if not embedding_model:
-                    raise ValueError(
-                        "embedding_model is required with embedding_provider_id"
-                    )
-                embedding_row = require_provider(
-                    providers.get(embedding_provider_id)
-                )
-                embedding = OpenAICompatibleEmbeddingProvider(
-                    embedding_row, embedding_model
-                )
+                    raise ValueError("embedding_model is required with embedding_provider_id")
+                embedding_row = require_provider(providers.get(embedding_provider_id))
+                embedding = OpenAICompatibleEmbeddingProvider(embedding_row, embedding_model)
             row = photos.analyze(
                 family_id,
                 asset_id,
                 _current_user(user_repo),
                 vision=vision,
                 embedding=embedding,
-                geocoder=NominatimReverseGeocodingProvider()
-                if reverse_geocode
-                else None,
+                geocoder=NominatimReverseGeocodingProvider() if reverse_geocode else None,
                 face_recognition=vision if recognize_faces else None,
             )
             return _ok(asdict(row))
         except Exception as exc:
             return _error(exc)
 
-    def family_set_face_reference(
-        family_id: str, member_id: str, asset_id: str
-    ) -> str:
+    def family_set_face_reference(family_id: str, member_id: str, asset_id: str) -> str:
         try:
             photos.set_face_reference(
                 family_id,
@@ -661,15 +623,11 @@ def build_family_tools(
                 asset_id,
                 _current_user(user_repo),
             )
-            return _ok(
-                {"member_id": member_id, "asset_id": asset_id, "registered": True}
-            )
+            return _ok({"member_id": member_id, "asset_id": asset_id, "registered": True})
         except Exception as exc:
             return _error(exc)
 
-    def family_find_similar_photos(
-        family_id: str, asset_id: str, max_distance: int = 8
-    ) -> str:
+    def family_find_similar_photos(family_id: str, asset_id: str, max_distance: int = 8) -> str:
         try:
             rows = photos.similar(
                 family_id,
@@ -678,10 +636,7 @@ def build_family_tools(
                 max_distance=max_distance,
             )
             return _ok(
-                [
-                    {"asset_id": item_id, "hamming_distance": distance}
-                    for item_id, distance in rows
-                ]
+                [{"asset_id": item_id, "hamming_distance": distance} for item_id, distance in rows]
             )
         except Exception as exc:
             return _error(exc)

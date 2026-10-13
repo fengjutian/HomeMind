@@ -23,7 +23,6 @@ from homemind.infra.db.repos.asset_jobs import (
 from homemind.infra.db.services import HomeMindServices
 from homemind.infra.family.manager import FamilyManager
 from octop.api.deps import current_user, get_server
-from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.server import OctopServer
 from octop.infra.users.identity import User
 
@@ -86,7 +85,9 @@ class DashboardSummary(BaseModel):
     upcoming_events: list[UpcomingEvent] = Field(default_factory=list)
     recent_memories: list[RecentMemory] = Field(default_factory=list)
     recent_assets: list[RecentAsset] = Field(default_factory=list)
-    devices: DeviceSummary = Field(default_factory=lambda: DeviceSummary(total=0, online=0, offline=0))
+    devices: DeviceSummary = Field(
+        default_factory=lambda: DeviceSummary(total=0, online=0, offline=0)
+    )
     recent_jobs: list[JobSummary] = Field(default_factory=list)
 
 
@@ -107,7 +108,9 @@ def _services(server: OctopServer) -> HomeMindServices:
     ),
 )
 async def dashboard_summary(
-    family_id: str, server: Server, user: CurrentUser,
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
 ) -> DashboardSummary:
     services = _services(server)
     family = FamilyManager(services.family_repo)
@@ -121,7 +124,9 @@ async def dashboard_summary(
             services.family_transaction_repo.list_approvals(family_id, "PENDING"),
         )
     pending_candidates = services.memory_candidate_repo.list_for_family(
-        family_id, status="PENDING", limit=100,
+        family_id,
+        status="PENDING",
+        limit=100,
     ).__len__()
 
     events = services.family_context_repo.list_events(family_id)
@@ -146,12 +151,8 @@ async def dashboard_summary(
         family_name=record.name,
         timezone=record.timezone,
         member_count=len(services.family_repo.list_members(family_id)),
-        today_task_count=sum(
-            1 for task in tasks if (task.due_at or 0) >= day_start
-        ),
-        open_task_count=sum(
-            1 for task in tasks if task.status not in {"DONE", "CANCELLED"}
-        ),
+        today_task_count=sum(1 for task in tasks if (task.due_at or 0) >= day_start),
+        open_task_count=sum(1 for task in tasks if task.status not in {"DONE", "CANCELLED"}),
         pending_approval_count=pending_approvals,
         pending_memory_candidate_count=pending_candidates,
         upcoming_events=[

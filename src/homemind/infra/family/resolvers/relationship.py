@@ -11,7 +11,6 @@ from homemind.infra.db.repos.families import (
 )
 from homemind.infra.family.resolvers.models import ResolutionCandidate
 
-
 # Term → list of relationship-type pairs that connect current→target.
 # A relationship edge stored as (from=A, to=B, type=T) means A is T of B.
 # Resolving from the current member's POV means we treat the relationship
@@ -95,10 +94,7 @@ class RelationshipResolver:
 
     def _by_display_name(self, name: str) -> list[ResolvedMember]:
         normalized = name.casefold()
-        members = [
-            member
-            for member in self.repo.list_members_by_display_name(normalized)
-        ]
+        members = list(self.repo.list_members_by_display_name(normalized))
         return [
             ResolvedMember(
                 candidate=ResolutionCandidate(

@@ -22,11 +22,11 @@ from homemind.infra.family.transaction_actions.filesystem import (
 from homemind.infra.family.transaction_actions.memories import (
     MemoryCreateHandler,
 )
-from homemind.infra.family.transaction_actions.tasks import TaskCreateHandler
 from homemind.infra.family.transaction_actions.registry import (
-    build_default_action_registry,
     FamilyActionRegistry,
+    build_default_action_registry,
 )
+from homemind.infra.family.transaction_actions.tasks import TaskCreateHandler
 
 _DEFAULT_REGISTRY = build_default_action_registry()
 

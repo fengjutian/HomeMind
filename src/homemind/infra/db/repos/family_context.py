@@ -148,8 +148,13 @@ class FamilyContextRepo:
 
     def update_event(self, event_id: str, **values: object) -> FamilyEventRow | None:
         allowed = {
-            "event_type", "title", "start_at", "end_at", "location",
-            "description", "metadata_json",
+            "event_type",
+            "title",
+            "start_at",
+            "end_at",
+            "location",
+            "description",
+            "metadata_json",
         }
         fields, params = optional_updates(
             [(key, value) for key, value in values.items() if key in allowed]
@@ -159,8 +164,7 @@ class FamilyContextRepo:
             params.extend((now_ts(), event_id))
             with self._db.transaction() as conn:
                 conn.execute(
-                    f"UPDATE homemind_family_events SET {', '.join(fields)} "
-                    "WHERE event_id = ?",
+                    f"UPDATE homemind_family_events SET {', '.join(fields)} WHERE event_id = ?",
                     params,
                 )
         return self.get_event(event_id)
@@ -196,11 +200,20 @@ class FamilyContextRepo:
                 "created_by, created_at, updated_at, expires_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    memory_id, family_id, values["subject_type"],
-                    values.get("subject_id"), values["content"], values["memory_type"],
-                    values.get("importance", 0.5), values.get("confidence", 0.5),
-                    values.get("visibility", "FAMILY"), values["source_type"],
-                    values.get("source_id"), values["created_by"], ts, ts,
+                    memory_id,
+                    family_id,
+                    values["subject_type"],
+                    values.get("subject_id"),
+                    values["content"],
+                    values["memory_type"],
+                    values.get("importance", 0.5),
+                    values.get("confidence", 0.5),
+                    values.get("visibility", "FAMILY"),
+                    values["source_type"],
+                    values.get("source_id"),
+                    values["created_by"],
+                    ts,
+                    ts,
                     values.get("expires_at"),
                 ),
             )
@@ -305,8 +318,17 @@ class FamilyContextRepo:
 
     def update_memory(self, memory_id: str, **values: object) -> FamilyMemoryRow | None:
         allowed = {
-            "subject_type", "subject_id", "content", "memory_type", "importance",
-            "confidence", "visibility", "source_type", "source_id", "expires_at", "status",
+            "subject_type",
+            "subject_id",
+            "content",
+            "memory_type",
+            "importance",
+            "confidence",
+            "visibility",
+            "source_type",
+            "source_id",
+            "expires_at",
+            "status",
         }
         fields, params = optional_updates(
             [(key, value) for key, value in values.items() if key in allowed]
@@ -316,8 +338,7 @@ class FamilyContextRepo:
             params.extend((now_ts(), memory_id))
             with self._db.transaction() as conn:
                 conn.execute(
-                    f"UPDATE homemind_family_memories SET {', '.join(fields)} "
-                    "WHERE memory_id = ?",
+                    f"UPDATE homemind_family_memories SET {', '.join(fields)} WHERE memory_id = ?",
                     params,
                 )
         return self.get_memory(memory_id)

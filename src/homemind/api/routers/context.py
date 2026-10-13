@@ -124,9 +124,7 @@ def _manager(server: OctopServer) -> FamilyContextManager:
 
 
 def _event_response(row: Any) -> EventResponse:
-    return EventResponse.model_validate(
-        {**row.__dict__, "metadata": json.loads(row.metadata_json)}
-    )
+    return EventResponse.model_validate({**row.__dict__, "metadata": json.loads(row.metadata_json)})
 
 
 @router.post(
@@ -153,9 +151,7 @@ async def list_events(
     start_at: int | None = Query(default=None),
     end_at: int | None = Query(default=None),
 ) -> list[EventResponse]:
-    rows = _manager(server).list_events(
-        family_id, user, start_at=start_at, end_at=end_at
-    )
+    rows = _manager(server).list_events(family_id, user, start_at=start_at, end_at=end_at)
     return [_event_response(row) for row in rows]
 
 
@@ -228,7 +224,10 @@ async def search_memories_fts(
     limit: int = Query(default=20, ge=1, le=200),
 ) -> object:
     return _manager(server).search_memories_fts(
-        family_id, user, q, limit=limit,
+        family_id,
+        user,
+        q,
+        limit=limit,
     )
 
 

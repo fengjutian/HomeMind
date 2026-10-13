@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from homemind.infra.db.repos.family_context import (
     FamilyContextRepo,
@@ -115,6 +115,7 @@ def _score_event(
     if member_ids:
         try:
             import json as _json
+
             metadata = _json.loads(event.metadata_json) if event.metadata_json else {}
             linked = set(metadata.get("member_ids", []) if isinstance(metadata, dict) else [])
         except (TypeError, ValueError):

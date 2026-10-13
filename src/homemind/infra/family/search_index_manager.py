@@ -149,18 +149,21 @@ class FamilySearchManager:
     # ---------------------------------------------------------------- query
 
     def search(
-        self, family_id: str, user: User, query: FamilySearchQuery,
+        self,
+        family_id: str,
+        user: User,
+        query: FamilySearchQuery,
     ) -> SearchPage:
         self.family.require_access(family_id, user)
         kinds = query.resolved_kinds()
         visible = sanitize_visibility(query.visibility)
         allow_private = self.permissions.evaluate(
-            family_id=family_id, user=user, action="family.search",
+            family_id=family_id,
+            user=user,
+            action="family.search",
         ).effect.value == "ALLOW" and self._is_manager(family_id, user)
         membership = self.family.repo.get_membership(family_id, user.id)
-        owner_member_id = (
-            str(membership["member_id"]) if membership is not None else None
-        )
+        owner_member_id = str(membership["member_id"]) if membership is not None else None
 
         keyword_hits = self.repo.keyword_search(
             family_id,
@@ -178,21 +181,23 @@ class FamilySearchManager:
         merged: dict[str, _Candidate] = {}
         for document, rank in keyword_hits:
             merged[document.document_id] = _Candidate(
-                document=document, keyword=rank, semantic=None,
+                document=document,
+                keyword=rank,
+                semantic=None,
             )
         for document, similarity in semantic_hits:
             existing = merged.get(document.document_id)
             if existing is None:
                 merged[document.document_id] = _Candidate(
-                    document=document, keyword=0.0, semantic=similarity,
+                    document=document,
+                    keyword=0.0,
+                    semantic=similarity,
                 )
             else:
                 existing.semantic = similarity
 
         candidates = [c for c in merged.values() if self._passes_filters(c, query)]
-        candidates = [
-            c for c in candidates if self._can_read(family_id, user, c.document)
-        ]
+        candidates = [c for c in candidates if self._can_read(family_id, user, c.document)]
         for candidate in candidates:
             candidate.score = self._blend(candidate, query)
             candidate.matched_by = self._matched_by(candidate)
@@ -255,7 +260,10 @@ class FamilySearchManager:
     # ------------------------------------------------------------ semantic
 
     def _semantic_candidates(
-        self, family_id: str, query: FamilySearchQuery, kinds: tuple[str, ...],
+        self,
+        family_id: str,
+        query: FamilySearchQuery,
+        kinds: tuple[str, ...],
     ) -> list[tuple[SearchDocumentRow, float]]:
         """Compare the query vector against rows with matching provenance.
 
@@ -329,7 +337,10 @@ class FamilySearchManager:
         return True
 
     def _can_read(
-        self, family_id: str, user: User, document: SearchDocumentRow,
+        self,
+        family_id: str,
+        user: User,
+        document: SearchDocumentRow,
     ) -> bool:
         """Final permission check in Python — defence in depth behind the
         SQL predicate, not a replacement for it."""
@@ -399,8 +410,10 @@ class FamilySearchManager:
             last = window[-1]
             next_cursor = sign_token(
                 encode_position(
-                    last.score, last.document.updated_at,
-                    last.document.kind, last.document.entity_id,
+                    last.score,
+                    last.document.updated_at,
+                    last.document.kind,
+                    last.document.entity_id,
                 ),
                 secret=self._cursor_secret,
             )
@@ -432,7 +445,8 @@ class FamilySearchManager:
 
     @staticmethod
     def _resume_offset(
-        candidates: Sequence[_Candidate], position: dict[str, Any],
+        candidates: Sequence[_Candidate],
+        position: dict[str, Any],
     ) -> int:
         """Find where the previous page stopped.
 

@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Callable
 from zoneinfo import ZoneInfo
 
 from homemind.infra.family.resolvers.models import ResolvedTimeRange
-
 
 # Day-count per Chinese relative term.
 _PHRASE_RULES: tuple[tuple[str, int], ...] = (
@@ -174,9 +173,7 @@ class TimeRangeResolver:
         end = next_start - timedelta(seconds=1)
         return self._range(start, end, text, 0.95)
 
-    def _match_year_and_festival(
-        self, text: str, now: datetime
-    ) -> ResolvedTimeRange | None:
+    def _match_year_and_festival(self, text: str, now: datetime) -> ResolvedTimeRange | None:
         match = re.search(r"(今年|去年|前年|this|last)?\s*春节", text)
         if match is None:
             return None
@@ -192,9 +189,7 @@ class TimeRangeResolver:
         end = start + timedelta(days=7) - timedelta(seconds=1)
         return self._range(start, end, text, 0.7)
 
-    def _match_member_birthday(
-        self, text: str, now: datetime
-    ) -> ResolvedTimeRange | None:
+    def _match_member_birthday(self, text: str, now: datetime) -> ResolvedTimeRange | None:
         if "生日" not in text and "birthday" not in text.casefold():
             return None
         return ResolvedTimeRange(None, None, text, 0.4)

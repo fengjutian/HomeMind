@@ -82,9 +82,7 @@ class OpenAICompatibleVisionProvider:
             ],
         )
 
-    def recognize(
-        self, image_path: Path, references: list[FaceReference]
-    ) -> list[DetectedFace]:
+    def recognize(self, image_path: Path, references: list[FaceReference]) -> list[DetectedFace]:
         if not references:
             return []
         if len(references) > 20:
@@ -94,8 +92,8 @@ class OpenAICompatibleVisionProvider:
                 "type": "text",
                 "text": (
                     "The first image is the target. Remaining images are labeled family "
-                    "member references. Return JSON only as {\"faces\": [{\"confidence\": "
-                    "0.0, \"member_id\": null, \"label\": null}]}. Use only an exact "
+                    'member references. Return JSON only as {"faces": [{"confidence": '
+                    '0.0, "member_id": null, "label": null}]}. Use only an exact '
                     "provided member_id when identity is visually supported."
                 ),
             },
@@ -193,9 +191,7 @@ class OpenAICompatibleEmbeddingProvider:
 class NominatimReverseGeocodingProvider:
     name = "openstreetmap-nominatim"
 
-    def __init__(
-        self, *, language: str = "zh-CN", client: httpx.Client | None = None
-    ) -> None:
+    def __init__(self, *, language: str = "zh-CN", client: httpx.Client | None = None) -> None:
         self._language = language
         self._client = client
 
@@ -230,12 +226,7 @@ class NominatimReverseGeocodingProvider:
 
 
 def require_provider(provider: ProviderRow | None) -> ProviderRow:
-    if (
-        provider is None
-        or not provider.enabled
-        or not provider.base_url
-        or not provider.api_key
-    ):
+    if provider is None or not provider.enabled or not provider.base_url or not provider.api_key:
         raise ValueError("photo intelligence provider is not ready")
     return provider
 
@@ -244,9 +235,7 @@ def _connection(provider: ProviderRow) -> tuple[str, dict[str, str]]:
     provider = require_provider(provider)
     headers = provider_headers(provider)
     headers["Authorization"] = f"Bearer {provider.api_key}"
-    headers = ensure_opencode_session_header(
-        provider.name, headers, base_url=provider.base_url
-    )
+    headers = ensure_opencode_session_header(provider.name, headers, base_url=provider.base_url)
     return str(provider.base_url).rstrip("/"), headers
 
 

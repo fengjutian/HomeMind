@@ -135,7 +135,8 @@ class HomeMindMcpServer:
         self._user_repo = UserRepo(services.db)
         self._family = FamilyManager(services.family_repo)
         self._context = FamilyContextManager(
-            self._family, services.family_context_repo,
+            self._family,
+            services.family_context_repo,
             asset_repo=services.family_asset_repo,
         )
         self._lifecycle = MemoryLifecycleManager(
@@ -191,7 +192,10 @@ class HomeMindMcpServer:
                     error_message="no active family selected",
                 )
             self._audit(
-                principal, family_id, name, {"rejected": failure.error_message},
+                principal,
+                family_id,
+                name,
+                {"rejected": failure.error_message},
             )
             return failure
         try:
@@ -199,12 +203,16 @@ class HomeMindMcpServer:
         except HomeMindError as exc:
             self._audit(principal, family_id, name, {"error": exc.message})
             return McpResult(
-                ok=False, error_code=exc.code.value, error_message=exc.message,
+                ok=False,
+                error_code=exc.code.value,
+                error_message=exc.message,
             )
         except OctopError as exc:
             self._audit(principal, family_id, name, {"error": str(exc)})
             return McpResult(
-                ok=False, error_code=exc.code.value, error_message=str(exc),
+                ok=False,
+                error_code=exc.code.value,
+                error_message=str(exc),
             )
         self._audit(principal, family_id, name, {"ok": True})
         return McpResult(ok=True, data=data)
@@ -212,7 +220,9 @@ class HomeMindMcpServer:
     # ------------------------------------------------------------- identity
 
     def _resolve(
-        self, principal: McpPrincipal, arguments: dict[str, Any],
+        self,
+        principal: McpPrincipal,
+        arguments: dict[str, Any],
     ) -> tuple[User | None, str | None, McpResult | None]:
         """Bind the principal to a user and an authorised family.
 
@@ -222,10 +232,14 @@ class HomeMindMcpServer:
         """
         row = self._user_repo.get(principal.user_id)
         if row is None or row.disabled:
-            return None, None, McpResult(
-                ok=False,
-                error_code=McpErrorCode.IDENTITY_REQUIRED,
-                error_message="MCP principal is not a live user",
+            return (
+                None,
+                None,
+                McpResult(
+                    ok=False,
+                    error_code=McpErrorCode.IDENTITY_REQUIRED,
+                    error_message="MCP principal is not a live user",
+                ),
             )
         user = User(
             id=row.id,
@@ -261,9 +275,7 @@ class HomeMindMcpServer:
                 McpResult(
                     ok=False,
                     error_code=McpErrorCode.FAMILY_MISMATCH,
-                    error_message=(
-                        "family_id does not match the caller's active family"
-                    ),
+                    error_message=("family_id does not match the caller's active family"),
                 ),
             )
         return user, active_family, None
@@ -271,7 +283,11 @@ class HomeMindMcpServer:
     # -------------------------------------------------------------- dispatch
 
     def _dispatch(
-        self, name: str, arguments: dict[str, Any], user: User, family_id: str,
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        user: User,
+        family_id: str,
     ) -> dict[str, Any]:
         if name == "family.list_members":
             return {
@@ -289,7 +305,8 @@ class HomeMindMcpServer:
             member = self._family.repo.get_member(member_id)
             if member is None or member.family_id != family_id:
                 raise HomeMindError(
-                    HomeMindErrorCode.FAMILY_INVALID, "member not found in family",
+                    HomeMindErrorCode.FAMILY_INVALID,
+                    "member not found in family",
                 )
             return {
                 "member": {
@@ -303,7 +320,8 @@ class HomeMindMcpServer:
             from homemind.infra.family.assets import FamilyAssetManager  # noqa: PLC0415
 
             assets = FamilyAssetManager(
-                self._family.repo, self._services.family_asset_repo,
+                self._family.repo,
+                self._services.family_asset_repo,
             ).search(family_id, user, limit=int(arguments.get("limit", 20)))
             return {
                 "assets": [
@@ -318,7 +336,9 @@ class HomeMindMcpServer:
             }
         if name == "family.search_memory":
             memories = self._context.search_memories(
-                family_id, user, query=arguments.get("query"),
+                family_id,
+                user,
+                query=arguments.get("query"),
             )
             return {
                 "memories": [
@@ -346,8 +366,7 @@ class HomeMindMcpServer:
             tasks = self._services.family_task_repo.list_for_family(family_id)
             return {
                 "tasks": [
-                    {"id": task.id, "title": task.title, "status": task.status}
-                    for task in tasks
+                    {"id": task.id, "title": task.title, "status": task.status} for task in tasks
                 ],
             }
         if name == "family.get_devices":
@@ -365,7 +384,9 @@ class HomeMindMcpServer:
             }
         if name == "family.resolve_context":
             resolved = self._context.resolve(
-                family_id, user, str(arguments.get("query", "")),
+                family_id,
+                user,
+                str(arguments.get("query", "")),
             )
             return {
                 "context": {
@@ -386,13 +407,17 @@ class HomeMindMcpServer:
             }
         if name == "family.create_task":
             return self._plan_write(
-                family_id, user, action="task.create",
+                family_id,
+                user,
+                action="task.create",
                 payload={"title": str(arguments.get("title", ""))},
                 idempotency_key=arguments.get("idempotency_key"),
             )
         if name == "family.create_event":
             return self._plan_write(
-                family_id, user, action="event.create",
+                family_id,
+                user,
+                action="event.create",
                 payload={
                     "title": str(arguments.get("title", "")),
                     "event_type": str(arguments.get("event_type", "OTHER")),
@@ -406,7 +431,8 @@ class HomeMindMcpServer:
             return self._create_memory_candidate(family_id, user, arguments)
         if name == "family.plan_transaction":
             return self._plan_write(
-                family_id, user,
+                family_id,
+                user,
                 action=str(arguments.get("action", "")),
                 payload=dict(arguments.get("payload") or {}),
                 idempotency_key=arguments.get("idempotency_key"),
@@ -455,7 +481,8 @@ class HomeMindMcpServer:
                 idempotency_key=arguments.get("idempotency_key"),
             )
         raise HomeMindError(
-            HomeMindErrorCode.FAMILY_INVALID, f"unhandled tool {name!r}",
+            HomeMindErrorCode.FAMILY_INVALID,
+            f"unhandled tool {name!r}",
         )
 
     # ---------------------------------------------------------------- writes
@@ -495,9 +522,7 @@ class HomeMindMcpServer:
             user,
             action=action,
             payload=payload,
-            idempotency_key=(
-                str(idempotency_key) if idempotency_key is not None else None
-            ),
+            idempotency_key=(str(idempotency_key) if idempotency_key is not None else None),
         )
         return {
             "transaction_id": transaction.id,
@@ -506,7 +531,10 @@ class HomeMindMcpServer:
         }
 
     def _create_memory_candidate(
-        self, family_id: str, user: User, arguments: dict[str, Any],
+        self,
+        family_id: str,
+        user: User,
+        arguments: dict[str, Any],
     ) -> dict[str, Any]:
         """Create a memory candidate.
 
@@ -517,7 +545,8 @@ class HomeMindMcpServer:
         content = str(arguments.get("content", "")).strip()
         if not content:
             raise HomeMindError(
-                HomeMindErrorCode.FAMILY_INVALID, "candidate content is required",
+                HomeMindErrorCode.FAMILY_INVALID,
+                "candidate content is required",
             )
         candidate = self._lifecycle.create_candidate(
             CandidateSpec(
@@ -525,9 +554,7 @@ class HomeMindMcpServer:
                 subject_type=str(arguments.get("subject_type", "FAMILY")),
                 subject_id=arguments.get("subject_id"),
                 content=content,
-                memory_type=str(
-                    arguments.get("memory_type", MemoryType.EXPERIENCE.value)
-                ),
+                memory_type=str(arguments.get("memory_type", MemoryType.EXPERIENCE.value)),
                 importance=float(arguments.get("importance", 0.5)),
                 confidence=float(arguments.get("confidence", 0.5)),
                 visibility=str(arguments.get("visibility", "FAMILY")),
@@ -635,7 +662,8 @@ _FAMILY = {"type": "string", "description": "Must match the caller's active fami
 _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "family.list_members": _schema({}),
     "family.get_member": _schema(
-        {"member_id": _STRING}, ["member_id"],
+        {"member_id": _STRING},
+        ["member_id"],
     ),
     "family.search_assets": _schema(
         {"family_id": _FAMILY, "limit": {"type": "integer", "minimum": 1, "maximum": 200}},
@@ -647,7 +675,8 @@ _TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "family.list_tasks": _schema({"family_id": _FAMILY}),
     "family.get_devices": _schema({"family_id": _FAMILY}),
     "family.resolve_context": _schema(
-        {"family_id": _FAMILY, "query": _STRING}, ["query"],
+        {"family_id": _FAMILY, "query": _STRING},
+        ["query"],
     ),
     "family.create_task": _schema(
         {

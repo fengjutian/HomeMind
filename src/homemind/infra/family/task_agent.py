@@ -167,9 +167,7 @@ class FamilyTaskAgentExecutor:
         try:
             context = self._family_context(task)
         except Exception:  # noqa: BLE001 — context is a nicety, not a gate
-            logger.warning(
-                "TaskExecutor: family context unavailable for task %s", task.id
-            )
+            logger.warning("TaskExecutor: family context unavailable for task %s", task.id)
             return []
         return [f"Family context:\n{context}"] if context else []
 

@@ -153,9 +153,7 @@ class HomeAssistantSubscriber:
             error_code: str | None = None
             try:
                 await self._set_state(
-                    SubscriptionState.RECONNECTING
-                    if self.attempt
-                    else SubscriptionState.CONNECTING
+                    SubscriptionState.RECONNECTING if self.attempt else SubscriptionState.CONNECTING
                 )
                 handle = await self._connect()
                 self.attempt = 0

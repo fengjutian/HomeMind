@@ -32,7 +32,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from homemind.infra.db.repos.families import (
     FamilyPermissionRow,
@@ -66,9 +66,7 @@ _FORCE_CONFIRMATION_ACTIONS: frozenset[str] = frozenset(
 )
 
 
-def _apply_force_confirmation(
-    effect: PermissionEffect, action: str
-) -> PermissionEffect:
+def _apply_force_confirmation(effect: PermissionEffect, action: str) -> PermissionEffect:
     """Bump ALLOW → REQUIRE_CONFIRMATION for destructive actions.
 
     DENY is never overridden: a destructive action that is explicitly denied
@@ -198,7 +196,7 @@ class FamilyPermissionEvaluator:
         self,
         *,
         family_id: str,
-        user: "User",
+        user: User,
         action: str,
         space_id: str | None = None,
         asset: _AssetLike | None = None,
@@ -219,10 +217,7 @@ class FamilyPermissionEvaluator:
 
         membership = self.repo.get_membership(family_id, user.id)
         member_id = str(membership["member_id"]) if membership is not None else None
-        is_owner = bool(membership and str(membership["role"]) == "OWNER")
-        is_admin_manager = bool(
-            membership and str(membership["role"]) in {"OWNER", "ADMIN"}
-        )
+        is_admin_manager = bool(membership and str(membership["role"]) in {"OWNER", "ADMIN"})
 
         # Step 1: non-members (non-admins) are denied outright.
         if membership is None and not user.is_admin:
@@ -262,9 +257,7 @@ class FamilyPermissionEvaluator:
 
         # Step 4: guard assets that live in another member's private space.
         asset_space_id = getattr(asset, "space_id", None) if asset is not None else None
-        asset_visibility = (
-            getattr(asset, "visibility", None) if asset is not None else None
-        )
+        asset_visibility = getattr(asset, "visibility", None) if asset is not None else None
         # When ``space_id`` itself points at a private space the current
         # member doesn't own, deny up front. This lets callers pass the
         # space id directly (e.g. "filesystem.read in space X") without
@@ -367,7 +360,7 @@ class FamilyPermissionEvaluator:
         if not rules:
             return None
 
-        def _sort_key(rule: FamilyPermissionRow) -> tuple[int, int]:
+        def _sort_key(rule: FamilyPermissionRow) -> tuple[tuple[int, int], int]:
             specificity = (
                 0 if rule.subject_member_id is not None else 1,
                 0 if rule.space_id is not None else 1,
@@ -396,19 +389,14 @@ class FamilyPermissionEvaluator:
         member_id: str | None,
         space_id: str | None,
     ) -> bool:
-        if (
-            permission.subject_member_id is not None
-            and permission.subject_member_id != member_id
-        ):
+        if permission.subject_member_id is not None and permission.subject_member_id != member_id:
             return False
-        if permission.space_id is not None and permission.space_id != space_id:
-            return False
-        return True
+        return permission.space_id is None or permission.space_id == space_id
 
     def can_see_candidate(
         self,
         family_id: str,
-        user: "User",
+        user: User,
         candidate: Any,
     ) -> bool:
         """Visibility filter for ``MemoryCandidateRow``.
@@ -453,7 +441,7 @@ def _candidate_space_id(repo: Any, candidate: Any) -> str | None:
         spaces = repo.list_spaces(member.family_id)
         for space in spaces:
             if space.space_type == "PRIVATE" and space.owner_member_id == member.id:
-                return space.id
+                return cast(str, space.id)
         return None
     return None
 
