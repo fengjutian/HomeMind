@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import logging
 from contextlib import suppress
 from typing import Any
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlparse, urlsplit
 
 import httpx
 import websockets
@@ -47,7 +48,15 @@ from octop.infra.bridge.token_refresh import (
     classify_login_failure,
     should_refresh,
 )
-from octop.infra.bridge.transport import BridgeSession
+from octop.infra.bridge.transport import (
+    ADVERTISED_BRIDGE_FEATURES,
+    BRIDGE_TUNNEL_CHUNKED_MAX_BODY_BYTES,
+    BRIDGE_TUNNEL_MAX_BODY_BYTES,
+    BRIDGE_WS_MAX_BYTES,
+    FEATURE_BODY_CHUNKS,
+    BridgeSession,
+    peer_feature_set,
+)
 from octop.infra.db.repos.bridge_connections import BridgeConnectionRepo, BridgeConnectionRow
 from octop.infra.db.repos.secrets import SecretRepo
 from octop.infra.db.repos.users import UserRepo
@@ -78,32 +87,69 @@ def _is_inbound(row: BridgeConnectionRow) -> bool:
 _bridge_turn_ws_payload = bridge_turn_ws_payload
 
 
-def _looks_like_endpoint_label(name: str) -> bool:
-    """True when a display name is an auto-filled URL / IPv4, not a nickname."""
-    n = (name or "").strip()
-    if not n:
-        return True
-    low = n.lower()
-    if low.startswith("http://") or low.startswith("https://"):
-        return True
-    return n.count(".") >= 3 and any(ch.isdigit() for ch in n)
+def _host_label(raw: str) -> str:
+    text = (raw or "").strip().strip("[]")
+    if not text or text.lower() == "unknown":
+        return ""
+    if text.count(":") == 1 and "." in text:
+        text = text.split(":", 1)[0].strip()
+    try:
+        addr = ipaddress.ip_address(text)
+    except ValueError:
+        return "" if text.lower() == "localhost" else text[:64]
+    return "" if addr.is_loopback or addr.is_unspecified else str(addr)
+
+
+def _advertise_host_label(url: str) -> str:
+    try:
+        return _host_label(urlparse((url or "").strip()).hostname or "")
+    except ValueError:
+        return ""
+
+
+def observe_ws_client_host(websocket: Any) -> str:
+    client = getattr(websocket, "client", None)
+    raw_host = getattr(client, "host", None) if client is not None else None
+    host = raw_host.strip() if isinstance(raw_host, str) else ""
+    if not host and isinstance(client, (tuple, list)) and client:
+        host = str(client[0]).strip()
+    headers = getattr(websocket, "headers", None)
+    forwarded = ""
+    if headers is not None:
+        raw_fwd = headers.get("x-forwarded-for") or headers.get("X-Forwarded-For")
+        if isinstance(raw_fwd, str):
+            hops = [part.strip() for part in raw_fwd.split(",") if part.strip()]
+            forwarded = hops[-1] if hops else ""
+    try:
+        direct = ipaddress.ip_address(host) if host else None
+    except ValueError:
+        direct = None
+    if direct is not None and direct.is_loopback and forwarded:
+        return _host_label(forwarded) or _host_label(host)
+    return _host_label(host)
 
 
 def inbound_default_display_name(
     *,
     connection_id: str,
-    preferred_name: str = "",
+    client_host: str = "",
+    advertise_base_url: str = "",
     peer_username: str = "",
     existing_name: str | None = None,
 ) -> str:
     """Human label for a reverse (peer-dialed) row — never the advertised URL."""
     existing = (existing_name or "").strip()
-    if existing and existing != connection_id and not _looks_like_endpoint_label(existing):
-        return existing
-    name = (preferred_name or "").strip() or (peer_username or "").strip() or connection_id
-    if _looks_like_endpoint_label(name):
-        name = (peer_username or "").strip() or connection_id
-    return name
+    if existing:
+        return existing[:64]
+    for candidate in (
+        _host_label(client_host),
+        _advertise_host_label(advertise_base_url),
+        (peer_username or "").strip(),
+        connection_id,
+    ):
+        if candidate:
+            return candidate[:64]
+    return "Remote"
 
 
 def _absolute_peer_url(base_url: str, maybe_path: str | None) -> str | None:

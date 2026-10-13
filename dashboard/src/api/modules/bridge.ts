@@ -18,6 +18,8 @@ export interface BridgeConnection {
   has_password: boolean;
   /** Peer-dialed reverse row: no stored password, this side cannot redial. */
   inbound?: boolean;
+  /** Address this instance observed for an inbound peer. */
+  peer_client_host?: string | null;
   /** Phase 13 state machine. `status` above stays the frozen legacy field. */
   state?: BridgeState;
   state_detail?: string | null;
