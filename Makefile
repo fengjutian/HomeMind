@@ -198,7 +198,8 @@ run-online:
 # ─── Quality (backend) ───────────────────────────────────────────────────────
 
 .PHONY: all
-all: format-all lint typecheck test
+all:
+	$(PYTHON) scripts/make_all.py
 
 .PHONY: lint
 lint:
