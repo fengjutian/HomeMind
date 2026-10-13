@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from homemind.infra.db.repos.family_assets import (
     FamilyAssetRepo,

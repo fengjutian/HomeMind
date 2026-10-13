@@ -450,7 +450,8 @@
 }
 
 .fileManagerCard {
-  max-width: 1200px;
+  width: 100%;
+  min-width: 0;
   border-color: var(--fn-border-secondary);
 }
 
@@ -467,6 +468,27 @@
 
 .fileBreadcrumb {
   margin-bottom: 8px;
+}
+
+.fileListItem {
+  min-width: 0;
+
+  :global(.ant-list-item-meta),
+  :global(.octop-list-item-meta),
+  :global(.ant-list-item-meta-content),
+  :global(.octop-list-item-meta-content) {
+    min-width: 0;
+  }
+
+  :global(.ant-list-item-meta-title),
+  :global(.octop-list-item-meta-title) {
+    overflow-wrap: anywhere;
+  }
+
+  :global(.ant-list-item-action),
+  :global(.octop-list-item-action) {
+    flex: 0 0 auto;
+  }
 }
 
 .filePreview {
@@ -587,5 +609,19 @@
 
   .fileToolbar {
     grid-template-columns: 1fr;
+  }
+
+  .fileListItem {
+    align-items: flex-start;
+    flex-wrap: wrap;
+
+    :global(.ant-list-item-action),
+    :global(.octop-list-item-action) {
+      display: flex;
+      width: 100%;
+      margin-block-start: 4px;
+      margin-inline-start: 0;
+      overflow-x: auto;
+    }
   }
 }

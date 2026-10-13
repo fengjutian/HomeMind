@@ -220,7 +220,9 @@ class FamilyContextMiddleware(AgentMiddleware[Any, Any]):
         return handler(request)
 
     async def _announce_candidates(
-        self, family_id: str, result: Any,
+        self,
+        family_id: str,
+        result: Any,
     ) -> None:
         """Tell the family's dashboards a candidate is waiting review.
 
@@ -355,7 +357,9 @@ def _build_payload(
             break
 
     assets: list[AssetSummary] = []
-    asset_repo = getattr(context_repo, "_asset_repo", None) or getattr(context_repo, "asset_repo", None)
+    asset_repo = getattr(context_repo, "_asset_repo", None) or getattr(
+        context_repo, "asset_repo", None
+    )
     if asset_repo is not None and resolved.asset_ids:
         for asset in asset_repo.list_for_family(family.id):
             if asset.id in resolved.asset_ids:

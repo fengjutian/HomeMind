@@ -234,6 +234,7 @@ export default function FileManagerPanel({ familyId }: FileManagerPanelProps) {
         locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
         renderItem={(entry) => (
           <List.Item
+            className={styles.fileListItem}
             actions={
               entry.kind === "file"
                 ? [

@@ -5,17 +5,15 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
-from typing import Any
-from datetime import datetime
 from enum import StrEnum
-from zoneinfo import ZoneInfo
+from typing import Any, cast
 
+from homemind.infra.db.repos.family_assets import FamilyAssetRepo
 from homemind.infra.db.repos.family_context import (
     FamilyContextRepo,
     FamilyEventRow,
     FamilyMemoryRow,
 )
-from homemind.infra.db.repos.family_assets import FamilyAssetRepo
 from homemind.infra.errors import HomeMindError, HomeMindErrorCode
 from homemind.infra.family.manager import FamilyManager
 from homemind.infra.family.permissions import (
@@ -81,6 +79,7 @@ class FamilyContextManager:
         # via the Stage 2 ``AssetQueryResolver``. Otherwise asset_ids stays
         # empty and ``asset_ids`` is simply not populated.
         self.asset_repo = asset_repo
+        self.asset_resolver: AssetQueryResolver | None
         if asset_repo is not None:
             self.asset_resolver = AssetQueryResolver(asset_repo)
         else:
@@ -88,7 +87,8 @@ class FamilyContextManager:
 
     def create_event(self, family_id: str, user: User, **values: object) -> FamilyEventRow:
         self.family.require_manager(family_id, user)
-        start_at, end_at = int(values["start_at"]), int(values["end_at"])
+        start_at = int(cast(int | str, values["start_at"]))
+        end_at = int(cast(int | str, values["end_at"]))
         if end_at < start_at:
             raise HomeMindError(
                 HomeMindErrorCode.FAMILY_INVALID,
@@ -118,8 +118,8 @@ class FamilyContextManager:
     ) -> FamilyEventRow:
         self.family.require_manager(family_id, user)
         event = self._event(family_id, event_id)
-        start_at = int(changes.get("start_at", event.start_at))
-        end_at = int(changes.get("end_at", event.end_at))
+        start_at = int(cast(int | str, changes.get("start_at", event.start_at)))
+        end_at = int(cast(int | str, changes.get("end_at", event.end_at)))
         if end_at < start_at:
             raise HomeMindError(
                 HomeMindErrorCode.FAMILY_INVALID,
@@ -129,9 +129,10 @@ class FamilyContextManager:
             changes["metadata_json"] = json.dumps(
                 changes.pop("metadata") or {}, ensure_ascii=False, sort_keys=True
             )
-        updated = self.repo.update_event(event_id, **changes)  # type: ignore[return-value]
-        if updated is not None:
-            self._reindex_event(family_id, updated)
+        updated = self.repo.update_event(event_id, **changes)
+        if updated is None:
+            raise OctopError(ErrorCode.NOT_FOUND, "family event not found")
+        self._reindex_event(family_id, updated)
         return updated
 
     def delete_event(self, family_id: str, event_id: str, user: User) -> None:
@@ -175,13 +176,12 @@ class FamilyContextManager:
         """
         self.family.require_access(family_id, user)
         memories = self.repo.search_memories_fts(
-            family_id, query=query, limit=limit,
+            family_id,
+            query=query,
+            limit=limit,
         )
         if memories:
-            return [
-                memory for memory in memories
-                if self._can_read_memory(memory, user)
-            ]
+            return [memory for memory in memories if self._can_read_memory(memory, user)]
         return self.search_memories(family_id, user, query=query)
 
     def update_memory(
@@ -195,9 +195,10 @@ class FamilyContextManager:
         self._memory(family_id, memory_id)
         if "content" in changes:
             changes["content"] = str(changes["content"]).strip()
-        updated = self.repo.update_memory(memory_id, **changes)  # type: ignore[return-value]
-        if updated is not None:
-            self._reindex_memory(family_id, updated)
+        updated = self.repo.update_memory(memory_id, **changes)
+        if updated is None:
+            raise OctopError(ErrorCode.NOT_FOUND, "family memory not found")
+        self._reindex_memory(family_id, updated)
         return updated
 
     def delete_memory(self, family_id: str, memory_id: str, user: User) -> None:
@@ -211,9 +212,7 @@ class FamilyContextManager:
         membership = self.family.repo.get_membership(family_id, user.id)
         if membership is None and not user.is_admin:
             raise OctopError(ErrorCode.FORBIDDEN, "family membership required")
-        current_member_id = (
-            str(membership["member_id"]) if membership is not None else ""
-        )
+        current_member_id = str(membership["member_id"]) if membership is not None else ""
 
         relationship_resolver = RelationshipResolver(self.family.repo)
         time_resolver = TimeRangeResolver(timezone=family.timezone)
@@ -262,7 +261,6 @@ class FamilyContextManager:
         # 2. Time resolution.
         time_range = time_resolver.resolve(query)
         start_at = time_range.start_at
-        end_at = time_range.end_at
 
         # 3. Event resolution: structured, no silent "return all".
         event_matches = event_resolver.search(
@@ -275,7 +273,9 @@ class FamilyContextManager:
         # title / location / type contains query terms.
         if not event_matches and start_at is None:
             event_matches = event_resolver.search(
-                family_id, text=query, member_ids=matched_member_ids,
+                family_id,
+                text=query,
+                member_ids=matched_member_ids,
             )
         events = [match.event for match in event_matches]
 
@@ -289,9 +289,7 @@ class FamilyContextManager:
             for memory in memories
             if memory.content.casefold() in normalized
             or any(
-                token in memory.content.casefold()
-                for token in normalized.split()
-                if len(token) > 1
+                token in memory.content.casefold() for token in normalized.split() if len(token) > 1
             )
         ]
         if not memory_matches:
@@ -332,8 +330,7 @@ class FamilyContextManager:
             permissions=[
                 permission.action
                 for permission in permissions
-                if permission.expires_at is None
-                or permission.expires_at > int(time.time())
+                if permission.expires_at is None or permission.expires_at > int(time.time())
             ],
         )
 
@@ -353,7 +350,9 @@ class FamilyContextManager:
         """
         decisions = [
             self.permissions.evaluate(
-                family_id=family_id, user=user, action=action,
+                family_id=family_id,
+                user=user,
+                action=action,
             )
             for action in ("family.read", "family.search")
         ]
@@ -398,10 +397,10 @@ class FamilyContextManager:
         if memory.visibility == "PRIVATE" and not user.is_admin:
             membership = self.family.repo.get_membership(memory.family_id, user.id)
             member_id = str(membership["member_id"]) if membership is not None else None
-            owns_memory = memory.created_by == user.id or (
-                memory.subject_type == "USER" and memory.subject_id == str(user.id)
-            ) or (
-                memory.subject_type == "MEMBER" and memory.subject_id == member_id
+            owns_memory = (
+                memory.created_by == user.id
+                or (memory.subject_type == "USER" and memory.subject_id == str(user.id))
+                or (memory.subject_type == "MEMBER" and memory.subject_id == member_id)
             )
             if not owns_memory:
                 return False
@@ -409,7 +408,6 @@ class FamilyContextManager:
             family_id=memory.family_id,
             user=user,
             action="memory.read",
-            asset=memory,
         )
         return decision.effect is PermissionEffect.ALLOW
 
@@ -458,7 +456,9 @@ def _log_index_failure(kind: str, family_id: str, entity_id: str) -> None:
 
     logging.getLogger(__name__).warning(
         "search index update failed for %s %s/%s; the write itself succeeded",
-        kind, family_id, entity_id,
+        kind,
+        family_id,
+        entity_id,
     )
 
 

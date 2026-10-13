@@ -896,10 +896,14 @@ export default function FamilyPage() {
                     )}
                     onSearch={async (query) => {
                       try {
-                        setResults(await homeMindFamilyApi.search(familyId, query));
+                        setResults(
+                          await homeMindFamilyApi.search(familyId, query),
+                        );
                       } catch (error) {
                         message.error(
-                          error instanceof Error ? error.message : String(error),
+                          error instanceof Error
+                            ? error.message
+                            : String(error),
                         );
                       }
                     }}

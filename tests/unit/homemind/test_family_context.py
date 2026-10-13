@@ -38,21 +38,34 @@ def test_event_and_memory_crud(tmp_path: Path) -> None:
     context, families, user = _manager(tmp_path)
     family = families.create_family(user, name="My Family", timezone="Asia/Shanghai", locale="zh")
     event = context.create_event(
-        family.id, user, event_type="TRIP", title="日本旅行", start_at=1, end_at=2,
-        location="京都", description="春季旅行", metadata={"country": "JP"},
+        family.id,
+        user,
+        event_type="TRIP",
+        title="日本旅行",
+        start_at=1,
+        end_at=2,
+        location="京都",
+        description="春季旅行",
+        metadata={"country": "JP"},
     )
     memory = context.create_memory(
-        family.id, user, subject_type="EVENT", subject_id=event.id,
-        content="我们去了京都", memory_type=MemoryType.EXPERIENCE,
-        importance=0.8, confidence=0.9, visibility="FAMILY",
-        source_type="USER", source_id=None, expires_at=None,
+        family.id,
+        user,
+        subject_type="EVENT",
+        subject_id=event.id,
+        content="我们去了京都",
+        memory_type=MemoryType.EXPERIENCE,
+        importance=0.8,
+        confidence=0.9,
+        visibility="FAMILY",
+        source_type="USER",
+        source_id=None,
+        expires_at=None,
     )
 
     assert context.list_events(family.id, user) == [event]
     assert context.search_memories(family.id, user, "京都") == [memory]
-    updated = context.update_memory(
-        family.id, memory.id, user, {"content": "我们去了京都和大阪"}
-    )
+    updated = context.update_memory(family.id, memory.id, user, {"content": "我们去了京都和大阪"})
     assert updated.content.endswith("大阪")
     context.delete_memory(family.id, memory.id, user)
     context.delete_event(family.id, event.id, user)
@@ -62,9 +75,7 @@ def test_event_and_memory_crud(tmp_path: Path) -> None:
 
 def test_private_memory_is_visible_only_to_its_owner(tmp_path: Path) -> None:
     context, families, owner = _manager(tmp_path)
-    family = families.create_family(
-        owner, name="My Family", timezone="Asia/Shanghai", locale="zh"
-    )
+    family = families.create_family(owner, name="My Family", timezone="Asia/Shanghai", locale="zh")
     owner_member = families.repo.list_members(family.id)[0]
     families.create_member(
         family.id,
@@ -101,24 +112,47 @@ def test_resolve_last_year_context(tmp_path: Path) -> None:
     )
     owner = families.repo.list_members(family.id)[0]
     families.create_relationship(
-        family.id, user, from_member_id=owner.id, to_member_id=child.id,
+        family.id,
+        user,
+        from_member_id=owner.id,
+        to_member_id=child.id,
         relationship_type=RelationshipType.PARENT,
     )
     year = datetime.now(ZoneInfo("Asia/Shanghai")).year - 1
     trip_time = int(datetime(year, 4, 1, tzinfo=ZoneInfo("Asia/Shanghai")).timestamp())
     event = context.create_event(
-        family.id, user, event_type="TRIP", title="日本旅行", start_at=trip_time,
-        end_at=trip_time + 86400, location="京都", description="", metadata={},
+        family.id,
+        user,
+        event_type="TRIP",
+        title="日本旅行",
+        start_at=trip_time,
+        end_at=trip_time + 86400,
+        location="京都",
+        description="",
+        metadata={},
     )
     memory = context.create_memory(
-        family.id, user, subject_type="FAMILY", subject_id=None,
-        content="全家喜欢旅行", memory_type=MemoryType.PREFERENCE,
-        importance=0.7, confidence=0.9, visibility="FAMILY", source_type="USER",
-        source_id=None, expires_at=None,
+        family.id,
+        user,
+        subject_type="FAMILY",
+        subject_id=None,
+        content="全家喜欢旅行",
+        memory_type=MemoryType.PREFERENCE,
+        importance=0.7,
+        confidence=0.9,
+        visibility="FAMILY",
+        source_type="USER",
+        source_id=None,
+        expires_at=None,
     )
     families.create_permission(
-        family.id, user, subject_member_id=owner.id, space_id=None,
-        action="event.read", effect=PermissionEffect.ALLOW, expires_at=None,
+        family.id,
+        user,
+        subject_member_id=owner.id,
+        space_id=None,
+        action="event.read",
+        effect=PermissionEffect.ALLOW,
+        expires_at=None,
     )
 
     resolved = context.resolve(family.id, user, "去年我们去了哪里？")
