@@ -71,6 +71,22 @@ def test_read_operations_are_bounded_and_audited(tmp_path: Path) -> None:
     assert len(transactions.list_audit(family.id, user)) == 3
 
 
+def test_image_preview_is_bounded_and_rejects_non_images(tmp_path: Path) -> None:
+    _, filesystem, transactions, family, user, root, source_id = _setup(tmp_path)
+    image = root / "photo.png"
+    image.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    content, media_type = filesystem.image_preview(
+        family.id, user, source_id=source_id, path="photo.png"
+    )
+
+    assert content == image.read_bytes()
+    assert media_type == "image/png"
+    with pytest.raises(HomeMindError):
+        filesystem.image_preview(family.id, user, source_id=source_id, path="note.txt")
+    assert len(transactions.list_audit(family.id, user)) == 1
+
+
 def test_delete_requires_approval_and_is_recoverable(tmp_path: Path) -> None:
     families, _, transactions, family, user, root, source_id = _setup(tmp_path)
     owner = families.repo.list_members(family.id)[0]

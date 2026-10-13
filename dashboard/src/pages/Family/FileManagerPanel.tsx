@@ -40,6 +40,21 @@ type MutationAction =
   | "filesystem.move"
   | "filesystem.rename";
 
+const IMAGE_EXTENSIONS = new Set([
+  "avif",
+  "bmp",
+  "gif",
+  "jpeg",
+  "jpg",
+  "png",
+  "webp",
+]);
+
+const isPreviewableImage = (path: string) => {
+  const extension = path.split(".").pop()?.toLowerCase();
+  return extension !== undefined && IMAGE_EXTENSIONS.has(extension);
+};
+
 const parentPath = (path: string) => {
   const parts = path.split("/").filter(Boolean);
   parts.pop();
@@ -62,7 +77,8 @@ export default function FileManagerPanel({ familyId }: FileManagerPanelProps) {
   const [entries, setEntries] = useState<FamilyFilesystemEntry[]>([]);
   const [preview, setPreview] = useState<{
     path: string;
-    content: string;
+    content?: string;
+    imageUrl?: string;
   } | null>(null);
   const [mutation, setMutation] = useState<{
     entry: FamilyFilesystemEntry;
@@ -101,6 +117,13 @@ export default function FileManagerPanel({ familyId }: FileManagerPanelProps) {
   }, [familyId, message, path, sourceId]);
 
   useEffect(() => void load(), [load]);
+
+  useEffect(
+    () => () => {
+      if (preview?.imageUrl) URL.revokeObjectURL(preview.imageUrl);
+    },
+    [preview],
+  );
 
   const breadcrumbs = useMemo(() => {
     const parts = path === "." ? [] : path.split("/").filter(Boolean);
@@ -216,17 +239,39 @@ export default function FileManagerPanel({ familyId }: FileManagerPanelProps) {
                       key="read"
                       type="text"
                       onClick={async () => {
-                        if (sourceId)
-                          setPreview(
-                            await homeMindFamilyApi.readFile(
+                        if (!sourceId) return;
+                        try {
+                          if (isPreviewableImage(entry.path)) {
+                            const blob = await homeMindFamilyApi.previewImage(
                               familyId,
                               sourceId,
                               entry.path,
-                            ),
+                            );
+                            setPreview({
+                              path: entry.path,
+                              imageUrl: URL.createObjectURL(blob),
+                            });
+                          } else {
+                            setPreview(
+                              await homeMindFamilyApi.readFile(
+                                familyId,
+                                sourceId,
+                                entry.path,
+                              ),
+                            );
+                          }
+                        } catch (error) {
+                          message.error(
+                            error instanceof Error
+                              ? error.message
+                              : String(error),
                           );
+                        }
                       }}
                     >
-                      {t("family.previewText", "预览文本")}
+                      {isPreviewableImage(entry.path)
+                        ? t("family.previewImage", "预览图片")
+                        : t("family.previewText", "预览文本")}
                     </Button>,
                     <Button
                       key="copy"
@@ -316,9 +361,17 @@ export default function FileManagerPanel({ familyId }: FileManagerPanelProps) {
         width={760}
         onCancel={() => setPreview(null)}
       >
-        <Typography.Paragraph className={styles.filePreview} copyable>
-          {preview?.content}
-        </Typography.Paragraph>
+        {preview?.imageUrl ? (
+          <img
+            className={styles.fileImagePreview}
+            src={preview.imageUrl}
+            alt={preview.path}
+          />
+        ) : (
+          <Typography.Paragraph className={styles.filePreview} copyable>
+            {preview?.content}
+          </Typography.Paragraph>
+        )}
       </Modal>
 
       <Modal

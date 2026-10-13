@@ -6,7 +6,7 @@ import asyncio
 from functools import partial
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, Field, model_validator
 
 from homemind.api.routers.transactions import ApprovalResponse, TransactionResponse
@@ -163,6 +163,29 @@ async def read_file(
     )
     content = await asyncio.to_thread(call)
     return FilesystemReadResponse(path=path, content=content)
+
+
+@router.get(
+    "/{family_id}/filesystem/image-preview",
+    summary="Preview an image from a registered family directory",
+    description="Returns a supported raster image after checking family access and source boundaries.",
+)
+async def preview_image(
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
+    source_id: str = Query(),
+    path: str = Query(min_length=1, max_length=4096),
+) -> Response:
+    call = partial(
+        _filesystem(server).image_preview,
+        family_id,
+        user,
+        source_id=source_id,
+        path=path,
+    )
+    content, media_type = await asyncio.to_thread(call)
+    return Response(content=content, media_type=media_type)
 
 
 @router.post(

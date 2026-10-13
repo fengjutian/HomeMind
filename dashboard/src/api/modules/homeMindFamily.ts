@@ -729,6 +729,12 @@ export const homeMindFamilyApi = {
         sourceId,
       )}&path=${encodeURIComponent(path)}`,
     ),
+  previewImage: (familyId: string, sourceId: string, path: string) =>
+    requestBlob(
+      `${root}/${familyId}/filesystem/image-preview?source_id=${encodeURIComponent(
+        sourceId,
+      )}&path=${encodeURIComponent(path)}`,
+    ),
   mutateFile: (
     familyId: string,
     body: {

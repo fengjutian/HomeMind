@@ -125,6 +125,36 @@ class FamilyFilesystemManager:
         self._audit(family_id, user, "filesystem.read", path, {"bytes": len(content.encode())})
         return content
 
+    def image_preview(
+        self,
+        family_id: str,
+        user: User,
+        *,
+        source_id: str,
+        path: str,
+        max_bytes: int = 20 * 1024 * 1024,
+    ) -> tuple[bytes, str]:
+        media_types = {
+            ".avif": "image/avif",
+            ".bmp": "image/bmp",
+            ".gif": "image/gif",
+            ".jpeg": "image/jpeg",
+            ".jpg": "image/jpeg",
+            ".png": "image/png",
+            ".webp": "image/webp",
+        }
+        root = self._root(family_id, user, source_id)
+        target = self._resolve(root, path, must_exist=True)
+        media_type = media_types.get(target.suffix.casefold())
+        if not target.is_file() or media_type is None:
+            raise self._invalid("filesystem path is not a previewable image")
+        size = target.stat().st_size
+        if size > max_bytes:
+            raise self._invalid("filesystem image exceeds preview limit")
+        content = target.read_bytes()
+        self._audit(family_id, user, "filesystem.preview", path, {"bytes": size})
+        return content, media_type
+
     def execute(
         self,
         family_id: str,
