@@ -35,7 +35,10 @@ from octop.infra.agents.providers.probe import (
 )
 from octop.infra.agents.providers.reasoning import reasoning_capability
 from octop.infra.agents.providers.resolved import list_resolved_models as _list_resolved_models
-from octop.infra.agents.providers.store import clear_stale_pins_for_provider
+from octop.infra.agents.providers.store import (
+    clear_stale_pins_for_provider,
+    merge_stream_usage_extra,
+)
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.utils.locale import resolve_request_locale
 from octop.infra.utils.ulid import new_ulid

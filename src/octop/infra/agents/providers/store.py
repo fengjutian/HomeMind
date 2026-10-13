@@ -25,6 +25,25 @@ KIND_TO_PROTOCOL: dict[str, str] = {
 }
 
 
+def merge_stream_usage_extra(
+    extra_json: str | None,
+    stream_usage: bool | None,
+) -> str | None:
+    """Write ``stream_usage`` into *extra_json*. ``None`` leaves it unchanged."""
+    if stream_usage is None:
+        return extra_json
+    extra: dict[str, Any] = {}
+    if extra_json:
+        try:
+            parsed = json.loads(extra_json)
+            if isinstance(parsed, dict):
+                extra = dict(parsed)
+        except json.JSONDecodeError:
+            pass
+    extra["stream_usage"] = bool(stream_usage)
+    return json.dumps(extra)
+
+
 def _infer_model_input_modalities(
     model_id: str,
     explicit: list[str] | None = None,
