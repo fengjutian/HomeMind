@@ -3,7 +3,15 @@ import "@videojs/react/audio/skin.css";
 import { Video, VideoPlayer, VideoSkin } from "@videojs/react/video";
 import "@videojs/react/video/skin.css";
 import { App, Button, Image, Modal, Space, Spin, Typography } from "antd";
-import { Download, Eye, FileText, Film, Music, Play } from "lucide-react";
+import {
+  Download,
+  Eye,
+  FileText,
+  Film,
+  Music,
+  Play,
+  Share2,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -68,6 +76,38 @@ export default function FamilyAssetPreview({
       message.error(error instanceof Error ? error.message : String(error));
     }
   }, [asset.id, asset.name, familyId, message]);
+
+  const shareDocument = useCallback(async () => {
+    try {
+      const blob = await homeMindFamilyApi.getAssetContent(familyId, asset.id);
+      const file = new File([blob], asset.name, {
+        type: blob.type || "application/octet-stream",
+      });
+      const shareData: ShareData = {
+        title: asset.name,
+        files: [file],
+      };
+      if (navigator.share && navigator.canShare?.(shareData)) {
+        await navigator.share(shareData);
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = asset.name;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      message.info(
+        t(
+          "family.shareDownloadFallback",
+          "当前设备不支持直接分享，文件已下载，可从下载目录发送。",
+        ),
+      );
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      message.error(error instanceof Error ? error.message : String(error));
+    }
+  }, [asset.id, asset.name, familyId, message, t]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -221,6 +261,17 @@ export default function FamilyAssetPreview({
                 }}
               />
             )}
+            <Button
+              type="text"
+              icon={<Share2 size={15} />}
+              aria-label={t("family.shareDocument", "Share {{name}}", {
+                name: asset.name,
+              })}
+              onClick={(event) => {
+                event.stopPropagation();
+                void shareDocument();
+              }}
+            />
             <Button
               type="text"
               icon={<Download size={15} />}

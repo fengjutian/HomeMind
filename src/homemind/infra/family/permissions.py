@@ -92,6 +92,7 @@ DEFAULT_ACTION_EFFECTS: tuple[tuple[str, PermissionEffect], ...] = (
     ("family.read.", PermissionEffect.ALLOW),
     ("family.search.", PermissionEffect.ALLOW),
     ("filesystem.read", PermissionEffect.ALLOW),
+    ("filesystem.upload", PermissionEffect.ALLOW),
     ("memory.read", PermissionEffect.ALLOW),
     ("photo.read", PermissionEffect.ALLOW),
     ("event.read", PermissionEffect.ALLOW),

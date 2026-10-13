@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 
 import pytest
@@ -31,15 +32,13 @@ def _setup(tmp_path: Path):
     services = HomeMindServices.from_pool(pool)
     families = FamilyManager(services.family_repo)
     user = User(1, "owner", Role.USER, "Owner")
-    family = families.create_family(
-        user, name="My Family", timezone="Asia/Shanghai", locale="zh"
-    )
+    family = families.create_family(user, name="My Family", timezone="Asia/Shanghai", locale="zh")
     root = tmp_path / "source"
     root.mkdir()
     (root / "note.txt").write_text("family note", encoding="utf-8")
-    source = FamilyAssetManager(
-        services.family_repo, services.family_asset_repo
-    ).scan_directory(family.id, user, directory=str(root))
+    source = FamilyAssetManager(services.family_repo, services.family_asset_repo).scan_directory(
+        family.id, user, directory=str(root)
+    )
     filesystem = FamilyFilesystemManager(
         families, services.family_asset_repo, services.family_transaction_repo
     )
@@ -57,15 +56,13 @@ def _setup(tmp_path: Path):
 def test_read_operations_are_bounded_and_audited(tmp_path: Path) -> None:
     families, filesystem, transactions, family, user, _, source_id = _setup(tmp_path)
 
-    assert filesystem.read(
-        family.id, user, source_id=source_id, path="note.txt"
-    ) == "family note"
+    assert filesystem.read(family.id, user, source_id=source_id, path="note.txt") == "family note"
     assert [row.path for row in filesystem.list(family.id, user, source_id=source_id)] == [
         "note.txt"
     ]
-    assert [row.path for row in filesystem.search(
-        family.id, user, source_id=source_id, query="note"
-    )] == ["note.txt"]
+    assert [
+        row.path for row in filesystem.search(family.id, user, source_id=source_id, query="note")
+    ] == ["note.txt"]
     with pytest.raises(HomeMindError):
         filesystem.read(family.id, user, source_id=source_id, path="../outside.txt")
     assert len(transactions.list_audit(family.id, user)) == 3
@@ -84,6 +81,30 @@ def test_image_preview_is_bounded_and_rejects_non_images(tmp_path: Path) -> None
     assert media_type == "image/png"
     with pytest.raises(HomeMindError):
         filesystem.image_preview(family.id, user, source_id=source_id, path="note.txt")
+    assert len(transactions.list_audit(family.id, user)) == 1
+
+
+def test_upload_is_bounded_audited_and_never_overwrites(tmp_path: Path) -> None:
+    _, filesystem, transactions, family, user, root, source_id = _setup(tmp_path)
+
+    entry = filesystem.upload(
+        family.id,
+        user,
+        source_id=source_id,
+        path="documents/plan.pdf",
+        content=BytesIO(b"pdf"),
+    )
+
+    assert entry.path == "documents/plan.pdf"
+    assert (root / "documents" / "plan.pdf").read_bytes() == b"pdf"
+    with pytest.raises(HomeMindError):
+        filesystem.upload(
+            family.id,
+            user,
+            source_id=source_id,
+            path="documents/plan.pdf",
+            content=BytesIO(b"replacement"),
+        )
     assert len(transactions.list_audit(family.id, user)) == 1
 
 

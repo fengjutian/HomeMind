@@ -1,5 +1,5 @@
 import { getApiUrl } from "../config";
-import { getAuthToken, request, requestBlob } from "../request";
+import { getAuthToken, request, requestBlob, requestUpload } from "../request";
 
 let mediaToken: { owner: string; value: string; expiresAt: number } | null =
   null;
@@ -723,6 +723,21 @@ export const homeMindFamilyApi = {
         sourceId,
       )}&path=${encodeURIComponent(path)}&query=${encodeURIComponent(query)}`,
     ),
+  uploadFile: (
+    familyId: string,
+    sourceId: string,
+    path: string,
+    file: File,
+  ) => {
+    const body = new FormData();
+    body.append("upload", file, file.name);
+    return requestUpload<FamilyFilesystemEntry>(
+      `${root}/${familyId}/filesystem/upload?source_id=${encodeURIComponent(
+        sourceId,
+      )}&path=${encodeURIComponent(path)}`,
+      body,
+    );
+  },
   readFile: (familyId: string, sourceId: string, path: string) =>
     request<{ path: string; content: string }>(
       `${root}/${familyId}/filesystem/read?source_id=${encodeURIComponent(

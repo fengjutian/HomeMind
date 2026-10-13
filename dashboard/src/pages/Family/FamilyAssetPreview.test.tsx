@@ -24,7 +24,7 @@ vi.mock("antd", async (importOriginal) => {
     ({ children, ...props }: { children?: ReactNode }) =>
       React.createElement(tag, props, children);
   const AppMock = Object.assign(container("div"), {
-    useApp: () => ({ message: { error: vi.fn() } }),
+    useApp: () => ({ message: { error: vi.fn(), info: vi.fn() } }),
   });
   return {
     App: AppMock,
@@ -84,6 +84,14 @@ describe("FamilyAssetPreview", () => {
     getAssetContentUrl.mockClear();
     getAssetThumbnailUrl.mockClear();
     getAssetContent.mockClear();
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: vi.fn(() => true),
+    });
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: vi.fn(() => Promise.resolve()),
+    });
   });
 
   it("gives the video element a direct range-capable URL", async () => {
@@ -150,5 +158,27 @@ describe("FamilyAssetPreview", () => {
     expect(
       screen.getByRole("button", { name: "Download legacy.doc" }),
     ).toBeInTheDocument();
+  });
+
+  it("shares an authorized Office file through the system share sheet", async () => {
+    render(
+      <App>
+        <FamilyAssetPreview
+          familyId="family-1"
+          asset={{
+            id: "document-3",
+            name: "budget.xlsx",
+            asset_type: "DOCUMENT",
+          }}
+        />
+      </App>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Share budget.xlsx" }));
+
+    await waitFor(() => expect(navigator.share).toHaveBeenCalledOnce());
+    expect(getAssetContent).toHaveBeenCalledWith("family-1", "document-3");
+    const shared = vi.mocked(navigator.share).mock.calls[0][0];
+    expect(shared.files?.[0]).toMatchObject({ name: "budget.xlsx" });
   });
 });

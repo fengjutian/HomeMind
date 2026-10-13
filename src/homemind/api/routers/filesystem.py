@@ -6,7 +6,7 @@ import asyncio
 from functools import partial
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from pydantic import BaseModel, Field, model_validator
 
 from homemind.api.routers.transactions import ApprovalResponse, TransactionResponse
@@ -186,6 +186,38 @@ async def preview_image(
     )
     content, media_type = await asyncio.to_thread(call)
     return Response(content=content, media_type=media_type)
+
+
+@router.post(
+    "/{family_id}/filesystem/upload",
+    response_model=FilesystemEntryResponse,
+    status_code=201,
+    summary="Upload a file to a registered family directory",
+    description="Streams a file into the selected directory without overwriting an existing file.",
+)
+async def upload_file(
+    family_id: str,
+    server: Server,
+    user: CurrentUser,
+    upload: Annotated[UploadFile, File()],
+    source_id: str = Query(),
+    path: str = Query(default="."),
+) -> object:
+    filename = (upload.filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
+    if not filename or filename in {".", ".."}:
+        from homemind.infra.errors import HomeMindError, HomeMindErrorCode
+
+        raise HomeMindError(HomeMindErrorCode.FAMILY_INVALID, "upload filename is invalid")
+    destination = filename if path == "." else f"{path.rstrip('/')}/{filename}"
+    call = partial(
+        _filesystem(server).upload,
+        family_id,
+        user,
+        source_id=source_id,
+        path=destination,
+        content=upload.file,
+    )
+    return await asyncio.to_thread(call)
 
 
 @router.post(

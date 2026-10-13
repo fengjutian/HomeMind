@@ -12,15 +12,17 @@ import {
   Popconfirm,
   Select,
   Typography,
+  Upload,
 } from "antd";
 import {
   Copy,
-  File,
+  File as FileIcon,
   Folder,
   FolderOpen,
   Move,
   Pencil,
   Trash2,
+  UploadCloud,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -218,6 +220,34 @@ export default function FileManagerPanel({ familyId }: FileManagerPanelProps) {
             );
           }}
         />
+        <Upload
+          showUploadList={false}
+          customRequest={async ({ file, onError, onSuccess }) => {
+            if (!sourceId || !(file instanceof File)) return;
+            try {
+              const entry = await homeMindFamilyApi.uploadFile(
+                familyId,
+                sourceId,
+                path,
+                file,
+              );
+              onSuccess?.(entry);
+              message.success(t("family.uploadComplete", "文件上传完成"));
+              await load();
+            } catch (error) {
+              onError?.(
+                error instanceof Error ? error : new Error(String(error)),
+              );
+              message.error(
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+          }}
+        >
+          <Button icon={<UploadCloud size={16} />} disabled={!sourceId}>
+            {t("family.uploadFile", "上传文件")}
+          </Button>
+        </Upload>
       </div>
       <Breadcrumb className={styles.fileBreadcrumb} items={breadcrumbs} />
       {path !== "." && (
@@ -337,7 +367,7 @@ export default function FileManagerPanel({ familyId }: FileManagerPanelProps) {
                 entry.kind === "directory" ? (
                   <Folder size={20} />
                 ) : (
-                  <File size={20} />
+                  <FileIcon size={20} />
                 )
               }
               title={

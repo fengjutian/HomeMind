@@ -10,6 +10,7 @@ import shutil
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePath
+from typing import BinaryIO
 from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 
@@ -157,6 +158,47 @@ class FamilyFilesystemManager:
         self._audit(family_id, user, "filesystem.preview", path, {"bytes": size})
         return content, media_type
 
+    def upload(
+        self,
+        family_id: str,
+        user: User,
+        *,
+        source_id: str,
+        path: str,
+        content: BinaryIO,
+        max_bytes: int = 100 * 1024 * 1024,
+    ) -> FilesystemEntry:
+        """Stream one new file into a registered source without overwriting."""
+        root = self._root(family_id, user, source_id)
+        source = self.assets.get_source(source_id)
+        assert source is not None
+        decision = self.permissions.evaluate(
+            family_id=family_id,
+            user=user,
+            action="filesystem.upload",
+            space_id=source.space_id,
+            asset=source,
+        )
+        if decision.effect is not PermissionEffect.ALLOW:
+            raise OctopError(ErrorCode.FORBIDDEN, "family asset upload denied")
+        target = self._resolve(root, path, must_exist=False)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        written = 0
+        try:
+            with target.open("xb") as destination:
+                while chunk := content.read(1024 * 1024):
+                    written += len(chunk)
+                    if written > max_bytes:
+                        raise self._invalid("filesystem upload exceeds size limit")
+                    destination.write(chunk)
+        except FileExistsError as exc:
+            raise self._invalid("filesystem destination already exists") from exc
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise
+        self._audit(family_id, user, "filesystem.upload", path, {"bytes": written})
+        return self._entry(root, target)
+
     def execute(
         self,
         family_id: str,
@@ -256,7 +298,9 @@ class FamilyFilesystemManager:
         ):
             raise self._invalid("absolute paths and parent traversal are forbidden")
         candidate = root.joinpath(*raw.parts)
-        check = candidate if candidate.exists() else candidate.parent
+        check = candidate
+        while not check.exists() and check != root:
+            check = check.parent
         resolved = check.resolve(strict=True)
         if not resolved.is_relative_to(root) or any(
             part.is_symlink() for part in self._parents(root, check)
