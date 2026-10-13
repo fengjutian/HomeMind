@@ -3,14 +3,16 @@ import "@videojs/react/audio/skin.css";
 import { Video, VideoPlayer, VideoSkin } from "@videojs/react/video";
 import "@videojs/react/video/skin.css";
 import { App, Button, Image, Modal, Space, Spin, Typography } from "antd";
-import { Film, Music, Play } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Download, Eye, FileText, Film, Music, Play } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
   homeMindFamilyApi,
   type FamilyAsset,
 } from "../../api/modules/homeMindFamily";
+import DocumentPreviewCore from "../../components/DocumentPreviewCore";
+import { getDocKind } from "../../utils/docKind";
 import styles from "./index.module.less";
 
 interface FamilyAssetPreviewProps {
@@ -34,8 +36,38 @@ export default function FamilyAssetPreview({
   const [mediaUrl, setMediaUrl] = useState("");
   const [playerOpen, setPlayerOpen] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(false);
+  const [documentOpen, setDocumentOpen] = useState(false);
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const documentKind = getDocKind(asset.name);
+
+  const fetchDocument = useCallback(
+    (
+      onProgress?: (loaded: number, total: number) => void,
+      signal?: AbortSignal,
+    ) =>
+      homeMindFamilyApi.getAssetContent(
+        familyId,
+        asset.id,
+        onProgress,
+        signal ? { signal } : undefined,
+      ),
+    [asset.id, familyId],
+  );
+
+  const downloadDocument = useCallback(async () => {
+    try {
+      const blob = await homeMindFamilyApi.getAssetContent(familyId, asset.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = asset.name;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : String(error));
+    }
+  }, [asset.id, asset.name, familyId, message]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -160,6 +192,67 @@ export default function FamilyAssetPreview({
             )}
           </Spin>
         </Modal>
+      </>
+    );
+  }
+
+  if (documentKind) {
+    const previewSupported = !asset.name.toLowerCase().endsWith(".doc");
+    return (
+      <>
+        <div className={styles.familyDocumentEntry}>
+          <FileText size={22} aria-hidden="true" />
+          {showName && (
+            <Typography.Text className={styles.familyDocumentName} ellipsis>
+              {asset.name}
+            </Typography.Text>
+          )}
+          <div className={styles.familyDocumentActions}>
+            {previewSupported && (
+              <Button
+                type="text"
+                icon={<Eye size={15} />}
+                aria-label={t("family.previewDocument", "Preview {{name}}", {
+                  name: asset.name,
+                })}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setDocumentOpen(true);
+                }}
+              />
+            )}
+            <Button
+              type="text"
+              icon={<Download size={15} />}
+              aria-label={t("family.downloadDocument", "Download {{name}}", {
+                name: asset.name,
+              })}
+              onClick={(event) => {
+                event.stopPropagation();
+                void downloadDocument();
+              }}
+            />
+          </div>
+        </div>
+        {previewSupported && (
+          <Modal
+            title={asset.name}
+            open={documentOpen}
+            footer={null}
+            destroyOnHidden
+            width="min(1120px, calc(100vw - 32px))"
+            onCancel={() => setDocumentOpen(false)}
+          >
+            <div className={styles.familyDocumentPreview}>
+              <DocumentPreviewCore
+                kind={documentKind}
+                filename={asset.name}
+                fetchBlob={fetchDocument}
+                onDownload={downloadDocument}
+              />
+            </div>
+          </Modal>
+        )}
       </>
     );
   }

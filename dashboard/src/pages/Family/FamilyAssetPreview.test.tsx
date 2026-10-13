@@ -5,14 +5,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import FamilyAssetPreview from "./FamilyAssetPreview";
 
-const { getAssetContentUrl, getAssetThumbnailUrl } = vi.hoisted(() => ({
-  getAssetContentUrl: vi.fn(
-    () => "https://server.test/video.mp4?access_token=short",
-  ),
-  getAssetThumbnailUrl: vi.fn(
-    () => "https://server.test/thumb.webp?access_token=short",
-  ),
-}));
+const { getAssetContent, getAssetContentUrl, getAssetThumbnailUrl } =
+  vi.hoisted(() => ({
+    getAssetContent: vi.fn(() => Promise.resolve(new Blob(["document"]))),
+    getAssetContentUrl: vi.fn(
+      () => "https://server.test/video.mp4?access_token=short",
+    ),
+    getAssetThumbnailUrl: vi.fn(
+      () => "https://server.test/thumb.webp?access_token=short",
+    ),
+  }));
 
 vi.mock("antd", async (importOriginal) => {
   await importOriginal<typeof import("antd")>();
@@ -64,13 +66,24 @@ vi.mock("@videojs/react/audio", async () => {
 });
 
 vi.mock("../../api/modules/homeMindFamily", () => ({
-  homeMindFamilyApi: { getAssetContentUrl, getAssetThumbnailUrl },
+  homeMindFamilyApi: {
+    getAssetContent,
+    getAssetContentUrl,
+    getAssetThumbnailUrl,
+  },
+}));
+
+vi.mock("../../components/DocumentPreviewCore", () => ({
+  default: ({ filename }: { filename: string }) => (
+    <div data-testid="document-preview">{filename}</div>
+  ),
 }));
 
 describe("FamilyAssetPreview", () => {
   beforeEach(() => {
     getAssetContentUrl.mockClear();
     getAssetThumbnailUrl.mockClear();
+    getAssetContent.mockClear();
   });
 
   it("gives the video element a direct range-capable URL", async () => {
@@ -91,5 +104,51 @@ describe("FamilyAssetPreview", () => {
       ),
     );
     expect(getAssetContentUrl).toHaveBeenCalledWith("family-1", "video-1");
+  });
+
+  it("opens the shared document preview for modern Office files", () => {
+    render(
+      <App>
+        <FamilyAssetPreview
+          familyId="family-1"
+          asset={{
+            id: "document-1",
+            name: "plan.docx",
+            asset_type: "DOCUMENT",
+          }}
+        />
+      </App>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview plan.docx" }));
+
+    expect(screen.getByTestId("document-preview")).toHaveTextContent(
+      "plan.docx",
+    );
+    expect(
+      screen.getByRole("button", { name: "Download plan.docx" }),
+    ).toBeInTheDocument();
+  });
+
+  it("offers download without preview for legacy Word files", () => {
+    render(
+      <App>
+        <FamilyAssetPreview
+          familyId="family-1"
+          asset={{
+            id: "document-2",
+            name: "legacy.doc",
+            asset_type: "DOCUMENT",
+          }}
+        />
+      </App>,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Preview legacy.doc" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Download legacy.doc" }),
+    ).toBeInTheDocument();
   });
 });

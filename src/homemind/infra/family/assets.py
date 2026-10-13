@@ -64,18 +64,33 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _asset_type(mime_type: str) -> str:
+_DOCUMENT_SUFFIXES = frozenset({".pdf", ".doc", ".docx", ".xls", ".xlsx", ".xlsm", ".ppt", ".pptx"})
+_DOCUMENT_MIME_TYPES = frozenset(
+    {
+        "application/pdf",
+        "application/msword",
+        "application/vnd.ms-excel",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel.sheet.macroenabled.12",
+    }
+)
+
+
+def _asset_type(mime_type: str, filename: str = "") -> str:
     if mime_type.startswith("image/"):
         return "PHOTO"
     if mime_type.startswith("video/"):
         return "VIDEO"
     if mime_type.startswith("audio/"):
         return "AUDIO"
-    if mime_type.startswith("text/") or mime_type in {
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    }:
+    if (
+        mime_type.startswith("text/")
+        or mime_type.casefold() in _DOCUMENT_MIME_TYPES
+        or Path(filename).suffix.casefold() in _DOCUMENT_SUFFIXES
+    ):
         return "DOCUMENT"
     return "OTHER"
 
@@ -368,7 +383,7 @@ class FamilyAssetManager:
         if not target.is_file():
             raise ValueError("asset path is not a file")
         mime_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
-        if _asset_type(mime_type) != "PHOTO":
+        if _asset_type(mime_type, target.name) != "PHOTO":
             return
         photo = _photo_metadata(target, ZoneInfo(family.timezone))
         self.repo.upsert_photo_metadata(
@@ -406,7 +421,7 @@ class FamilyAssetManager:
         timezone: ZoneInfo,
     ) -> FamilyAssetRow:
         mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        kind = _asset_type(mime_type)
+        kind = _asset_type(mime_type, path.name)
         photo = _photo_metadata(path, timezone) if kind == "PHOTO" else PhotoMetadata()
         captured_at = photo.taken_at or int(stat.st_mtime)
         metadata = {

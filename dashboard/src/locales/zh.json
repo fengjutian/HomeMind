@@ -109,6 +109,8 @@
     "relationship": "关系",
     "addIndexedAsset": "添加已索引照片或文件",
     "albumEmpty": "相册中还没有内容",
+    "previewDocument": "预览 {{name}}",
+    "downloadDocument": "下载 {{name}}",
     "description": "说明",
     "assignee": "负责人",
     "dueAt": "截止时间",
@@ -186,7 +188,7 @@
     "tabs": {
       "home": "首页",
       "members": "成员",
-      "albums": "相册与影音",
+      "albums": "相册与文件",
       "tasks": "任务",
       "events": "家庭日程",
       "assets": "家庭资产",

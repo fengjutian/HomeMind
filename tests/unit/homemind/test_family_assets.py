@@ -28,6 +28,37 @@ def _repos(tmp_path: Path) -> tuple[FamilyRepo, FamilyAssetRepo]:
     return FamilyRepo(pool), FamilyAssetRepo(pool)
 
 
+def test_office_and_pdf_files_are_document_assets_cross_platform(tmp_path: Path) -> None:
+    family_repo, asset_repo = _repos(tmp_path)
+    user = User(id=1, username="owner", role=Role.USER, display_name="Owner")
+    family = FamilyManager(family_repo).create_family(
+        user, name="My Family", timezone="Asia/Shanghai", locale="zh"
+    )
+    source = tmp_path / "documents"
+    source.mkdir()
+    filenames = {
+        "report.pdf",
+        "letter.doc",
+        "letter.docx",
+        "budget.xls",
+        "budget.xlsx",
+        "budget.xlsm",
+        "slides.ppt",
+        "slides.pptx",
+    }
+    for filename in filenames:
+        (source / filename).write_bytes(filename.encode())
+
+    result = FamilyAssetManager(family_repo, asset_repo).scan_directory(
+        family.id, user, directory=str(source)
+    )
+    assets = FamilyAssetManager(family_repo, asset_repo).search(family.id, user)
+
+    assert result.indexed == len(filenames)
+    assert {asset.name for asset in assets} == filenames
+    assert {asset.asset_type for asset in assets} == {"DOCUMENT"}
+
+
 def test_scan_search_duplicates_and_delete_index(tmp_path: Path) -> None:
     family_repo, asset_repo = _repos(tmp_path)
     user = User(id=1, username="owner", role=Role.USER, display_name="Owner")
