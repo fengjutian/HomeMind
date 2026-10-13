@@ -60,6 +60,39 @@ def test_event_and_memory_crud(tmp_path: Path) -> None:
     assert context.list_events(family.id, user) == []
 
 
+def test_private_memory_is_visible_only_to_its_owner(tmp_path: Path) -> None:
+    context, families, owner = _manager(tmp_path)
+    family = families.create_family(
+        owner, name="My Family", timezone="Asia/Shanghai", locale="zh"
+    )
+    owner_member = families.repo.list_members(family.id)[0]
+    families.create_member(
+        family.id,
+        owner,
+        display_name="Child",
+        role=MemberRole.MEMBER,
+        user_id=2,
+    )
+    memory = context.create_memory(
+        family.id,
+        owner,
+        subject_type="MEMBER",
+        subject_id=owner_member.id,
+        content="private note",
+        memory_type=MemoryType.EXPERIENCE,
+        importance=0.8,
+        confidence=0.9,
+        visibility="PRIVATE",
+        source_type="USER",
+        source_id=None,
+        expires_at=None,
+    )
+    child = User(id=2, username="child", role=Role.USER, display_name="Child")
+
+    assert context.search_memories(family.id, owner) == [memory]
+    assert context.search_memories(family.id, child) == []
+
+
 def test_resolve_last_year_context(tmp_path: Path) -> None:
     context, families, user = _manager(tmp_path)
     family = families.create_family(user, name="My Family", timezone="Asia/Shanghai", locale="zh")

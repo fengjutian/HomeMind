@@ -186,9 +186,11 @@ export default function FileManagerPanel({ familyId }: FileManagerPanelProps) {
         <Select
           className={styles.sourceSelect}
           value={sourceId}
-          options={sources.map((source) => ({
+          options={sources.map((source, index) => ({
             value: source.id,
-            label: source.directory_uri,
+            label: t("family.assetSourceNumber", "扫描源 {{number}}", {
+              number: index + 1,
+            }),
           }))}
           onChange={(value) => {
             setSourceId(value);

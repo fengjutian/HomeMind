@@ -8,7 +8,10 @@ from typing import Any
 
 from homemind.infra.active_family import ActiveFamilyResolver
 from homemind.infra.agents.action_checklist_middleware import ActionChecklistMiddleware
-from homemind.infra.agents.family_context_middleware import FamilyContextMiddleware
+from homemind.infra.agents.family_context_middleware import (
+    FamilyContextMiddleware,
+    render_resolved_family_context,
+)
 from homemind.infra.db.migrate import run_migrations
 from homemind.infra.db.repos.memory_candidates import (
     MemoryCandidateRepo,
@@ -435,11 +438,16 @@ class HomeMindServer(OctopServer):
 
         def render(task: Any) -> str:
             try:
-                resolved = manager.resolve(task.family_id, self._user_by_id(task.created_by))
+                user = self._user_by_id(task.created_by)
+                family = families.require_access(task.family_id, user)
+                query = " ".join(part for part in (task.title, task.description) if part).strip()
+                resolved = manager.resolve(task.family_id, user, query)
             except Exception:  # noqa: BLE001 — context is a nicety, not a gate
                 logger.warning("HomeMind: could not render family context for task %s", task.id)
                 return ""
-            return resolved.summary or ""
+            return render_resolved_family_context(
+                family, user, resolved, families, services.family_context_repo
+            )
 
         return render
 

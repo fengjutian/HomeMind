@@ -26,6 +26,8 @@ from homemind.infra.family.manager import (
     SpaceType,
 )
 from homemind.infra.family.permissions import FamilyPermissionEvaluator
+from homemind.infra.family.resolvers.asset_query import _score_asset
+from homemind.infra.db.repos.family_assets import FamilyAssetRow
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
 from octop.infra.users.identity import Role, User
@@ -156,3 +158,39 @@ def test_resolved_context_has_permission_decisions(tmp_path: Path) -> None:
     resolved = context.resolve(ids["family_id"], user, "今天的家庭安排")
     action_names = {d.action for d in resolved.permission_decisions}
     assert {"family.read", "family.search", "filesystem.read"} <= action_names
+
+
+def test_asset_without_capture_time_does_not_crash_time_filter() -> None:
+    asset = FamilyAssetRow(
+        id="asset-1",
+        pk=1,
+        family_id="family-1",
+        source_id=None,
+        space_id=None,
+        asset_type="DOCUMENT",
+        uri="file:///document.pdf",
+        name="document.pdf",
+        mime_type="application/pdf",
+        size_bytes=10,
+        content_hash="hash",
+        captured_at=None,
+        indexed_at=1,
+        metadata_json="{}",
+        created_by=1,
+        visibility="FAMILY",
+        status="ACTIVE",
+        created_at=1,
+        updated_at=1,
+    )
+
+    score, breakdown = _score_asset(
+        asset,
+        text="document",
+        member_ids=set(),
+        space_ids=set(),
+        start_at=1,
+        end_at=2,
+    )
+
+    assert score == 0.3
+    assert breakdown == ["name_match"]

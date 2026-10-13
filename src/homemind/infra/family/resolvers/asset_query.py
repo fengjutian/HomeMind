@@ -95,10 +95,10 @@ def _score_asset(
     if space_ids and asset.space_id in space_ids:
         score += 0.2
         breakdown.append("space_match")
-    if start_at is not None and asset.captured_at >= start_at:
+    if start_at is not None and asset.captured_at is not None and asset.captured_at >= start_at:
         score += 0.2
         breakdown.append("captured_after_start")
-    if end_at is not None and asset.captured_at <= end_at:
+    if end_at is not None and asset.captured_at is not None and asset.captured_at <= end_at:
         score += 0.2
         breakdown.append("captured_before_end")
     return min(score, 1.0), breakdown

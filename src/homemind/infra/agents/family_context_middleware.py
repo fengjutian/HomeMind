@@ -199,8 +199,9 @@ class FamilyContextMiddleware(AgentMiddleware[Any, Any]):
             logger.exception("FamilyContextMiddleware: resolve crashed family_id=%s", family_id)
             return await handler(request)
 
-        payload = _build_payload(family, user, resolved, self._family, self._context.repo)
-        block = render_family_context(**payload)
+        block = render_resolved_family_context(
+            family, user, resolved, self._family, self._context.repo
+        )
         return await handler(_append_block(request, block, self._system_message(request)))
 
     def wrap_model_call(
@@ -385,7 +386,21 @@ def _build_payload(
     }
 
 
+def render_resolved_family_context(
+    family: Any,
+    user: User,
+    resolved: ResolvedFamilyContext,
+    family_manager: FamilyManager,
+    context_repo: Any,
+) -> str:
+    """Render an already resolved context for chat and scheduled-agent callers."""
+    return render_family_context(
+        **_build_payload(family, user, resolved, family_manager, context_repo)
+    )
+
+
 __all__ = [
     "FamilyContextMiddleware",
     "_XML_PROLOGUE_NOTE",
+    "render_resolved_family_context",
 ]

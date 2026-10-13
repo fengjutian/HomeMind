@@ -395,6 +395,16 @@ class FamilyContextManager:
         return memory
 
     def _can_read_memory(self, memory: FamilyMemoryRow, user: User) -> bool:
+        if memory.visibility == "PRIVATE" and not user.is_admin:
+            membership = self.family.repo.get_membership(memory.family_id, user.id)
+            member_id = str(membership["member_id"]) if membership is not None else None
+            owns_memory = memory.created_by == user.id or (
+                memory.subject_type == "USER" and memory.subject_id == str(user.id)
+            ) or (
+                memory.subject_type == "MEMBER" and memory.subject_id == member_id
+            )
+            if not owns_memory:
+                return False
         decision = self.permissions.evaluate(
             family_id=memory.family_id,
             user=user,

@@ -192,7 +192,7 @@ export default function AssetsPanel({
           size="small"
           dataSource={sources}
           locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-          renderItem={(source) => (
+          renderItem={(source, index) => (
             <List.Item
               actions={[
                 <Button
@@ -214,7 +214,9 @@ export default function AssetsPanel({
               ]}
             >
               <List.Item.Meta
-                title={source.directory_uri}
+                title={t("family.assetSourceNumber", "扫描源 {{number}}", {
+                  number: index + 1,
+                })}
                 description={
                   <Space wrap>
                     <Tag>{source.visibility}</Tag>
@@ -370,15 +372,6 @@ export default function AssetsPanel({
                   label: t("family.assetStatus", "状态"),
                   children: selectedAsset.status,
                 },
-                {
-                  key: "path",
-                  label: t("family.assetPath", "服务器路径"),
-                  children: (
-                    <Typography.Text className={styles.assetDrawerPath}>
-                      {selectedAsset.uri}
-                    </Typography.Text>
-                  ),
-                },
               ]}
             />
           </Space>
@@ -409,7 +402,7 @@ export default function AssetsPanel({
                   <div key={asset.id} className={styles.duplicateAsset}>
                     <FamilyAssetPreview familyId={familyId} asset={asset} />
                     <Typography.Text type="secondary" ellipsis>
-                      {asset.uri}
+                      {asset.name}
                     </Typography.Text>
                   </div>
                 ))}

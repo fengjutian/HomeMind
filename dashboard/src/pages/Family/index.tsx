@@ -894,23 +894,29 @@ export default function FamilyPage() {
                       "family.searchPlaceholder",
                       "搜索成员、事件、记忆和资产",
                     )}
-                    onSearch={async (query) =>
-                      setResults(
-                        await homeMindFamilyApi.search(familyId, query),
-                      )
-                    }
+                    onSearch={async (query) => {
+                      try {
+                        setResults(await homeMindFamilyApi.search(familyId, query));
+                      } catch (error) {
+                        message.error(
+                          error instanceof Error ? error.message : String(error),
+                        );
+                      }
+                    }}
                   />
                   {listCard(
                     results,
                     (row) =>
-                      row.kind === "ASSET" &&
-                      row.metadata.asset_type === "PHOTO" ? (
+                      row.kind === "ASSET" ? (
                         <FamilyAssetPreview
                           familyId={familyId}
                           asset={{
                             id: row.id,
                             name: row.title,
-                            asset_type: "PHOTO",
+                            asset_type:
+                              typeof row.metadata.asset_type === "string"
+                                ? row.metadata.asset_type
+                                : "OTHER",
                           }}
                         />
                       ) : (
