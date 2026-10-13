@@ -1,4 +1,6 @@
-<p align="center"><img src="docs/assets/readme-banner-zh.png" alt="HomeMind" width="720" /></p>
+<p align="center"><img src="website/favicon.svg" alt="HomeMind 标志" width="72" /></p>
+
+<h1 align="center">HomeMind</h1>
 
 <p align="center">
   <strong>开源、自托管、面向家庭的多用户 AI 中枢。</strong><br />
