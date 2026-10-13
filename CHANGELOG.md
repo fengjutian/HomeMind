@@ -5,6 +5,7 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号遵循 [语义化版本规范](https://semver.org/spec/v2.0.0.html)。
 
 ## [Unreleased]
+- 知识库本地向量化改为单分块推理、复用模型并限制并发，避免大文档索引耗尽内存；systemd 服务启动/重启时为已有安装补充可覆盖的内存限制和重启限速，保留自定义启动配置
 - 暗色主题下专家 / 技能 / 子智能体 Markdown 编辑器白底：Monaco 未跟随应用主题渲染为亮色 `vs`；编辑器现按应用明暗模式切换主题（工作区文件编辑器同样改为读取应用主题，而非仅系统偏好）（Fixes #1355）
 - 知识库与对话附件支持 WPS Writer（`.wps`）及旧版 Word（`.doc`）：用 `firecrawl-anydoc` 抽成 Markdown 入库 / 注入模型上下文（OLE 二进制按内容识别，不依赖本机安装 WPS）（#1345）
 
