@@ -14,6 +14,4 @@ CREATE TABLE IF NOT EXISTS desktop_notifications (
 CREATE INDEX IF NOT EXISTS idx_desktop_notifications_user_created
   ON desktop_notifications(user_id, created_at);
 
-ALTER TABLE bridge_connections ADD COLUMN IF NOT EXISTS peer_client_host TEXT;
-
 UPDATE _schema_version SET version = 24;

@@ -72,6 +72,7 @@ async def run_foreground(
     import uvicorn
 
     from octop.api.app import build_app as build_octop_app
+    from octop.infra.bridge.transport import BRIDGE_WS_MAX_BYTES
     from octop.infra.setup.tls.http_companion import build_http_companion_app
     from octop.infra.setup.tls.listeners import build_listen_plan
     from octop.infra.setup.tls.store import resolve_tls_paths
@@ -117,6 +118,7 @@ async def run_foreground(
             reload=False,
             ssl_certfile=plan.ssl_certfile,
             ssl_keyfile=plan.ssl_keyfile,
+            ws_max_size=BRIDGE_WS_MAX_BYTES,
         )
         companion = build_http_companion_app(https_port=plan.https_port)
         http_config = uvicorn.Config(
@@ -146,6 +148,7 @@ async def run_foreground(
             reload=reload,
             ssl_certfile=plan.ssl_certfile,
             ssl_keyfile=plan.ssl_keyfile,
+            ws_max_size=BRIDGE_WS_MAX_BYTES,
         )
         servers.append(uvicorn.Server(single_config))
 

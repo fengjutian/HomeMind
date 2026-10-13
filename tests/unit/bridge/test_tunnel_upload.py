@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import time
 
 import pytest
 from fastapi import FastAPI, File, UploadFile
 
 from octop.infra.bridge.http_tunnel import execute_local_http
+from octop.infra.bridge.audit import new_audit
 from octop.infra.bridge.ids import rewrite_tunneled_json
 from octop.infra.bridge.transport import (
     BODY_CHUNK_RAW_BYTES,
@@ -57,6 +59,7 @@ async def test_execute_local_http_accepts_chat_upload() -> None:
         headers={"content-type": content_type},
         body=raw,
         access_token="token",
+        audit=new_audit(owner_user_id=1, now=int(time.time())),
     )
     assert result["status"] == 200
     payload = json.loads(base64.b64decode(str(result["body_b64"])))
