@@ -48,15 +48,7 @@ from octop.infra.bridge.token_refresh import (
     classify_login_failure,
     should_refresh,
 )
-from octop.infra.bridge.transport import (
-    ADVERTISED_BRIDGE_FEATURES,
-    BRIDGE_TUNNEL_CHUNKED_MAX_BODY_BYTES,
-    BRIDGE_TUNNEL_MAX_BODY_BYTES,
-    BRIDGE_WS_MAX_BYTES,
-    FEATURE_BODY_CHUNKS,
-    BridgeSession,
-    peer_feature_set,
-)
+from octop.infra.bridge.transport import BridgeSession
 from octop.infra.db.repos.bridge_connections import BridgeConnectionRepo, BridgeConnectionRow
 from octop.infra.db.repos.secrets import SecretRepo
 from octop.infra.db.repos.users import UserRepo
