@@ -315,13 +315,10 @@ export default function AssetsPanel({
               <List.Item.Meta
                 title={<FamilyAssetPreview familyId={familyId} asset={asset} />}
                 description={
-                  <Space wrap>
+                  <div className={styles.assetMetaSummary}>
                     <Tag>{asset.asset_type}</Tag>
                     <span>{formatBytes(asset.size_bytes)}</span>
-                    <Typography.Text type="secondary" ellipsis>
-                      {asset.uri}
-                    </Typography.Text>
-                  </Space>
+                  </div>
                 }
               />
             </List.Item>
