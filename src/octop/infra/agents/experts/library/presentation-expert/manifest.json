@@ -1,0 +1,137 @@
+{
+  "id": "presentation-expert",
+  "label": {
+    "zh": "PPT 演示专家",
+    "en": "Presentation Expert"
+  },
+  "description": {
+    "zh": "从目标与受众出发完成演示策划、故事线、逐页文案、视觉系统、图表与讲稿，并可创建、改版和质检 .pptx 文件的专业演示顾问。",
+    "en": "Presentation consultant for audience strategy, storylines, slide copy, visual systems, charts, speaker notes, and the creation, redesign, and quality assurance of .pptx files."
+  },
+  "welcome_message": {
+    "zh": "告诉我演示目标、受众、场合和时长；我可以从故事线开始，也可以直接改你的 PPT",
+    "en": "Tell me the goal, audience, setting, and duration—or share an existing deck for a complete redesign"
+  },
+  "icon_name": "presentation",
+  "icon_url": "/experts/avatars/scene-office.svg",
+  "color": "#F97316",
+  "prompt_files": [
+    "SOUL.md"
+  ],
+  "quick_prompts": [
+    {
+      "title": {
+        "zh": "从零制作 PPT",
+        "en": "Create a deck"
+      },
+      "description": {
+        "zh": "从目标、故事线到可交付文件",
+        "en": "From objective and storyline to a finished file"
+      },
+      "prompt": {
+        "zh": "请为我从零制作一份 PPT。先根据以下信息梳理受众、核心结论和故事线，再给出逐页方案并生成可交付的 .pptx 文件：\n- 主题：\n- 受众：\n- 场合：\n- 演讲时长：\n- 期望行动：\n- 品牌或风格要求：\n- 可用资料：\n",
+        "en": "Create a presentation from scratch. First clarify the audience, core conclusion, and storyline, then produce a slide-by-slide plan and a deliverable .pptx file:\n- Topic:\n- Audience:\n- Setting:\n- Speaking time:\n- Desired action:\n- Brand or style requirements:\n- Available source material:\n"
+      },
+      "color": "#FFEDD5",
+      "icon_name": "presentation"
+    },
+    {
+      "title": {
+        "zh": "设计故事线",
+        "en": "Design a storyline"
+      },
+      "description": {
+        "zh": "把零散材料变成有说服力的叙事",
+        "en": "Turn scattered material into a persuasive narrative"
+      },
+      "prompt": {
+        "zh": "请把以下材料重组为一条适合演示的故事线。先提炼一句话核心结论，再给出章节结构、每页结论式标题、关键证据和页面目的；同时指出信息缺口与可删内容：\n\n",
+        "en": "Restructure the following material into a presentation storyline. Start with a one-sentence core conclusion, then provide sections, assertion-style slide titles, supporting evidence, and each slide's purpose. Flag information gaps and removable content:\n\n"
+      },
+      "color": "#FEF3C7",
+      "icon_name": "route"
+    },
+    {
+      "title": {
+        "zh": "改版现有 PPT",
+        "en": "Redesign a deck"
+      },
+      "description": {
+        "zh": "诊断内容与视觉问题并系统重做",
+        "en": "Diagnose content and visual issues, then rebuild"
+      },
+      "prompt": {
+        "zh": "请审阅并改版这份 PPT。保留可验证的事实，诊断故事线、信息层级、版式、图表、配色和一致性问题；先列出改版原则与逐页修改表，再生成新版 .pptx，并提供修改摘要。文件路径：\n",
+        "en": "Review and redesign this presentation. Preserve verifiable facts; diagnose storyline, hierarchy, layout, charts, color, and consistency. First provide redesign principles and a slide-by-slide change table, then generate the revised .pptx and a change summary. File path:\n"
+      },
+      "color": "#FCE7F3",
+      "icon_name": "paintbrush"
+    },
+    {
+      "title": {
+        "zh": "制作数据汇报",
+        "en": "Build a data presentation"
+      },
+      "description": {
+        "zh": "把数据转化为结论、图表与行动",
+        "en": "Turn data into conclusions, charts, and actions"
+      },
+      "prompt": {
+        "zh": "请把以下数据或分析结果制作成管理层汇报。每页只表达一个结论，选择与比较关系匹配的图表，标明口径、时间范围、单位和来源，并区分事实、推断与建议：\n\n",
+        "en": "Turn the following data or analysis into an executive presentation. Give each slide one conclusion, choose charts that match the comparison, state definitions, time range, units, and sources, and separate facts, inferences, and recommendations:\n\n"
+      },
+      "color": "#DBEAFE",
+      "icon_name": "chart-no-axes-combined"
+    },
+    {
+      "title": {
+        "zh": "准备路演提案",
+        "en": "Prepare a pitch deck"
+      },
+      "description": {
+        "zh": "围绕决策与说服构建提案",
+        "en": "Structure a proposal around decision and persuasion"
+      },
+      "prompt": {
+        "zh": "请为以下项目设计一份路演/提案 PPT。明确决策者关心的问题，依次呈现机会、痛点、方案、差异化、证据、实施计划、投入产出、风险和明确请求；不要虚构市场数据：\n\n",
+        "en": "Design a pitch/proposal deck for the following project. Address the decision maker's concerns through opportunity, problem, solution, differentiation, evidence, implementation, economics, risks, and a clear ask. Do not fabricate market data:\n\n"
+      },
+      "color": "#EDE9FE",
+      "icon_name": "rocket"
+    },
+    {
+      "title": {
+        "zh": "交付前质检",
+        "en": "Pre-delivery QA"
+      },
+      "description": {
+        "zh": "检查内容、版式、溢出与可演讲性",
+        "en": "Check content, layout, overflow, and delivery readiness"
+      },
+      "prompt": {
+        "zh": "请对这份 PPT 做交付前质检：检查事实与口径、章节逻辑、标题结论、文字密度、字号、对齐、留白、配色、图表、图片质量、元素溢出和演讲时长；渲染后逐页检查，修复问题并输出最终文件与质检清单。文件路径：\n",
+        "en": "Perform pre-delivery QA on this presentation: check facts and definitions, narrative flow, assertion titles, text density, font sizes, alignment, whitespace, color, charts, image quality, overflow, and speaking time. Render and inspect every slide, fix issues, and return the final file with a QA checklist. File path:\n"
+      },
+      "color": "#DCFCE7",
+      "icon_name": "badge-check"
+    }
+  ],
+  "task_examples": {
+    "zh": [
+      "每周一「09:00」把上周经营数据整理为 8 页管理层汇报大纲",
+      "每周三「16:00」检查共享目录中的项目周报 PPT，列出逻辑与版式问题",
+      "每周五「15:00」将本周项目进展整理成结论先行的汇报结构",
+      "每月 1 日「10:00」根据上月指标生成月度复盘演示草稿",
+      "每月最后一个工作日「17:00」更新公司介绍中的关键数据与里程碑页",
+      "每季度首日「09:30」生成季度业务回顾的故事线、页面清单和资料缺口"
+    ],
+    "en": [
+      "Every Monday at 09:00, turn last week's operating data into an eight-slide executive-report outline",
+      "Every Wednesday at 16:00, review project update decks in the shared folder and list narrative and layout issues",
+      "Every Friday at 15:00, structure this week's project progress as a conclusion-first presentation",
+      "On the 1st of every month at 10:00, draft a monthly review deck from the previous month's metrics",
+      "At 17:00 on the last working day of every month, update key data and milestone slides in the company overview",
+      "At 09:30 on the first day of every quarter, prepare the quarterly business review storyline, slide list, and source gaps"
+    ]
+  }
+}
