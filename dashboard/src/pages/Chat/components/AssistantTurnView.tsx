@@ -43,6 +43,7 @@ interface AssistantTurnViewProps {
    */
   liveSpeakers?: ReadonlyArray<string>;
   onRegenerate?: (messageId: string) => void;
+  onDisableStreamUsage?: () => Promise<boolean>;
   onRegenerateMermaid?: (code: string) => void;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
@@ -83,6 +84,7 @@ export default function AssistantTurnView({
   isTurnInProgress = false,
   liveSpeakers = [],
   onRegenerate,
+  onDisableStreamUsage,
   onRegenerateMermaid,
   onEditUserMessage,
   onForkAssistantMessage,
