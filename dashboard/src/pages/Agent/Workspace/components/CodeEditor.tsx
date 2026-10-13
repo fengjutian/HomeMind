@@ -86,7 +86,7 @@ export default function CodeEditor({
         <MonacoEditor
           height="100%"
           language={resolvedLanguage}
-          theme="vs-dark"
+          theme={isDark ? "vs-dark" : "light"}
           value={value}
           onChange={(v) => onChange(v ?? "")}
           onMount={handleMount}
