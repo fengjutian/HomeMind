@@ -409,7 +409,13 @@ async def patch_agent(
             "mcp_servers",
         }
     }
-    if body.config is not None and body.migrate_workspace:
+    migration_required = body.config is not None and (
+        body.migrate_workspace
+        or server.app_runtime.agent_registry.workspace_root_migration_required(
+            agent_id, body.config
+        )
+    )
+    if body.config is not None and migration_required:
         row = await server.app_runtime.agent_registry.migrate_workspace_root(agent_id, body.config)
     elif body.config is not None:
         updates["config_json"] = json.dumps(body.config)

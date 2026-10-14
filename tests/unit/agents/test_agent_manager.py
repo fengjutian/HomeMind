@@ -2340,6 +2340,39 @@ async def test_migrate_workspace_root_copies_files_and_updates_layout(
 
 
 @pytest.mark.asyncio
+async def test_migrate_workspace_root_repairs_workspace_outside_unchanged_root(
+    manager: AgentManager, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from octop.infra.agents.manager import AgentCreateSpec
+
+    row = await manager.create(AgentCreateSpec(name="root-repair"), defer_bootstrap=True)
+    monkeypatch.setattr(manager, "_schedule_reload", lambda _aid: None)
+    source = manager.resolve_workspace_dir(row.agent_id)
+    (source / "kept.txt").write_text("workspace data", encoding="utf-8")
+    new_root = tmp_path / "new-root"
+    new_root.mkdir()
+    config = manager.get_config(row.agent_id)
+    config["backend"] = {
+        "type": "local_shell",
+        "root_dir": str(new_root),
+        "virtual_mode": True,
+    }
+    manager._repos.agent_repo.update_config(  # noqa: SLF001
+        row.agent_id,
+        config_json=json.dumps(config),
+    )
+
+    assert manager.workspace_root_migration_required(row.agent_id, config)
+    await manager.migrate_workspace_root(row.agent_id, config)
+
+    target = new_root / ".octop" / "workspaces" / row.agent_id
+    assert (target / "kept.txt").read_text(encoding="utf-8") == "workspace data"
+    saved = manager.get_config(row.agent_id)
+    assert saved["workspace_dir"] == f"/.octop/workspaces/{row.agent_id}"
+    assert not manager.workspace_root_migration_required(row.agent_id, saved)
+
+
+@pytest.mark.asyncio
 async def test_migrate_workspace_root_rejects_existing_destination(
     manager: AgentManager, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

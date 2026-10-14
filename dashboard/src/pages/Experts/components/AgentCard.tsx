@@ -41,6 +41,7 @@ import { isSharedExpertViewer } from "../../../utils/sharedExpert";
 import type { PublishedExpert } from "../../../api/modules/publishedExperts";
 import PublishTemplateButton from "./PublishTemplateButton";
 import AgentMoreActions from "./AgentMoreActions";
+import { expertForegroundColor } from "../../../utils/expertColor";
 
 const STATE_META: Record<
   string,
@@ -280,6 +281,7 @@ export const AgentCard = memo(function AgentCard({
   }, [reloadInstalledSubagents]);
 
   const accent = accentColor || "#6366f1";
+  const foregroundAccent = expertForegroundColor(accent);
   const meta = getStateMeta(localState);
   const friendlyError = formatAgentError(localError, t);
   const chatReady = isAgentChatReady(localState);
@@ -496,7 +498,10 @@ export const AgentCard = memo(function AgentCard({
           {chatReady ? (
             <button
               className={styles.agentCard2ChatBtn}
-              style={{ color: accent, borderColor: `${accent}55` }}
+              style={{
+                color: foregroundAccent,
+                borderColor: `${foregroundAccent}55`,
+              }}
               onClick={handleOpenChat}
             >
               <MessageSquare size={13} />
@@ -510,7 +515,10 @@ export const AgentCard = memo(function AgentCard({
             <button
               type="button"
               className={styles.agentCard2ChatBtn}
-              style={{ color: accent, borderColor: `${accent}55` }}
+              style={{
+                color: foregroundAccent,
+                borderColor: `${foregroundAccent}55`,
+              }}
               disabled={isTransient || actionLoading}
               onClick={() => void handleToggle(true)}
             >

@@ -1003,9 +1003,6 @@ class AgentManager:
                 ErrorCode.WORKSPACE_OP_UNSUPPORTED,
                 "workspace root migration requires a local backend",
             )
-        if Path(current_root).expanduser().resolve() == Path(requested_root).expanduser().resolve():
-            return await self.update(agent_id, config_json=dumps_config(requested))
-
         source_raw = current.get("workspace_dir")
         if not isinstance(source_raw, str) or not source_raw.strip():
             source = default_agent_workspace_dir(
@@ -1068,6 +1065,30 @@ class AgentManager:
             target=agent_id,
         )
         return updated
+
+    def workspace_root_migration_required(self, agent_id: str, config: dict[str, Any]) -> bool:
+        """Return whether *config* would leave the persisted workspace outside its layout."""
+        from octop.infra.agents.workspace.dir import (  # noqa: PLC0415
+            default_agent_workspace_dir,
+            resolve_workspace_host_path,
+        )
+
+        row = self._repos.agent_repo.get(agent_id)
+        if row is None:
+            raise OctopError(ErrorCode.AGENT_NOT_FOUND, f"agent {agent_id!r} not found")
+        current = parse_config_json(row.config_json)
+        source_raw = current.get("workspace_dir")
+        if not isinstance(source_raw, str) or not source_raw.strip():
+            source = default_agent_workspace_dir(
+                self._paths, agent_id, cfg=current, ensure=False
+            ).resolve()
+        else:
+            source = resolve_workspace_host_path(source_raw, current)
+        requested = self._preserve_internal_layout(agent_id, dict(config))
+        target = default_agent_workspace_dir(
+            self._paths, agent_id, cfg=requested, ensure=False
+        ).resolve()
+        return source.resolve() != target
 
     async def set_shared(self, agent_id: str, shared: bool) -> AgentRow:
         """Persist whether other users may access this agent."""

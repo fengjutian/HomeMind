@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { PALETTE_SWATCH } from "../styles/themePalettes";
+import { contrastRatio, PALETTE_SWATCH } from "../styles/themePalettes";
 import {
   DEFAULT_SUBAGENT_ACCENT,
+  expertForegroundColor,
   expertPaletteColor,
   parseStoredColor,
   resolveExpertPalette,
@@ -49,6 +50,19 @@ describe("parseStoredColor", () => {
     expect(parseStoredColor("")).toBeNull();
     expect(parseStoredColor("not-a-color")).toBeNull();
     expect(parseStoredColor("orange")).toBeNull();
+  });
+});
+
+describe("expertForegroundColor", () => {
+  it("darkens pale custom colors until small controls are readable on white", () => {
+    const foreground = expertForegroundColor("#d4f7e6");
+
+    expect(foreground).not.toBe("#d4f7e6");
+    expect(contrastRatio(foreground, "#FFFFFF")).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("keeps an already-readable accent unchanged", () => {
+    expect(expertForegroundColor("#334155")).toBe("#334155");
   });
 });
 

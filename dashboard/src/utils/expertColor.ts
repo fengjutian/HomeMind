@@ -2,6 +2,7 @@ import {
   DEFAULT_PALETTE,
   PALETTE_SWATCH,
   VALID_PALETTES,
+  deriveCustomBrandColors,
   normalizeHexColor,
   type ThemePalette,
 } from "../styles/themePalettes";
@@ -82,6 +83,12 @@ export function parseStoredColor(
 
 export function expertPaletteColor(palette: ThemePalette): string {
   return PALETTE_SWATCH[palette];
+}
+
+/** Darken an expert accent when it is used as small text or an icon on white. */
+export function expertForegroundColor(color: string): string {
+  const normalized = normalizeHexColor(color);
+  return normalized ? deriveCustomBrandColors(normalized).solid : color;
 }
 
 /** Fallback accent when a subagent has no usable color. */
