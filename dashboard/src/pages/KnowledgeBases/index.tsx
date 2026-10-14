@@ -3394,11 +3394,13 @@ export default function KnowledgeBasesPage() {
                           <span className={styles.onnxModelName}>
                             RapidOCR (ONNX)
                           </span>
-                          <span className={styles.onnxModelMeta}>
-                            {t("knowledgeBases.ocrLocalHint")}
-                          </span>
                         </div>
                       </div>
+                      <Alert
+                        type="info"
+                        showIcon
+                        message={t("knowledgeBases.ocrLocalInstallNotice")}
+                      />
                     ) : (
                       <>
                         <Alert

@@ -114,6 +114,18 @@ async def test_create_agent_from_expert_applies_quick_prompts(env: Any) -> None:
                     "icon_name": "zap",
                 }
             ],
+            "task_examples": {
+                "zh": [
+                    "每天「09:00」生成巡检简报",
+                    "每周一「10:00」复盘上周进展",
+                    "每月 1 日「09:30」更新本月计划",
+                ],
+                "en": [
+                    "Every day at 09:00, generate a patrol briefing",
+                    "Every Monday at 10:00, review last week's progress",
+                    "On the 1st of each month at 09:30, update the monthly plan",
+                ],
+            },
         },
     )
     assert created.status_code == 201, created.text
@@ -130,6 +142,7 @@ async def test_create_agent_from_expert_applies_quick_prompts(env: Any) -> None:
     assert data is not None
     assert data.get("quick_prompts")
     assert data["quick_prompts"][0]["title"]["zh"] == "创建卡"
+    assert data["task_examples"]["zh"][0] == "每天「09:00」生成巡检简报"
     # Seeded template keys must survive a page-config overlay.
     text = await workspace.aread_text(WORKSPACE_MANIFEST_PATH)
     assert text is not None

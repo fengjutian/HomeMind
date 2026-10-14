@@ -157,6 +157,7 @@ class FromExpertBody(AgentRuntimeFields):
     hub_skills: list[ComposerHubSkillBody] | None = None
     copy_skills: list[ComposerCopySkillBody] | None = None
     quick_prompts: list[QuickPromptResponse] | None = None
+    task_examples: dict[str, list[str]] | None = None
 
 
 class PublishExpertBody(BaseModel):
@@ -266,15 +267,20 @@ def _composer_initializer(
     copies: tuple[tuple[str, Any], ...] = (),
     report: ComposerApplyReport | None = None,
     quick_prompts: list[dict[str, Any]] | None = None,
+    task_examples: dict[str, list[str]] | None = None,
 ) -> Any:
-    if patch.is_empty() and not copies and quick_prompts is None:
+    if patch.is_empty() and not copies and quick_prompts is None and task_examples is None:
         return None
 
     async def _apply(_row: Any, workspace: Any) -> None:
         if not patch.is_empty() or copies:
             await apply_composer_workspace_patch(workspace, patch, copies=copies, report=report)
-        if quick_prompts is not None:
-            await apply_workspace_quick_prompts(workspace, quick_prompts)
+        if quick_prompts is not None or task_examples is not None:
+            await apply_workspace_quick_prompts(
+                workspace,
+                quick_prompts,
+                task_examples=task_examples,
+            )
 
     return _apply
 
@@ -976,6 +982,7 @@ async def create_agent_from_expert(
             copies,
             report,
             quick_prompts=_quick_prompts_from_body(body),
+            task_examples=body.task_examples,
         ),
     )
     return {

@@ -833,7 +833,7 @@
     "ocrDescription": "Optional. Indexes images and automatically recognizes scanned PDFs when normal text extraction returns nothing.",
     "ocrLocal": "Local ONNX",
     "ocrRemote": "Online vision model",
-    "ocrLocalHint": "RapidOCR components and default Chinese/English models are installed when saved.",
+    "ocrLocalInstallNotice": "The first save downloads and installs RapidOCR components and the default Chinese/English models. This may take several minutes depending on your network; keep this page open.",
     "ocrRemotePrivacy": "Images and rendered scan pages are sent to the selected online model provider.",
     "ocrSelectModel": "Select an image-capable model",
     "ocrNoProviders": "No online provider has an image-capable model",
@@ -1103,7 +1103,13 @@
       "previewTitle": "Expert draft preview",
       "modelUsed": "Generated with: {{model}}",
       "create": "Create expert",
-      "quickPrompts": "Quick prompt preview"
+      "quickPrompts": "Quick prompts (editable)",
+      "quickPromptTitle": "Quick prompt {{index}} title",
+      "quickPromptDescription": "Quick prompt {{index}} description",
+      "quickPromptContent": "Quick prompt {{index}} template",
+      "taskExamples": "Scheduled-task examples (editable)",
+      "taskExamplesHint": "These appear on the Tasks page after creation to help users create recurring jobs.",
+      "taskExample": "Scheduled-task example {{index}}"
     },
     "viewCard": "Cards",
     "viewTable": "Table",

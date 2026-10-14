@@ -833,7 +833,7 @@
     "ocrDescription": "可选能力。启用后可索引图片，并在普通 PDF 无法提取文字时自动识别扫描页。",
     "ocrLocal": "本地 ONNX",
     "ocrRemote": "在线视觉模型",
-    "ocrLocalHint": "保存时自动安装 RapidOCR 组件和默认中英文模型。",
+    "ocrLocalInstallNotice": "首次保存会下载并安装 RapidOCR 组件和默认中英文模型。受网络速度影响可能需要几分钟，请勿关闭页面。",
     "ocrRemotePrivacy": "图片和扫描页会发送给所选在线模型提供商。",
     "ocrSelectModel": "选择支持图片输入的模型",
     "ocrNoProviders": "暂无支持图片输入的在线模型提供商",
@@ -1103,7 +1103,13 @@
       "previewTitle": "专家草稿预览",
       "modelUsed": "生成模型：{{model}}",
       "create": "确认创建专家",
-      "quickPrompts": "快捷入口预览"
+      "quickPrompts": "快捷入口（可编辑）",
+      "quickPromptTitle": "快捷入口 {{index}} 标题",
+      "quickPromptDescription": "快捷入口 {{index}} 说明",
+      "quickPromptContent": "快捷入口 {{index}} 提问模板",
+      "taskExamples": "定时任务示例（可编辑）",
+      "taskExamplesHint": "创建后会显示在任务页面，帮助用户快速创建周期任务。",
+      "taskExample": "定时任务示例 {{index}}"
     },
     "viewCard": "卡片",
     "viewTable": "表格",

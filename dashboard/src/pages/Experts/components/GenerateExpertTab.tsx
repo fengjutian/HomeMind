@@ -46,6 +46,36 @@ export default function GenerateExpertTab({ lang, onCreated }: Props) {
   const [generating, setGenerating] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  const updateQuickPrompt = (
+    index: number,
+    field: "title" | "description" | "prompt",
+    value: string,
+  ) => {
+    setDraft((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        quick_prompts: current.quick_prompts.map((item, itemIndex) =>
+          itemIndex === index
+            ? { ...item, [field]: { ...item[field], [lang]: value } }
+            : item,
+        ),
+      };
+    });
+  };
+
+  const updateTaskExample = (index: number, value: string) => {
+    setDraft((current) => {
+      if (!current) return current;
+      const localized = [...(current.task_examples[lang] ?? [])];
+      localized[index] = value;
+      return {
+        ...current,
+        task_examples: { ...current.task_examples, [lang]: localized },
+      };
+    });
+  };
+
   const applyDraft = (next: GeneratedExpertDraft) => {
     setDraft(next);
     setName(next.label[lang] || next.label.zh || next.label.en);
@@ -98,6 +128,7 @@ export default function GenerateExpertTab({ lang, onCreated }: Props) {
             color: draft.color,
             file_overrides: [{ name: "SOUL.md", content: soul }],
             quick_prompts: draft.quick_prompts,
+            task_examples: draft.task_examples,
             enable_trajectory: true,
             conversation_mode: "craft",
           }),
@@ -130,21 +161,27 @@ export default function GenerateExpertTab({ lang, onCreated }: Props) {
           placeholder={t("experts.aiGenerate.placeholder")}
           autoSize={{ minRows: 6, maxRows: 14 }}
           maxLength={8000}
-          showCount
           disabled={generating}
         />
         <div className={styles.aiGenerateActions}>
-          <span>{t("experts.aiGenerate.safetyHint")}</span>
-          <Button
-            type="primary"
-            icon={<Sparkles size={15} />}
-            loading={generating}
-            onClick={() => void generate()}
-          >
-            {draft
-              ? t("experts.aiGenerate.regenerate")
-              : t("experts.aiGenerate.generate")}
-          </Button>
+          <span className={styles.aiGenerateSafetyHint}>
+            {t("experts.aiGenerate.safetyHint")}
+          </span>
+          <div className={styles.aiGenerateSubmit}>
+            <span className={styles.aiGenerateCount}>
+              {requirement.length.toLocaleString()} / 8,000
+            </span>
+            <Button
+              type="primary"
+              icon={<Sparkles size={15} />}
+              loading={generating}
+              onClick={() => void generate()}
+            >
+              {draft
+                ? t("experts.aiGenerate.regenerate")
+                : t("experts.aiGenerate.generate")}
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -207,11 +244,60 @@ export default function GenerateExpertTab({ lang, onCreated }: Props) {
                   className={styles.aiGeneratePromptCard}
                   key={`${prompt.title.zh}-${index}`}
                 >
-                  <strong>{prompt.title[lang] || prompt.title.zh}</strong>
-                  <span>
-                    {prompt.description[lang] || prompt.description.zh}
-                  </span>
+                  <Input
+                    aria-label={t("experts.aiGenerate.quickPromptTitle", {
+                      index: index + 1,
+                    })}
+                    value={prompt.title[lang]}
+                    onChange={(event) =>
+                      updateQuickPrompt(index, "title", event.target.value)
+                    }
+                  />
+                  <Input
+                    aria-label={t("experts.aiGenerate.quickPromptDescription", {
+                      index: index + 1,
+                    })}
+                    value={prompt.description[lang]}
+                    onChange={(event) =>
+                      updateQuickPrompt(
+                        index,
+                        "description",
+                        event.target.value,
+                      )
+                    }
+                  />
+                  <Input.TextArea
+                    aria-label={t("experts.aiGenerate.quickPromptContent", {
+                      index: index + 1,
+                    })}
+                    value={prompt.prompt[lang]}
+                    autoSize={{ minRows: 3, maxRows: 6 }}
+                    onChange={(event) =>
+                      updateQuickPrompt(index, "prompt", event.target.value)
+                    }
+                  />
                 </div>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.aiGeneratePromptSection}>
+            <h4>{t("experts.aiGenerate.taskExamples")}</h4>
+            <p className={styles.aiGenerateSectionHint}>
+              {t("experts.aiGenerate.taskExamplesHint")}
+            </p>
+            <div className={styles.aiGenerateTaskList}>
+              {(draft.task_examples[lang] ?? []).map((example, index) => (
+                <Input
+                  key={index}
+                  aria-label={t("experts.aiGenerate.taskExample", {
+                    index: index + 1,
+                  })}
+                  value={example}
+                  onChange={(event) =>
+                    updateTaskExample(index, event.target.value)
+                  }
+                />
               ))}
             </div>
           </div>

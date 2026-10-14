@@ -83,11 +83,25 @@
 
 .aiGenerateActions {
   margin-top: 16px;
+}
 
-  span {
-    color: var(--fn-text-tertiary);
-    font-size: 12px;
-  }
+.aiGenerateSafetyHint,
+.aiGenerateCount {
+  color: var(--fn-text-tertiary);
+  font-size: 12px;
+}
+
+.aiGenerateSubmit {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.aiGenerateCount {
+  min-width: 72px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .aiGeneratePreview {
@@ -172,6 +186,18 @@
   }
 }
 
+.aiGenerateSectionHint {
+  margin: -6px 0 12px;
+  color: var(--fn-text-tertiary);
+  font-size: 12px;
+}
+
+.aiGenerateTaskList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 @media (max-width: 720px) {
   .aiGeneratePage {
     padding-top: 16px;
@@ -188,7 +214,15 @@
     flex-direction: column;
   }
 
+  .aiGenerateSubmit {
+    justify-content: space-between;
+  }
+
   .aiGeneratePromptGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .aiGenerateTaskList {
     grid-template-columns: 1fr;
   }
 }
