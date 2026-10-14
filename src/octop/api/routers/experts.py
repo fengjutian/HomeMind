@@ -66,6 +66,10 @@ from octop.infra.agents.experts.published_creation import (
 from octop.infra.agents.experts.published_creation import (
     unpublish_expert as unpublish_owned_expert,
 )
+from octop.infra.agents.experts.requirement_generator import (
+    generate_expert_from_requirement,
+    resolve_requirement_generator_llm,
+)
 from octop.infra.agents.experts.skillhub_market import (
     SkillHubMarketError,
     SkillHubMarketErrorKind,
@@ -286,6 +290,26 @@ class QuickPromptResponse(BaseModel):
     prompt: LocalizedTextResponse
     color: str = "#e8f4ff"
     icon_name: str | None = None
+
+
+class GenerateExpertBody(BaseModel):
+    requirement: str = Field(min_length=10, max_length=8000)
+    model: str | None = Field(
+        default=None,
+        description="Optional provider/model reference; uses the active model when omitted",
+    )
+
+
+class GeneratedExpertDraftResponse(BaseModel):
+    label: LocalizedTextResponse
+    description: LocalizedTextResponse
+    welcome_message: LocalizedTextResponse
+    icon_name: str
+    color: str
+    quick_prompts: list[QuickPromptResponse]
+    task_examples: dict[str, list[str]]
+    soul_md: str
+    model: str
 
 
 class ExpertHubItemResponse(BaseModel):
@@ -823,6 +847,49 @@ async def install_expert_hub_item(
         "bootstrap_pending": not server.app_runtime.agent_registry.is_bootstrapped(row.agent_id),
         **report.as_api_fields(),
     }
+
+
+@router.post(
+    "/experts/generate",
+    response_model=GeneratedExpertDraftResponse,
+    summary="Generate an editable expert draft",
+    description=(
+        "Uses a configured language model to turn a natural-language requirement into "
+        "bilingual expert metadata, quick prompts, task examples, and a SOUL.md draft. "
+        "The draft is not persisted or executed until the user creates an expert."
+    ),
+)
+async def generate_expert_draft(
+    body: GenerateExpertBody,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    """Generate a preview-only expert draft from the user's requirement."""
+    resolved = resolve_requirement_generator_llm(server, body.model)
+    if resolved is None:
+        raise OctopError(
+            ErrorCode.INTERNAL_ERROR,
+            "no usable model is configured for expert generation",
+            status=503,
+        )
+    llm, model_ref = resolved
+    locale = resolve_user_locale(
+        user_repo=server.services.user_repo,
+        user_id=user.id,
+    )
+    try:
+        draft = await generate_expert_from_requirement(
+            llm=llm,
+            requirement=body.requirement,
+            locale=locale,
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise OctopError(
+            ErrorCode.INTERNAL_ERROR,
+            f"expert generation failed: {exc}",
+            status=422,
+        ) from exc
+    return {**draft, "model": model_ref}
 
 
 @router.get("/experts/{expert_id}")

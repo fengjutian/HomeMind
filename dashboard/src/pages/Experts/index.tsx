@@ -30,6 +30,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
   Store,
   Users,
 } from "lucide-react";
@@ -59,13 +60,14 @@ import { TeamCard } from "./components/TeamCard";
 import { PublishedExpertCard } from "./components/PublishedExpertCard";
 import AgentExpertsTable from "./components/AgentExpertsTable";
 import ExpertMarketTab from "./components/ExpertMarketTab";
+import GenerateExpertTab from "./components/GenerateExpertTab";
 import { OctopEmptyMascot } from "../../components/EmptyState";
 import { pickLocale } from "../../utils/localizedText";
 import { isOwnedExpert, ownedExperts } from "../../utils/sharedExpert";
 import { apiErrorMessage } from "../../utils/apiError";
 import styles from "./index.module.less";
 
-type TabKey = "my" | "teams" | "library" | "market";
+type TabKey = "my" | "teams" | "library" | "market" | "generate";
 type ViewMode = "card" | "table";
 const VIEW_STORAGE_KEY = "octop:experts-view";
 
@@ -863,6 +865,15 @@ export default function ExpertsPage() {
               <TabLabel icon={Store}>{t("experts.expertMarket")}</TabLabel>
             ),
             children: marketContent,
+          },
+          {
+            key: "generate",
+            label: (
+              <TabLabel icon={Sparkles}>{t("experts.aiGenerate.tab")}</TabLabel>
+            ),
+            children: (
+              <GenerateExpertTab lang={lang} onCreated={handleCreated} />
+            ),
           },
         ]}
       />
