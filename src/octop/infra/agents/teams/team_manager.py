@@ -16,6 +16,7 @@ import asyncio
 import inspect
 import json
 import logging
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import fields
 from types import SimpleNamespace
@@ -125,9 +126,91 @@ class TeamManager:
         self._hitl_waiters: dict[str, asyncio.Future[list[dict[str, Any]]]] = {}
         self._peer_prompts: dict[tuple[str, str], tuple[str, str]] = {}
         self._live_host_replies: set[str] = set()
+        self._member_activity: dict[str, dict[str, dict[str, Any]]] = {}
 
     def replace_thread_message_repo(self, repo: Any) -> None:
         self._thread_message_repo = repo
+
+    def active_members(self, room_thread_id: str) -> list[dict[str, Any]]:
+        """Return serializable server-authoritative member activity for a room."""
+        rows = self._member_activity.get(room_thread_id, {})
+        return [
+            {key: value for key, value in row.items() if not key.startswith("_")}
+            for row in rows.values()
+        ]
+
+    def cancel_member(self, room_thread_id: str, speaker_id: str) -> bool:
+        row = self._member_activity.get(room_thread_id, {}).get(speaker_id)
+        if row is None:
+            return False
+        self._agent_manager.cancel_stream(speaker_id, str(row["member_thread_id"]))
+        logger.info(
+            "team member cancel requested room=%s speaker=%s member_thread=%s",
+            room_thread_id,
+            speaker_id,
+            row["member_thread_id"],
+        )
+        return True
+
+    def _start_member_activity(
+        self, room_thread_id: str, speaker_id: str, member_thread_id: str
+    ) -> dict[str, Any]:
+        now = time.time()
+        row: dict[str, Any] = {
+            "speaker_agent_id": speaker_id,
+            "member_thread_id": member_thread_id,
+            "stage": "queued",
+            "started_at": now,
+            "last_activity_at": now,
+            "timings_ms": {},
+            "_stage_started": time.monotonic(),
+            "_first_token_seen": False,
+        }
+        self._member_activity.setdefault(room_thread_id, {})[speaker_id] = row
+        logger.info(
+            "team member task start room=%s speaker=%s member_thread=%s",
+            room_thread_id,
+            speaker_id,
+            member_thread_id,
+        )
+        return row
+
+    def _set_member_stage(self, row: dict[str, Any], stage: str) -> None:
+        now_mono = time.monotonic()
+        previous = str(row.get("stage") or "queued")
+        elapsed = round((now_mono - float(row["_stage_started"])) * 1000)
+        timings = row["timings_ms"]
+        timings[previous] = int(timings.get(previous, 0)) + elapsed
+        row["stage"] = stage
+        row["last_activity_at"] = time.time()
+        row["_stage_started"] = now_mono
+
+    @staticmethod
+    def _tool_stage(chunk: dict[str, Any]) -> str:
+        text = json.dumps(chunk, ensure_ascii=False, default=str).lower()
+        if any(word in text for word in ("pytest", "npm test", "make all", "typecheck")):
+            return "running_tests"
+        if any(word in text for word in ("read_file", "get-content", "search", "rg ")):
+            return "reading_code"
+        return "tool_running"
+
+    def _finish_member_activity(
+        self, room_thread_id: str, speaker_id: str, row: dict[str, Any]
+    ) -> None:
+        self._set_member_stage(row, "finalizing")
+        total_ms = round((time.time() - float(row["started_at"])) * 1000)
+        logger.info(
+            "team member task finish room=%s speaker=%s total_ms=%d timings_ms=%s",
+            room_thread_id,
+            speaker_id,
+            total_ms,
+            row["timings_ms"],
+        )
+        room = self._member_activity.get(room_thread_id)
+        if room is not None:
+            room.pop(speaker_id, None)
+            if not room:
+                self._member_activity.pop(room_thread_id, None)
 
     # -- ask_agent session (member page) -------------------------------------
 
@@ -348,6 +431,7 @@ class TeamManager:
         """
         payload = _chat_request_payload(request, speaker_id)
         member_tid = str(payload.get("thread_id") or "").strip()
+        activity = self._start_member_activity(room_thread_id, speaker_id, member_tid)
         text_parts: list[str] = []
         reasoning_parts: list[str] = []
         relayed_visible = False
@@ -356,6 +440,7 @@ class TeamManager:
         room_open = True
         if hold_room and self._host_turn_busy(host_id, room_thread_id):
             room_open = await self._wait_host_dispatch_idle(host_id, room_thread_id)
+        self._set_member_stage(activity, "waiting_model")
         buffered: list[dict[str, Any]] = []
         resume_pending: str | None = None
 
@@ -417,6 +502,17 @@ class TeamManager:
                     if not isinstance(chunk, dict):
                         continue
                     kind = str(chunk.get("type") or "")
+                    if kind in {"token", "reasoning"}:
+                        self._set_member_stage(activity, "model_generating")
+                        if not activity["_first_token_seen"]:
+                            activity["_first_token_seen"] = True
+                            activity["first_token_at"] = time.time()
+                    elif kind == "tool_call_chunk":
+                        self._set_member_stage(activity, self._tool_stage(chunk))
+                    elif kind == "tool_result":
+                        self._set_member_stage(activity, "waiting_model")
+                    else:
+                        activity["last_activity_at"] = time.time()
                     if kind == "token":
                         piece = str(chunk.get("content") or "")
                         if piece:
@@ -471,6 +567,7 @@ class TeamManager:
             raise
         finally:
             await release_held_room()
+            self._finish_member_activity(room_thread_id, speaker_id, activity)
             done: dict[str, Any] = {"type": "done"}
             if extra_stamp:
                 done = {**done, **extra_stamp}

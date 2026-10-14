@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { App } from "antd";
-import { FileText, X } from "lucide-react";
+import { FileText, Pencil, X } from "lucide-react";
 
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import {
@@ -857,7 +857,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     </span>
                   </span>
                   <span className={styles.longTextAction}>
-                    {t("chat.longText.expand")}
+                    <Pencil size={13} />
                   </span>
                 </button>
                 <button

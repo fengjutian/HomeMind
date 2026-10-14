@@ -115,7 +115,32 @@ async def dashboard_chat_ws(
                         "type": "turn_status",
                         "thread_id": thread_id,
                         "active": hub.is_turn_active(thread_id),
+                        "team_activity": gateway.processor.teams.active_members(thread_id),
                     },
+                )
+                continue
+
+            if msg_type == "cancel_member":
+                thread_id = str(payload.get("thread_id") or "").strip()
+                speaker_id = str(payload.get("speaker_agent_id") or "").strip()
+                row = gateway.thread_registry.get_thread(thread_id)
+                if (
+                    not thread_id
+                    or not speaker_id
+                    or row is None
+                    or row.agent_id != agent_id
+                    or row.user_id != user.id
+                ):
+                    await send_frame({"type": "error", "message": "invalid member cancel"})
+                    continue
+                cancelled = gateway.processor.teams.cancel_member(thread_id, speaker_id)
+                await send_frame(
+                    {
+                        "type": "member_cancelled",
+                        "thread_id": thread_id,
+                        "speaker_agent_id": speaker_id,
+                        "cancelled": cancelled,
+                    }
                 )
                 continue
 

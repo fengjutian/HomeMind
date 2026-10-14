@@ -174,7 +174,9 @@ describe("long composer text", () => {
 
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.getByText(longText)).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("long-text-card"));
+    fireEvent.click(
+      screen.getByRole("button", { name: "chat.longText.expand" }),
+    );
     expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
       longText,
     );

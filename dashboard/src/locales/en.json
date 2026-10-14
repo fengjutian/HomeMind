@@ -1621,6 +1621,17 @@
     "generatingWithElapsed": "Generating · {{seconds}}s",
     "membersResponding": "Members responding",
     "memberResponding": "{{name}} is responding",
+    "memberLastActivity": "last activity {{seconds}}s ago",
+    "cancelMember": "Stop expert",
+    "memberStage": {
+      "queued": "Queued",
+      "waiting_model": "Waiting for model",
+      "model_generating": "Model generating",
+      "reading_code": "Reading code",
+      "running_tests": "Running tests",
+      "tool_running": "Running tool",
+      "finalizing": "Finalizing"
+    },
     "membersRespondingNamed": "{{names}} are responding",
     "nameJoin": ", ",
     "processOrganizing": "Organizing results",

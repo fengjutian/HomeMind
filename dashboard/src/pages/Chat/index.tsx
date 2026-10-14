@@ -354,6 +354,7 @@ function ChatPageInner() {
     contextUsage,
     pendingPlanPath,
     liveSpeakers,
+    teamActivity,
     sendMessage,
     editAndResend,
     cancelStream,
@@ -1461,6 +1462,7 @@ function ChatPageInner() {
                     onRefreshHistory={refreshHistory}
                     isStreaming={isStreaming}
                     liveSpeakers={liveSpeakers}
+                    teamActivity={teamActivity}
                     thinkingStartedAt={thinkingStartedAt}
                     sessionKey={activeThreadId ?? undefined}
                     onRegenerate={handleRegenerate}

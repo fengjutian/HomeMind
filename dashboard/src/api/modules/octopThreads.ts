@@ -99,12 +99,24 @@ export interface OctopThreadHistory {
   history_retry_after_ms?: number;
   /** True while a turn is still streaming server-side for this thread. */
   turn_active?: boolean;
+  /** Server-authoritative team members still running in this room. */
+  team_activity?: TeamMemberActivity[];
   /** Pending tool approval for this thread (survives page reload). */
   hitl_pending?: HitlPendingPayload | null;
   /** Legacy path list (compat). Prefer ``artifact_refs`` when present. */
   artifacts?: Array<string | ThreadArtifact>;
   /** Structured refs with producer ``agent_id``. */
   artifact_refs?: ThreadArtifact[];
+}
+
+export interface TeamMemberActivity {
+  speaker_agent_id: string;
+  member_thread_id: string;
+  stage: string;
+  started_at: number;
+  last_activity_at: number;
+  first_token_at?: number;
+  timings_ms: Record<string, number>;
 }
 
 /** Result of deleting a thread when the client asks about compaction. */

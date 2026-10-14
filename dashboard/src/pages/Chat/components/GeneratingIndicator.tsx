@@ -1,5 +1,7 @@
 import { useTranslation } from "react-i18next";
+import { Button } from "antd";
 import { useElapsedSince } from "../../../hooks/useElapsedSeconds";
+import type { TeamMemberActivity } from "../hooks/sseHelpers";
 import styles from "../index.module.less";
 
 interface GeneratingIndicatorProps {
@@ -13,6 +15,8 @@ interface GeneratingIndicatorProps {
   membersOnly?: boolean;
   /** Named speakers still generating (e.g. ["临床助手"]). */
   speakerNames?: ReadonlyArray<string>;
+  activity?: TeamMemberActivity;
+  onCancelMember?: () => void;
 }
 
 /**
@@ -24,6 +28,8 @@ export default function GeneratingIndicator({
   showElapsed = false,
   membersOnly = false,
   speakerNames = [],
+  activity,
+  onCancelMember,
 }: GeneratingIndicatorProps) {
   const { t } = useTranslation();
   const elapsedAnchor =
@@ -34,6 +40,12 @@ export default function GeneratingIndicator({
   );
 
   const named = speakerNames.filter((n) => n.trim());
+  const memberElapsed = useElapsedSince(
+    activity?.started_at ? activity.started_at * 1000 : elapsedAnchor,
+  );
+  const idleSeconds = activity?.last_activity_at
+    ? Math.max(0, Math.floor(Date.now() / 1000 - activity.last_activity_at))
+    : 0;
   let label: string;
   if (membersOnly || named.length > 0) {
     if (named.length === 1) {
@@ -71,6 +83,23 @@ export default function GeneratingIndicator({
         <span className={styles.thinkingDot} />
         <span className={styles.thinkingDot} />
         <span className={styles.generatingText}>{label}</span>
+        {activity ? (
+          <span className={styles.generatingText}>
+            · {t(`chat.memberStage.${activity.stage}`, activity.stage)} ·{" "}
+            {memberElapsed}s
+            {idleSeconds > 0
+              ? ` · ${t("chat.memberLastActivity", {
+                  seconds: idleSeconds,
+                  defaultValue: "last activity {{seconds}}s ago",
+                })}`
+              : ""}
+          </span>
+        ) : null}
+        {onCancelMember ? (
+          <Button size="small" danger type="text" onClick={onCancelMember}>
+            {t("chat.cancelMember", "Stop expert")}
+          </Button>
+        ) : null}
       </div>
     </div>
   );

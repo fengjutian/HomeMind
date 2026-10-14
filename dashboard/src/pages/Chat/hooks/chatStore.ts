@@ -265,6 +265,7 @@ const EMPTY_SNAPSHOT: SessionSnapshot = Object.freeze({
   historyHydrated: false,
   pendingPlanPath: null,
   liveSpeakers: [] as string[],
+  teamActivity: [],
 });
 
 const sessionStates = new Map<string, SessionStreamState>();
@@ -397,6 +398,7 @@ function buildSnapshot(state: SessionStreamState): SessionSnapshot {
     historyHydrated: state.historyHydrated,
     pendingPlanPath: state.pendingPlanPath ?? null,
     liveSpeakers: [...state.liveSpeakers].sort(),
+    teamActivity: state.teamActivity,
   };
 }
 
@@ -412,6 +414,26 @@ function markSpeakerLive(state: SessionStreamState, speaker?: string): void {
   if (!key) {
     const host = state.roomAgentId?.trim();
     if (host) state.liveSpeakers.add(host);
+  }
+}
+
+function touchTeamActivity(
+  state: SessionStreamState,
+  speaker: string | undefined,
+  stage: string,
+): void {
+  const key = speakerLiveKey(speaker);
+  if (!key) return;
+  const now = Date.now() / 1000;
+  const existing = state.teamActivity.find(
+    (row) => row.speaker_agent_id === key,
+  );
+  if (existing) {
+    state.teamActivity = state.teamActivity.map((row) =>
+      row.speaker_agent_id === key
+        ? { ...row, stage, last_activity_at: now }
+        : row,
+    );
   }
 }
 
@@ -479,6 +501,7 @@ function getOrCreate(sessionId: string): SessionStreamState {
       roomAgentId: undefined,
       isTeamRoom: false,
       liveSpeakers: new Set(),
+      teamActivity: [],
     };
     sessionStates.set(sessionId, state);
   }
@@ -848,6 +871,23 @@ function sendCancelFrame(ws: WebSocket, threadId: string): void {
   }
 }
 
+export function cancelTeamMember(
+  sessionId: string,
+  speakerAgentId: string,
+): boolean {
+  const live = liveSockets.get(sessionId);
+  const speaker = speakerAgentId.trim();
+  if (!live || !speaker || live.ws.readyState !== WebSocket.OPEN) return false;
+  live.ws.send(
+    JSON.stringify({
+      type: "cancel_member",
+      thread_id: live.threadId,
+      speaker_agent_id: speaker,
+    }),
+  );
+  return true;
+}
+
 function closeLiveSocket(
   sessionId: string,
   opts: { intentional: boolean; userCancelled?: boolean },
@@ -1182,6 +1222,7 @@ function handleHarnessChunk(
       const snapshot = Boolean(chunk.team_snapshot);
       // Snapshots are complete wall copies — never leave the speaker "live".
       if (!snapshot) markSpeakerLive(state, speaker);
+      touchTeamActivity(state, speaker, "model_generating");
       appendStreamingToken(
         state,
         chunk.content,
@@ -1194,6 +1235,7 @@ function handleHarnessChunk(
     }
     case "reasoning":
       markSpeakerLive(state, speaker);
+      touchTeamActivity(state, speaker, "model_generating");
       appendStreamingReasoning(state, chunk.content, speaker);
       break;
     case "usage":
@@ -1201,11 +1243,13 @@ function handleHarnessChunk(
       break;
     case "tool_call_chunk":
       markSpeakerLive(state, speaker);
+      touchTeamActivity(state, speaker, "tool_running");
       upsertToolCall(state, chunk, sessionId, speaker);
       break;
     case "tool_result":
       // Keep the speaker live across the tool→next-token gap.
       markSpeakerLive(state, speaker);
+      touchTeamActivity(state, speaker, "waiting_model");
       closeToolCall(state, chunk.messages, sessionId, speaker);
       break;
     case "done":
@@ -1230,6 +1274,9 @@ function handleHarnessChunk(
         sessionHostAgentId(state, sessionId),
       );
       clearSpeakerLive(state, speaker);
+      state.teamActivity = state.teamActivity.filter(
+        (row) => row.speaker_agent_id !== speaker,
+      );
       // Host done always frees the composer. Member bubbles may still stream.
       if (!speaker || (!hasStreamingMessages(state) && state.isStreaming)) {
         clearStreamingFlags(state);
@@ -2396,6 +2443,21 @@ export async function attachThread(
         if (!frameBelongsToThread(data, live.threadId)) return;
 
         if (data.type === "turn_status") {
+          const activity = Array.isArray(data.team_activity)
+            ? data.team_activity.filter(
+                (row): row is import("./sseHelpers").TeamMemberActivity =>
+                  Boolean(
+                    row &&
+                      typeof row === "object" &&
+                      typeof (row as Record<string, unknown>)
+                        .speaker_agent_id === "string",
+                  ),
+              )
+            : [];
+          state.teamActivity = activity;
+          state.liveSpeakers = new Set(
+            activity.map((row) => row.speaker_agent_id.trim()).filter(Boolean),
+          );
           if (turnStatusAction(Boolean(data.active)) === "expect_stream") {
             if (!state.isStreaming) {
               state.runUsage = null;

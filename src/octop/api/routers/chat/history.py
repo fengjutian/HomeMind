@@ -386,6 +386,7 @@ async def get_thread_history(
         user_id=effective_uid,
     )
     workspace_dir = _agent_facing_workspace_dir(server, agent_id)
+    team_activity = server.app_runtime.gateway.processor.teams.active_members(thread_id)
     return {
         "thread_id": thread_id,
         "messages": messages,
@@ -397,6 +398,7 @@ async def get_thread_history(
         "history_status": projection_status,
         "history_retry_after_ms": 1500 if history_loading else 0,
         "turn_active": server.app_runtime.gateway.ws_hub.is_turn_active(thread_id),
+        "team_activity": team_activity,
         "hitl_pending": hitl_pending,
         **thread_artifacts_payload(
             row.artifacts,

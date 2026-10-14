@@ -140,6 +140,17 @@ export interface SessionStreamState {
    * panels open across tool gaps after the composer has unlocked.
    */
   liveSpeakers: Set<string>;
+  teamActivity: TeamMemberActivity[];
+}
+
+export interface TeamMemberActivity {
+  speaker_agent_id: string;
+  member_thread_id: string;
+  stage: string;
+  started_at: number;
+  last_activity_at: number;
+  first_token_at?: number;
+  timings_ms: Record<string, number>;
 }
 
 /** Read-only snapshot shape exposed via ``chatStore.getSnapshot``. */
@@ -157,4 +168,5 @@ export interface SessionSnapshot {
   pendingPlanPath?: string | null;
   /** Sorted speaker keys still generating (see SessionStreamState.liveSpeakers). */
   liveSpeakers: string[];
+  teamActivity: TeamMemberActivity[];
 }

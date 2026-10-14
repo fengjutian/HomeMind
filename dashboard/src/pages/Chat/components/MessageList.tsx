@@ -19,6 +19,8 @@ import MessageBubble from "./MessageBubble";
 import AssistantTurnView from "./AssistantTurnView";
 import ScrollToBottomButton from "./ScrollToBottomButton";
 import GeneratingIndicator from "./GeneratingIndicator";
+import { cancelTeamMember } from "../hooks/chatStore";
+import type { TeamMemberActivity } from "../hooks/sseHelpers";
 import TurnTimelineRail from "./TurnTimelineRail";
 import { isLiveAssistantTurn } from "./liveAssistantTurn";
 import { chatGeneratingPhase } from "./generatingGate";
@@ -98,6 +100,7 @@ interface MessageListProps {
   isStreaming?: boolean;
   /** Speakers still generating (tool gaps after composer unlock). */
   liveSpeakers?: ReadonlyArray<string>;
+  teamActivity?: ReadonlyArray<TeamMemberActivity>;
   thinkingStartedAt?: number | null;
   sessionKey?: string;
   onRegenerate?: (messageId: string) => void;
@@ -261,6 +264,7 @@ export default function MessageList(props: MessageListProps) {
     onRefreshHistory,
     isStreaming,
     liveSpeakers = [],
+    teamActivity = [],
     thinkingStartedAt = null,
     sessionKey,
     onRegenerate,
@@ -804,6 +808,16 @@ export default function MessageList(props: MessageListProps) {
               showElapsed={isAwaitingAssistantReply}
               membersOnly={generatingMembersOnly}
               speakerNames={liveSpeakerNames}
+              activity={teamActivity[0]}
+              onCancelMember={
+                generatingMembersOnly && sessionKey && teamActivity[0]
+                  ? () =>
+                      cancelTeamMember(
+                        sessionKey,
+                        teamActivity[0].speaker_agent_id,
+                      )
+                  : undefined
+              }
             />
           </div>
         )}
@@ -816,6 +830,8 @@ export default function MessageList(props: MessageListProps) {
       isAwaitingAssistantReply,
       generatingMembersOnly,
       liveSpeakerNames,
+      teamActivity,
+      sessionKey,
       refreshFooter,
     ],
   );

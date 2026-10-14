@@ -872,6 +872,7 @@ export function useChat(
     historyHydrated,
     pendingPlanPath,
     liveSpeakers,
+    teamActivity,
   } = useSyncExternalStore(subscribeStore, getStoreSnapshot);
 
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -1245,6 +1246,7 @@ export function useChat(
     historyHydrated,
     pendingPlanPath,
     liveSpeakers,
+    teamActivity,
     sendMessage,
     editAndResend,
     cancelStream,

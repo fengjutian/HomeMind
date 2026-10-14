@@ -1762,6 +1762,7 @@ class AgentManager:
             self._apply_pending_bootstrap_graph_refresh(agent_id)
             req = self._prepare_stream_request(agent_id, request)
             with hitl_thread_scope(thread_id_from_request(req)):
+                await self._compact_before_context_pressure(agent_id, req)
                 has_side_effect = False
                 try:
                     async for chunk in self._harness_manager.stream(agent_id, cast(Any, req)):
@@ -1777,6 +1778,55 @@ class AgentManager:
                     async for chunk in self._harness_manager.stream(agent_id, cast(Any, req)):
                         yield chunk
             self._apply_pending_bootstrap_graph_refresh(agent_id)
+
+    async def _compact_before_context_pressure(
+        self,
+        agent_id: str,
+        request: dict[str, Any],
+    ) -> None:
+        """Best-effort compact before a thread reaches the provider hard limit."""
+        thread_id = thread_id_from_request(request)
+        if not thread_id:
+            return
+        try:
+            agent = self.get_agent(agent_id)
+            middleware = getattr(agent, "_context_usage_mw", None)
+            snapshot_getter = getattr(middleware, "get_snapshot", None)
+            compact = getattr(agent, "acompact_conversation", None)
+            if not callable(snapshot_getter) or not callable(compact):
+                return
+            usage = snapshot_getter(thread_id)
+            used = int(getattr(usage, "used_tokens", 0) or 0)
+            maximum = int(
+                getattr(usage, "max_tokens", 0) or self.resolve_context_max_tokens(agent_id)
+            )
+            ratio = used / maximum if maximum > 0 else 0.0
+            if ratio < 0.8:
+                return
+            started = time.monotonic()
+            logger.info(
+                "context precompact start agent=%s thread=%s used=%d max=%d ratio=%.3f",
+                agent_id,
+                thread_id,
+                used,
+                maximum,
+                ratio,
+            )
+            result = await compact(thread_id, model=request.get("model"))
+            logger.info(
+                "context precompact finish agent=%s thread=%s ok=%s elapsed_ms=%d",
+                agent_id,
+                thread_id,
+                bool(getattr(result, "ok", False)),
+                round((time.monotonic() - started) * 1000),
+            )
+        except Exception:
+            logger.warning(
+                "context precompact failed agent=%s thread=%s",
+                agent_id,
+                thread_id,
+                exc_info=True,
+            )
 
     async def call(self, agent_id: str, request: dict[str, Any]) -> dict[str, Any]:
         """Non-streaming harness invocation (one-shot agent call)."""

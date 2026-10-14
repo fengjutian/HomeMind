@@ -1621,6 +1621,17 @@
     "generatingWithElapsed": "生成中 · {{seconds}}s",
     "membersResponding": "成员回答中",
     "memberResponding": "{{name}} 正在回答",
+    "memberLastActivity": "最后活动于 {{seconds}} 秒前",
+    "cancelMember": "终止专家",
+    "memberStage": {
+      "queued": "排队中",
+      "waiting_model": "等待模型",
+      "model_generating": "模型生成中",
+      "reading_code": "读取代码",
+      "running_tests": "执行测试",
+      "tool_running": "执行工具",
+      "finalizing": "正在收尾"
+    },
     "membersRespondingNamed": "{{names}} 正在回答",
     "nameJoin": "、",
     "processOrganizing": "整理结果中",
