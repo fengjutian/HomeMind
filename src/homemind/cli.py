@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from importlib.metadata import PackageNotFoundError, version
 from typing import ClassVar
 
 import click
 
 from homemind.compat import prepare_environment
 from homemind.launch import run_foreground_blocking
+from homemind.version import HOMEMIND_VERSION
 from octop.cli.main import _ensure_utf8_stdio, _LazyCLI
 from octop.cli.registry import COMMANDS
 
@@ -16,10 +16,7 @@ prepare_environment()
 
 
 def _version() -> str:
-    try:
-        return version("homemind")
-    except PackageNotFoundError:
-        return "unknown"
+    return HOMEMIND_VERSION
 
 
 def _print_version(ctx: click.Context, _param: click.Parameter, value: bool) -> None:

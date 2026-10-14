@@ -7,11 +7,12 @@ from click.testing import CliRunner
 from octop.cli.main import cli
 
 
-def test_version_prints_homemind_version() -> None:
+def test_version_prints_octop_upstream_version() -> None:
     runner = CliRunner()
     result = runner.invoke(cli, ["version"])
     assert result.exit_code == 0
-    assert "homemind" in result.output.lower()
+    assert "octop" in result.output.lower()
+    assert "2571a04c" in result.output.lower()
     assert any(ch.isdigit() for ch in result.output)
 
 
@@ -25,4 +26,4 @@ def test_root_version_flag() -> None:
     runner = CliRunner()
     result = runner.invoke(cli, ["-v"])
     assert result.exit_code == 0
-    assert "homemind" in result.output.lower()
+    assert "octop" in result.output.lower()

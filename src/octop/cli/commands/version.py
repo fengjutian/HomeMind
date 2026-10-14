@@ -7,11 +7,7 @@ import click
 
 @click.command("version")
 def version() -> None:
-    """Show the installed HomeMind version."""
-    try:
-        from importlib.metadata import version as _v
+    """Show the integrated Octop upstream version and commit."""
+    from octop.upstream_version import OCTOP_UPSTREAM_COMMIT, OCTOP_UPSTREAM_VERSION
 
-        v = _v("homemind")
-    except Exception:
-        v = "unknown"
-    click.echo(f"HomeMind v{v}")
+    click.echo(f"Octop v{OCTOP_UPSTREAM_VERSION} ({OCTOP_UPSTREAM_COMMIT[:8]})")

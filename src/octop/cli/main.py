@@ -39,18 +39,15 @@ def _ensure_utf8_stdio(
 
 
 def _get_version() -> str:
-    try:
-        from importlib.metadata import version as pkg_version
+    from octop.upstream_version import OCTOP_UPSTREAM_VERSION
 
-        return pkg_version("homemind")
-    except Exception:
-        return "unknown"
+    return OCTOP_UPSTREAM_VERSION
 
 
 def _print_version(ctx: click.Context, _param: click.Parameter, value: bool) -> None:
     if not value or ctx.resilient_parsing:
         return
-    click.echo(f"HomeMind v{_get_version()}")
+    click.echo(f"Octop v{_get_version()}")
     ctx.exit()
 
 
@@ -88,7 +85,7 @@ class _LazyCLI(click.Group):
     is_eager=True,
     expose_value=False,
     callback=_print_version,
-    help="Show the installed HomeMind version.",
+    help="Show the integrated Octop upstream version.",
 )
 @click.option(
     "--user",

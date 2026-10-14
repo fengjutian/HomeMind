@@ -1,14 +1,10 @@
 """HomeMind — a self-hosted family AI assistant."""
 
-from importlib.metadata import PackageNotFoundError, version
-
 from homemind.compat import prepare_environment
+from homemind.version import HOMEMIND_VERSION
 
 prepare_environment()
 
-__all__ = ["prepare_environment"]
+__version__ = HOMEMIND_VERSION
 
-try:
-    __version__ = version("homemind")
-except PackageNotFoundError:
-    __version__ = "0.0.0"
+__all__ = ["HOMEMIND_VERSION", "__version__", "prepare_environment"]
