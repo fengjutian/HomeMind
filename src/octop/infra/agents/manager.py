@@ -975,6 +975,100 @@ class AgentManager:
         self._schedule_reload(agent_id)
         return row
 
+    async def migrate_workspace_root(self, agent_id: str, config: dict[str, Any]) -> AgentRow:
+        """Copy an agent workspace to the layout implied by a new local root.
+
+        The source directory is intentionally retained as a recovery copy.  The
+        database is updated only after the copy succeeds.
+        """
+        from octop.infra.agents.workspace.dir import (  # noqa: PLC0415
+            default_agent_workspace_dir,
+            local_backend_root_dir,
+            resolve_workspace_host_path,
+            scoped_workspace_dir_str,
+            uses_scoped_workspace_default,
+        )
+
+        row = self._repos.agent_repo.get(agent_id)
+        if row is None:
+            raise OctopError(ErrorCode.AGENT_NOT_FOUND, f"agent {agent_id!r} not found")
+        current = parse_config_json(row.config_json)
+        current_root = local_backend_root_dir(current)
+        requested = self._preserve_internal_layout(agent_id, dict(config))
+        requested_root = local_backend_root_dir(requested)
+        if current_root is None or requested_root is None:
+            raise OctopError(
+                ErrorCode.WORKSPACE_OP_UNSUPPORTED,
+                "workspace root migration requires a local backend",
+            )
+        if Path(current_root).expanduser().resolve() == Path(requested_root).expanduser().resolve():
+            return await self.update(agent_id, config_json=dumps_config(requested))
+
+        source_raw = current.get("workspace_dir")
+        if not isinstance(source_raw, str) or not source_raw.strip():
+            source = default_agent_workspace_dir(
+                self._paths, agent_id, cfg=current, ensure=False
+            ).resolve()
+        else:
+            source = resolve_workspace_host_path(source_raw, current)
+
+        requested.pop("workspace_dir", None)
+        target = default_agent_workspace_dir(
+            self._paths, agent_id, cfg=requested, ensure=False
+        ).resolve()
+        requested["workspace_dir"] = (
+            scoped_workspace_dir_str(agent_id)
+            if uses_scoped_workspace_default(requested)
+            else str(target)
+        )
+        if uses_scoped_workspace_default(requested):
+            requested.setdefault("project_dir", "/")
+
+        if source == target:
+            return await self.update(agent_id, config_json=dumps_config(requested))
+        if target.exists():
+            raise OctopError(
+                ErrorCode.WORKSPACE_MIGRATION_CONFLICT,
+                f"destination workspace already exists: {target}",
+            )
+
+        copied = False
+        try:
+            async with self._lifecycle_lock_for(agent_id):
+                if self._octop_harness_or_none(agent_id) is not None:
+                    await asyncio.to_thread(self._quiesce_octop_memory, agent_id)
+                    assert self._harness_manager is not None
+                    await self._harness_manager.aremove_agent(agent_id)
+                await asyncio.to_thread(shutil.copytree, source, target)
+                copied = True
+                self._repos.agent_repo.update_config(
+                    agent_id,
+                    config_json=dumps_config(requested),
+                    **extract_profile_from_config(requested),
+                )
+        except OctopError:
+            raise
+        except Exception as exc:
+            if copied:
+                with suppress(OSError):
+                    await asyncio.to_thread(shutil.rmtree, target)
+            self._schedule_reload(agent_id)
+            raise OctopError(
+                ErrorCode.WORKSPACE_MIGRATION_FAILED,
+                f"workspace migration failed: {exc}",
+            ) from exc
+
+        updated = self._repos.agent_repo.get(agent_id)
+        if updated is None:
+            raise OctopError(ErrorCode.AGENT_NOT_FOUND, f"agent {agent_id!r} not found")
+        self._schedule_reload(agent_id)
+        self._repos.audit_repo.write(
+            actor=ACTOR_SYSTEM,
+            action="agent.workspace_root_migrate",
+            target=agent_id,
+        )
+        return updated
+
     async def set_shared(self, agent_id: str, shared: bool) -> AgentRow:
         """Persist whether other users may access this agent."""
         existing = self._repos.agent_repo.get(agent_id)

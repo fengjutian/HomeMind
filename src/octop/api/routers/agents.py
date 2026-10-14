@@ -66,6 +66,7 @@ class AgentPatchBody(AgentRuntimeFields):
     default_model: str | None = None
     system_prompt: str | None = None
     config: dict[str, Any] | None = None
+    migrate_workspace: bool = False
     icon: str | None = None
     template_name: str | None = None
     is_shared: bool | None = None
@@ -400,6 +401,7 @@ async def patch_agent(
         if key
         not in {
             "config",
+            "migrate_workspace",
             "is_shared",
             "welcome_message",
             "skill_package_ids",
@@ -407,7 +409,11 @@ async def patch_agent(
             "mcp_servers",
         }
     }
-    if body.config is not None:
+    if body.config is not None and body.migrate_workspace:
+        row = await server.app_runtime.agent_registry.migrate_workspace_root(
+            agent_id, body.config
+        )
+    elif body.config is not None:
         updates["config_json"] = json.dumps(body.config)
     if body.welcome_message is not None:
         updates["welcome_message"] = body.welcome_message

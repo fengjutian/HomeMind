@@ -431,6 +431,9 @@ function EditAgentDrawerBody({
         pathMappings,
         values.root_dir,
       );
+      const previousRootDir = parseBackendSpec(agentConfig.backend).rootDir ?? "/";
+      const nextRootDir = values.root_dir ?? "/";
+      const migrateWorkspace = previousRootDir !== nextRootDir;
 
       const nextColor = isCuratedPalette(colorPalette)
         ? expertPaletteColor(colorPalette)
@@ -486,6 +489,7 @@ function EditAgentDrawerBody({
           default_model: defaultModelFromForm(values.default_model),
           color: nextColor,
           config: nextConfig,
+           migrate_workspace: migrateWorkspace,
           welcome_message: stored.welcome_message ?? "",
           knowledge_base_ids: stored.knowledge_base_ids ?? [],
           mcp_servers: stored.mcp_servers ?? [],

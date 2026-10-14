@@ -463,6 +463,8 @@
     "TLS_ISSUE_IN_PROGRESS": "A certificate issuance task is already running.",
     "TLS_DOMAIN_MISMATCH": "The domain does not match the existing certificate.",
     "WORKSPACE_OP_UNSUPPORTED": "This workspace backend does not support that file operation.",
+    "WORKSPACE_MIGRATION_CONFLICT": "The destination workspace already exists. Choose another storage root or remove the conflicting directory.",
+    "WORKSPACE_MIGRATION_FAILED": "Failed to migrate the workspace. The original workspace and configuration were preserved.",
     "SKILL_IMPORT_UNSUPPORTED_URL": "This skill URL source is not supported.",
     "SKILL_IMPORT_FAILED": "Skill import failed: {reason}",
     "SKILL_ALREADY_EXISTS": "Skill {name} already exists. Enable overwrite to replace it.",

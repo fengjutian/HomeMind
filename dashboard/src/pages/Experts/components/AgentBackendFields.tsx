@@ -185,7 +185,7 @@ export default function AgentBackendFields({
           >
             <RootDirSelect
               treeRoots={treeRoots}
-              disabled={disabled || rootDirMode === "edit"}
+              disabled={disabled && rootDirMode !== "edit"}
             />
           </Form.Item>
           <div style={{ margin: "-8px 0 12px" }}>
