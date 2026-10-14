@@ -32,6 +32,7 @@ from octop.infra.gateway.process.response_mode import (
     wrap_weixin_stream_processor,
 )
 from octop.infra.gateway.slash.dispatcher import SlashDispatcher, build_default_dispatcher
+from octop.infra.gateway.steer import SteerCoordinator
 from octop.infra.gateway.threads import ThreadRegistry
 from octop.infra.gateway.ws import (
     WS_CHANNEL_ID,
@@ -122,6 +123,7 @@ class Gateway:
         self._slash_meta: SlashRuntimeMeta | None = None
         self._ws_hub = WebSocketHub()
         self._cli_hub = CliHub()
+        self._steer = SteerCoordinator()
         self._ws_channel: WebSocketChannel | None = None
         self._cli_channel: CliChannel | None = None
         self._runtime_status: dict[str, ChannelRuntimeStatus] = {}
@@ -141,6 +143,10 @@ class Gateway:
     @property
     def ws_hub(self) -> WebSocketHub:
         return self._ws_hub
+
+    @property
+    def steer(self) -> SteerCoordinator:
+        return self._steer
 
     @property
     def cli_hub(self) -> CliHub:
@@ -250,6 +256,7 @@ class Gateway:
         self._ws_channel = WebSocketChannel(
             self._processor,
             hub=self._ws_hub,
+            steer=self._steer,
             channel_id=WS_CHANNEL_ID,
         )
         await self._channel_manager.add_channel(self._ws_channel)

@@ -141,6 +141,16 @@ export interface SessionStreamState {
    */
   liveSpeakers: Set<string>;
   teamActivity: TeamMemberActivity[];
+  /** Mid-turn steer: ``turn.started`` / ``turn.resumed`` id (issue #1300). */
+  activeTurnId?: string | null;
+  /** Server-acked undrained steers (internal; drives transcript lifecycle). */
+  pendingSteers: Array<{
+    clientPendingId: string;
+    pendingId: string;
+    preview: string;
+    /** Client-only full text (frames carry 200-char previews). */
+    text?: string;
+  }>;
 }
 
 export interface TeamMemberActivity {
@@ -169,4 +179,5 @@ export interface SessionSnapshot {
   /** Sorted speaker keys still generating (see SessionStreamState.liveSpeakers). */
   liveSpeakers: string[];
   teamActivity: TeamMemberActivity[];
+  activeTurnId?: string | null;
 }

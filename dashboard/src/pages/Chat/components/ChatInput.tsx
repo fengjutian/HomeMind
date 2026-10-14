@@ -77,6 +77,8 @@ interface ChatInputProps {
   queuedItems?: QueuedChatItem[];
   onRemoveQueued?: (id: string) => void;
   onReclaimQueued?: (id: string) => QueuedChatItem | null;
+  /** Commit a local queued draft as a mid-turn steer (chip-row ↑ Steer). */
+  onSteerQueued?: (id: string) => void;
   onCancel: () => void;
   onNewChat: () => void;
   onUserInput?: () => void;
@@ -147,6 +149,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       queuedItems = [],
       onRemoveQueued,
       onReclaimQueued,
+      onSteerQueued,
       onCancel,
       onNewChat,
       onUserInput,
@@ -811,14 +814,20 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        {onRemoveQueued && onReclaimQueued && (
-          <ChatQueuedMessages
-            items={queuedItems}
-            onRemove={onRemoveQueued}
-            onReclaim={handleReclaimQueued}
-          />
-        )}
         <div className={styles.inputWrapper}>
+          {showDrop && (
+            <div className={styles.dropOverlay} data-testid="chat-drop-overlay">
+              {t("upload.dropHint", "Drop files or a folder to upload")}
+            </div>
+          )}
+          {onRemoveQueued && onReclaimQueued && (
+            <ChatQueuedMessages
+              items={queuedItems}
+              onRemove={onRemoveQueued}
+              onReclaim={handleReclaimQueued}
+              onSteer={onSteerQueued}
+            />
+          )}
           <ChatInputPreviewBar
             attachments={attachments}
             uploading={uploading}
@@ -886,10 +895,14 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               }}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder={t(
-                "chatWelcome.inputPlaceholder",
-                "Message HomeMind...",
-              )}
+              placeholder={
+                isStreaming || holdSend
+                  ? t(
+                      "chat.steer.placeholder",
+                      "Keep typing to queue a mid-turn steer…",
+                    )
+                  : t("chatWelcome.inputPlaceholder", "Message HomeMind...")
+              }
               rows={1}
               disabled={disabled}
               enterKeyHint={isMobile ? "enter" : undefined}
