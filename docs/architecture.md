@@ -153,6 +153,58 @@ entry points. Octop's `GlobalProcessor` implements the
 checkpoint and are pushed to the dashboard / IM channel by
 `on_reply`.
 
+## 7. HomeMind as a household hub
+
+HomeMind is the household AI and governance control plane, not a radio
+coordinator or a replacement for Home Assistant. A recommended deployment is:
+
+```text
+Web / desktop / CLI / messaging channels
+                  |
+               HomeMind
+     identity, AI, data, policy, approval
+                  |
+          Home Assistant / MQTT
+                  |
+   Matter / Zigbee / Wi-Fi / Bluetooth devices
+```
+
+The boundary is intentional:
+
+- Home Assistant owns vendor integrations, device discovery, radio protocols,
+  and the translation from physical devices to entities.
+- HomeMind imports normalized device state and capabilities, applies family
+  permissions and transaction approval, and exposes only reviewed commands to
+  agents and automations.
+- Vendor credentials remain in Home Assistant or the encrypted connector
+  secret store. They are not copied into agent prompts or workspaces.
+- Locks, cameras, security panels, gas valves, and similar high-risk devices
+  remain read-only until their write paths receive a dedicated security review.
+- A paired HomeMind device runtime on a NAS or home PC is a separate edge
+  worker for authorized file operations. It is not a smart-home protocol hub.
+
+The server can run on a single always-on PC, NAS, or low-power x86 mini PC.
+The default SQLite control plane and single-process runtime require neither
+Redis nor an external queue. PostgreSQL is an optional operational choice for
+larger installations, not a prerequisite for a household deployment. Local
+LLM inference is also optional; using a cloud model keeps the hub's compute and
+memory requirements modest.
+
+Hardware depends on enabled capabilities rather than on HomeMind itself:
+
+- Wi-Fi and Matter-over-Wi-Fi devices generally need no radio attached to the
+  HomeMind host.
+- Zigbee needs a coordinator supported by Home Assistant; Matter-over-Thread
+  needs a Thread border router; Bluetooth devices need host Bluetooth or a
+  Bluetooth proxy.
+- The hub should use persistent storage, wired networking where practical, a
+  reserved LAN address, off-host backups, and preferably a UPS for continuous
+  operation.
+
+See [Smart-home setup](smart-home-setup.md) for the supported integration path
+and [Home AI OS roadmap](home-ai-os-roadmap.md) for hardware profiles and future
+edge, device, and automation work.
+
 ## See also
 
 - [AGENTS.md](../AGENTS.md) — module boundaries, hard bans, change workflow
