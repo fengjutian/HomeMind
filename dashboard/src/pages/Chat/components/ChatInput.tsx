@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { App } from "antd";
-import { FileText, Pencil, X } from "lucide-react";
+import { FileText, X } from "lucide-react";
 
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import {
@@ -220,6 +220,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [longTextCollapsed, setLongTextCollapsed] = useState(() =>
       isLongComposerText(initialText || readInputDraft(agentId, threadId)),
     );
+    const [longTextAppend, setLongTextAppend] = useState("");
     const wasLongTextRef = useRef(isLongComposerText(text));
     const [polishing, setPolishing] = useState(false);
     // Track whether the user has manually edited the text after a prefill.
@@ -230,10 +231,19 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     // (parent may still hold the prefill string in a ref across the next render).
     const ignoreInitialTextRef = useRef<string | null>(null);
 
-    const setComposerText = useCallback((value: string) => {
-      userHasEditedRef.current = true;
-      setText(value);
-    }, []);
+    const setComposerText = useCallback(
+      (value: string) => {
+        userHasEditedRef.current = true;
+        if (longTextCollapsed) setLongTextAppend(value);
+        else setText(value);
+      },
+      [longTextCollapsed],
+    );
+
+    const activeComposerText = longTextCollapsed ? longTextAppend : text;
+    const completeComposerText = longTextCollapsed
+      ? [text.trimEnd(), longTextAppend.trim()].filter(Boolean).join("\n")
+      : text;
 
     const textRef = useRef(text);
     useEffect(() => {
@@ -303,6 +313,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           ignoreInitialTextRef.current = null;
           prevInitialTextRef.current = newText;
           setText(newText);
+          setLongTextAppend("");
           setLongTextCollapsed(isLongComposerText(newText));
           setTimeout(() => {
             const el = textareaRef.current;
@@ -320,6 +331,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           ignoreInitialTextRef.current = null;
           prevInitialTextRef.current = newText;
           setText(newText);
+          setLongTextAppend("");
           setLongTextCollapsed(isLongComposerText(newText));
           if (nextAttachments && nextAttachments.length > 0) {
             restoreAttachments(
@@ -373,6 +385,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       ) {
         prevInitialTextRef.current = initialText;
         setText(initialText);
+        setLongTextAppend("");
         setLongTextCollapsed(isLongComposerText(initialText));
         // Focus the textarea so the user can immediately start editing
         setTimeout(() => {
@@ -395,6 +408,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       prevInitialTextRef.current = "";
       const draft = readInputDraft(agentId, threadId);
       setText(draft);
+      setLongTextAppend("");
       setLongTextCollapsed(isLongComposerText(draft));
       const pendingAttachments = consumePendingPrefillAttachments();
       if (pendingAttachments.length > 0) {
@@ -408,10 +422,10 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     useEffect(() => {
       if (!agentId) return;
       const timer = window.setTimeout(() => {
-        writeInputDraft(agentId, threadId, text);
+        writeInputDraft(agentId, threadId, completeComposerText);
       }, 250);
       return () => window.clearTimeout(timer);
-    }, [text, agentId, threadId]);
+    }, [completeComposerText, agentId, threadId]);
     const submitRef = useRef<() => void>(() => {});
 
     const MIN_TEXTAREA_HEIGHT = isMobile ? 42 : 30;
@@ -439,7 +453,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       handleTextChange,
       handleKeyDown,
     } = useSlashMentionInput({
-      text,
+      text: activeComposerText,
       setText: setComposerText,
       textareaRef,
       slashCommands,
@@ -490,8 +504,8 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     );
 
     const selectedSkillSlugs = useMemo(
-      () => parseSkillSlugsInText(text, skillTokenRefs),
-      [text, skillTokenRefs],
+      () => parseSkillSlugsInText(completeComposerText, skillTokenRefs),
+      [completeComposerText, skillTokenRefs],
     );
 
     const insertExpertMention = useCallback(
@@ -527,6 +541,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const resetComposerAfterSubmit = useCallback(
       (prevHeight: number, submittedText: string) => {
         setText("");
+        setLongTextAppend("");
         setLongTextCollapsed(false);
         writeInputDraft(agentId, threadId, "");
         clearAttachments();
@@ -559,7 +574,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     );
 
     const submitMessage = useCallback(() => {
-      const trimmed = text.trim();
+      const trimmed = completeComposerText.trim();
       if ((!trimmed && attachments.length === 0) || disabled) return;
       const wireText = materializeSkillSlashes(trimmed, skillTokenRefs).trim();
       const slashItem = matchSlashCommand(wireText);
@@ -599,7 +614,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onSend(wireText, attachments.length > 0 ? attachments : undefined);
       resetComposerAfterSubmit(prevHeight, trimmed);
     }, [
-      text,
+      completeComposerText,
       attachments,
       onSend,
       onQueue,
@@ -640,6 +655,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 )
               : item.text;
           setText(restoredText);
+          setLongTextAppend("");
           setLongTextCollapsed(isLongComposerText(restoredText));
           restoreAttachments(item.attachments ?? []);
           if (ctx) {
@@ -792,7 +808,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     ]);
 
     const canSend = Boolean(
-      (text.trim() || attachments.length > 0) && !disabled,
+      (completeComposerText.trim() || attachments.length > 0) && !disabled,
     );
 
     return (
@@ -826,23 +842,18 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             onKnowledgeBaseIdsChange={onKnowledgeBaseIdsChange}
           />
 
-          <div className={styles.inputRow} style={{ position: "relative" }}>
-            {longTextCollapsed ? (
+          <div
+            className={styles.inputRow}
+            style={{
+              position: "relative",
+              ...(longTextCollapsed
+                ? { flexDirection: "column", alignItems: "stretch" }
+                : {}),
+            }}
+          >
+            {longTextCollapsed && (
               <div data-testid="long-text-card" className={styles.longTextCard}>
-                <button
-                  type="button"
-                  className={styles.longTextEdit}
-                  disabled={disabled}
-                  onClick={() => {
-                    setLongTextCollapsed(false);
-                    requestAnimationFrame(() => {
-                      const el = textareaRef.current;
-                      el?.focus();
-                      el?.setSelectionRange(el.value.length, el.value.length);
-                    });
-                  }}
-                  aria-label={t("chat.longText.expand")}
-                >
+                <div className={styles.longTextEdit}>
                   <span className={styles.longTextIcon}>
                     <FileText size={18} />
                   </span>
@@ -856,10 +867,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       })}
                     </span>
                   </span>
-                  <span className={styles.longTextAction}>
-                    <Pencil size={13} />
-                  </span>
-                </button>
+                </div>
                 <button
                   type="button"
                   data-testid="long-text-remove"
@@ -868,6 +876,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   onClick={() => {
                     userHasEditedRef.current = true;
                     setText("");
+                    setLongTextAppend("");
                     setLongTextCollapsed(false);
                   }}
                   aria-label={t("chat.longText.remove")}
@@ -875,33 +884,32 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   <X size={13} />
                 </button>
               </div>
-            ) : (
-              <textarea
-                ref={textareaRef}
-                className={styles.textarea}
-                value={text}
-                onChange={(e) => {
-                  userHasEditedRef.current = true;
-                  handleTextChange(e.target.value);
-                }}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                placeholder={t(
-                  "chatWelcome.inputPlaceholder",
-                  "Message HomeMind...",
-                )}
-                rows={1}
-                disabled={disabled}
-                enterKeyHint={isMobile ? "enter" : undefined}
-              />
             )}
+            <textarea
+              ref={textareaRef}
+              className={styles.textarea}
+              value={activeComposerText}
+              onChange={(e) => {
+                userHasEditedRef.current = true;
+                handleTextChange(e.target.value);
+              }}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              placeholder={t(
+                "chatWelcome.inputPlaceholder",
+                "Message HomeMind...",
+              )}
+              rows={1}
+              disabled={disabled}
+              enterKeyHint={isMobile ? "enter" : undefined}
+            />
             {/*
             Slash badge (plan §14.5): octop's HarnessProcessor handles slash
             commands server-side. The composer doesn't intercept them — it
             just surfaces a small inline pill so the user sees they're
             issuing a command, not a regular message.
           */}
-            {isSlashCommandText(text) && (
+            {isSlashCommandText(activeComposerText) && (
               <span
                 data-testid="slash-badge"
                 style={{

@@ -154,7 +154,7 @@ describe("long composer text", () => {
     ).toBe(true);
   });
 
-  it("shows a document card while preserving the full text for editing and sending", () => {
+  it("keeps long text collapsed while allowing an appended sentence", () => {
     const longText = `preview from the beginning ${"a".repeat(
       LONG_TEXT_CHARACTER_THRESHOLD,
     )}`;
@@ -172,17 +172,22 @@ describe("long composer text", () => {
       />,
     );
 
-    expect(screen.queryByRole("textbox")).toBeNull();
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(textarea.value).toBe("");
     expect(screen.getByText(longText)).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "chat.longText.expand" }),
-    );
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
-      longText,
-    );
+    expect(
+      screen.queryByRole("button", { name: "chat.longText.expand" }),
+    ).toBeNull();
+
+    fireEvent.change(textarea, {
+      target: { value: "Please focus on security." },
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "send" }));
-    expect(onSend).toHaveBeenCalledWith(longText, undefined);
+    expect(onSend).toHaveBeenCalledWith(
+      `${longText}\nPlease focus on security.`,
+      undefined,
+    );
   });
 
   it("removes collapsed text from the composer", () => {
