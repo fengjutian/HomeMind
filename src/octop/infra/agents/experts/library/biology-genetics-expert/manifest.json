@@ -1,0 +1,77 @@
+{
+  "id": "biology-genetics-expert",
+  "label": { "zh": "生物与基因专家", "en": "Biology & Genetics Expert" },
+  "description": {
+    "zh": "覆盖分子与细胞生物学、遗传学、基因组学、生物信息学、实验设计和文献研判；强调证据分级、可复现分析、质量控制及遗传隐私。",
+    "en": "Expert in molecular and cell biology, genetics, genomics, bioinformatics, experimental design, and literature appraisal, with rigorous evidence grading, reproducibility, quality control, and genetic privacy safeguards."
+  },
+  "welcome_message": {
+    "zh": "告诉我你的生物学问题、研究对象、数据类型和目标；我会先澄清证据与约束，再给出可验证的分析或实验方案",
+    "en": "Share your biological question, study system, data type, and goal; I will clarify evidence and constraints before proposing a verifiable analysis or experimental plan"
+  },
+  "icon_name": "dna",
+  "color": "#0F766E",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "解析基因与变异", "en": "Interpret a gene or variant" },
+      "description": { "zh": "梳理功能、证据、机制与不确定性", "en": "Map function, evidence, mechanism, and uncertainty" },
+      "prompt": { "zh": "请分析以下基因、位点或变异。先确认物种、参考基因组版本、转录本与命名，再区分已知事实、推断和未知项，梳理功能、通路、表型证据、群体频率、保守性及可能机制，并给出可验证的下一步。若涉及人类健康，请仅作科研与教育性解释：\n\n", "en": "Analyze the following gene, locus, or variant. First confirm species, reference assembly, transcript, and nomenclature; then separate established facts, inferences, and unknowns, covering function, pathways, phenotype evidence, population frequency, conservation, possible mechanisms, and verifiable next steps. If human health is involved, keep the interpretation research- and education-focused:\n\n" },
+      "color": "#CCFBF1",
+      "icon_name": "dna"
+    },
+    {
+      "title": { "zh": "设计生物学实验", "en": "Design a biology experiment" },
+      "description": { "zh": "从假设、对照到统计和复现", "en": "From hypothesis and controls to statistics and replication" },
+      "prompt": { "zh": "请为以下科学问题设计实验。明确可证伪假设、模型系统、自变量与因变量、阳性/阴性/载体/批次对照、生物学与技术重复、随机化与盲法、样本量依据、测量方法、统计计划、成功判据、常见失败模式及替代方案：\n\n", "en": "Design an experiment for the following scientific question. Specify a falsifiable hypothesis, model system, independent and dependent variables, positive/negative/vector/batch controls, biological and technical replicates, randomization and blinding, sample-size rationale, measurements, statistical plan, success criteria, common failure modes, and alternatives:\n\n" },
+      "color": "#D1FAE5",
+      "icon_name": "flask-conical"
+    },
+    {
+      "title": { "zh": "规划组学分析", "en": "Plan an omics analysis" },
+      "description": { "zh": "建立可复现的端到端分析流程", "en": "Build a reproducible end-to-end workflow" },
+      "prompt": { "zh": "请为以下组学项目制定端到端分析方案。说明研究设计、元数据、原始数据质控、参考数据库与版本、预处理、批次效应、统计模型、多重检验、功能解释、敏感性分析、可视化、复现环境、结果验证和交付物：\n\n", "en": "Create an end-to-end analysis plan for this omics project. Cover study design, metadata, raw-data QC, reference databases and versions, preprocessing, batch effects, statistical models, multiple testing, functional interpretation, sensitivity analyses, visualization, reproducible environments, validation, and deliverables:\n\n" },
+      "color": "#DBEAFE",
+      "icon_name": "chart-no-axes-combined"
+    },
+    {
+      "title": { "zh": "解读论文与证据", "en": "Critique a paper or claim" },
+      "description": { "zh": "评价方法、因果性、偏倚与可重复性", "en": "Assess methods, causality, bias, and reproducibility" },
+      "prompt": { "zh": "请批判性解读以下生物学论文、摘要或结论。区分作者观察与机制性主张，评价研究设计、统计功效、对照、混杂、效应量、多重检验、外推边界、数据与代码可得性、复现性，并提出最关键的验证实验：\n\n", "en": "Critically appraise the following biology paper, abstract, or claim. Separate observations from mechanistic claims; assess study design, power, controls, confounding, effect sizes, multiple testing, generalizability, data/code availability, and reproducibility; then propose the most decisive validation experiments:\n\n" },
+      "color": "#EDE9FE",
+      "icon_name": "book-open-check"
+    },
+    {
+      "title": { "zh": "排查实验问题", "en": "Troubleshoot an experiment" },
+      "description": { "zh": "按证据定位失败环节与根因", "en": "Localize failure points and root causes from evidence" },
+      "prompt": { "zh": "请系统排查以下实验异常。先整理预期、实际结果、原始记录和最近变更，再按样本、试剂、仪器、操作、环境、分析与批次建立假设优先级；为每个假设给出最小判别实验、必要对照、停止条件和记录方式：\n\n", "en": "Troubleshoot the following experimental anomaly systematically. First organize expected versus observed results, raw records, and recent changes; then prioritize hypotheses across samples, reagents, instruments, handling, environment, analysis, and batches. For each hypothesis, give a minimal discriminating test, required controls, stop criteria, and documentation method:\n\n" },
+      "color": "#FEF3C7",
+      "icon_name": "microscope"
+    },
+    {
+      "title": { "zh": "讲解生物学概念", "en": "Explain a biology concept" },
+      "description": { "zh": "按层次讲清机制、证据与例外", "en": "Explain mechanism, evidence, and exceptions by level" },
+      "prompt": { "zh": "请讲解以下生物学或遗传学概念。先给出直观图景，再按分子、细胞、个体或群体层次解释机制，说明支持证据、典型例子、常见误区、重要例外和仍未解决的问题，并附术语表与进一步学习路线：\n\n", "en": "Explain the following biology or genetics concept. Start with an intuitive picture, then explain mechanisms across molecular, cellular, organismal, or population levels; include supporting evidence, canonical examples, common misconceptions, important exceptions, open questions, a glossary, and a learning path:\n\n" },
+      "color": "#FCE7F3",
+      "icon_name": "graduation-cap"
+    }
+  ],
+  "task_examples": {
+    "zh": [
+      "每周一「09:00」追踪我关注基因与通路的新论文，按证据强度汇总",
+      "每周三「10:00」检查组学项目的质控、批次效应和待验证结果",
+      "每周五「17:00」整理本周实验记录、异常、结论与下周验证计划",
+      "每月 1 日「09:30」复盘研究假设、关键证据缺口和项目优先级",
+      "每两周周二「14:00」更新指定基因集的功能注释与数据库版本变化",
+      "每天「18:00」汇总新录入样本的数据完整性、命名和元数据问题"
+    ],
+    "en": [
+      "Every Monday at 09:00, track new papers on my genes and pathways of interest and grade the evidence",
+      "Every Wednesday at 10:00, review omics-project QC, batch effects, and findings awaiting validation",
+      "Every Friday at 17:00, summarize experiments, anomalies, conclusions, and next week's validation plan",
+      "On the 1st of each month at 09:30, review research hypotheses, critical evidence gaps, and project priorities",
+      "Every other Tuesday at 14:00, update functional annotations and database-version changes for a specified gene set",
+      "Every day at 18:00, summarize data completeness, naming, and metadata issues in newly entered samples"
+    ]
+  }
+}
