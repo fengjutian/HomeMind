@@ -12,6 +12,7 @@ import {
   Settings,
   GitFork,
   PanelRight,
+  FileText,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +22,7 @@ import UserMessageComposerTags, {
   type ComposerTagLookups,
 } from "./UserMessageComposerTags";
 import { deriveMessageContent } from "../utils/messageContent";
+import { isLongComposerText } from "../utils/longText";
 import { inferKindFromNameAndMime } from "../utils/chatAttachments";
 import { ChatMediaPlayer } from "./ChatMediaPlayer";
 import { useAuthImageSrc } from "../../../hooks/useAuthImageSrc";
@@ -670,6 +672,7 @@ function MessageBubble({
   }
 
   const isUser = message.role === "user";
+  const isLongUserMessage = isUser && isLongComposerText(message.content);
   const showUserComposerTags =
     isUser && !isEditing && hasUserComposerTags(message.composerContext);
   const isStreaming = message.status === "streaming";
@@ -860,7 +863,27 @@ function MessageBubble({
                       agentId={agentId}
                     />
                   )}
-                  {message.content && <div>{message.content}</div>}
+                  {message.content &&
+                    (isLongUserMessage ? (
+                      <div
+                        className={styles.userLongTextCard}
+                        data-testid="user-long-text-card"
+                      >
+                        <FileText size={18} />
+                        <span className={styles.userLongTextMeta}>
+                          <span className={styles.userLongTextTitle}>
+                            {message.content.replace(/\s+/g, " ").trim()}
+                          </span>
+                          <span className={styles.userLongTextCount}>
+                            {t("chat.longText.characterCount", {
+                              count: message.content.length,
+                            })}
+                          </span>
+                        </span>
+                      </div>
+                    ) : (
+                      <div>{message.content}</div>
+                    ))}
                 </div>
               )}
             </div>

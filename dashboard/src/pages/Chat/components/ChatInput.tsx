@@ -60,17 +60,8 @@ import type {
   QueuedChatItem,
 } from "../hooks/useChatMessageQueue";
 import type { HitlSessionPolicy } from "../utils/hitlSessionPolicy";
+import { isLongComposerText } from "../utils/longText";
 import styles from "../index.module.less";
-
-export const LONG_TEXT_CHARACTER_THRESHOLD = 2_000;
-export const LONG_TEXT_LINE_THRESHOLD = 12;
-
-export function isLongComposerText(value: string): boolean {
-  return (
-    value.length >= LONG_TEXT_CHARACTER_THRESHOLD ||
-    value.split(/\r?\n/).length >= LONG_TEXT_LINE_THRESHOLD
-  );
-}
 
 /** Imperative handle exposed via ref for programmatic text injection. */
 export interface ChatInputHandle {

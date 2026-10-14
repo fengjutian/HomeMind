@@ -453,6 +453,38 @@
   }
 }
 
+.userLongTextCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(360px, 65vw);
+  padding: 8px 10px;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: var(--fn-radius-sm);
+  background: rgb(255 255 255 / 12%);
+}
+
+.userLongTextMeta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.userLongTextTitle {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userLongTextCount {
+  color: rgb(255 255 255 / 72%);
+  font-size: 11px;
+}
+
 .userComposerTags {
   display: flex;
   flex-wrap: wrap;

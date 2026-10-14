@@ -128,12 +128,12 @@ vi.mock("../hooks/useSlashMentionInput", () => ({
   }),
 }));
 
-import ChatInput, {
+import ChatInput, { type ChatInputHandle } from "./ChatInput";
+import {
   LONG_TEXT_CHARACTER_THRESHOLD,
   LONG_TEXT_LINE_THRESHOLD,
   isLongComposerText,
-  type ChatInputHandle,
-} from "./ChatInput";
+} from "../utils/longText";
 
 beforeEach(() => {
   vi.clearAllMocks();

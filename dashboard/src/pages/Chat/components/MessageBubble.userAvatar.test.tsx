@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import MessageBubble from "./MessageBubble";
 import type { ChatMessage } from "../hooks/useChat";
 import type { OctopUser } from "../../../api/modules/auth";
+import { LONG_TEXT_CHARACTER_THRESHOLD } from "../utils/longText";
 
 const currentUser: Partial<OctopUser> = {
   username: "ada",
@@ -59,6 +60,14 @@ function userMessage(extra: Partial<ChatMessage> = {}): ChatMessage {
 }
 
 describe("MessageBubble user avatar", () => {
+  it("renders a sent long user message as a collapsed card", () => {
+    const content = `long message ${"a".repeat(LONG_TEXT_CHARACTER_THRESHOLD)}`;
+    render(<MessageBubble message={userMessage({ content })} showAvatar />);
+
+    expect(screen.getByTestId("user-long-text-card")).toBeInTheDocument();
+    expect(screen.getByText(content)).toBeInTheDocument();
+  });
+
   it("shows the account preset icon instead of name initials", () => {
     currentUser.avatar_icon = "doctor";
     currentUser.avatar_url = null;
