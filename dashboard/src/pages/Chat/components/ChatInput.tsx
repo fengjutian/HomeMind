@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { App } from "antd";
+import { FileText, X } from "lucide-react";
 
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import {
@@ -60,6 +61,16 @@ import type {
 } from "../hooks/useChatMessageQueue";
 import type { HitlSessionPolicy } from "../utils/hitlSessionPolicy";
 import styles from "../index.module.less";
+
+export const LONG_TEXT_CHARACTER_THRESHOLD = 2_000;
+export const LONG_TEXT_LINE_THRESHOLD = 12;
+
+export function isLongComposerText(value: string): boolean {
+  return (
+    value.length >= LONG_TEXT_CHARACTER_THRESHOLD ||
+    value.split(/\r?\n/).length >= LONG_TEXT_LINE_THRESHOLD
+  );
+}
 
 /** Imperative handle exposed via ref for programmatic text injection. */
 export interface ChatInputHandle {
@@ -206,6 +217,10 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [text, setText] = useState(
       () => initialText || readInputDraft(agentId, threadId),
     );
+    const [longTextCollapsed, setLongTextCollapsed] = useState(() =>
+      isLongComposerText(initialText || readInputDraft(agentId, threadId)),
+    );
+    const wasLongTextRef = useRef(isLongComposerText(text));
     const [polishing, setPolishing] = useState(false);
     // Track whether the user has manually edited the text after a prefill.
     // Once they start editing, we must not overwrite their input with a new
@@ -223,6 +238,12 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const textRef = useRef(text);
     useEffect(() => {
       textRef.current = text;
+    }, [text]);
+    useEffect(() => {
+      const isLong = isLongComposerText(text);
+      if (isLong && !wasLongTextRef.current) setLongTextCollapsed(true);
+      if (!isLong) setLongTextCollapsed(false);
+      wasLongTextRef.current = isLong;
     }, [text]);
     // Text that existed before the current voice session started; the session's
     // (possibly still refining) transcript is appended to it on every update.
@@ -282,6 +303,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           ignoreInitialTextRef.current = null;
           prevInitialTextRef.current = newText;
           setText(newText);
+          setLongTextCollapsed(isLongComposerText(newText));
           setTimeout(() => {
             const el = textareaRef.current;
             if (el) {
@@ -298,6 +320,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           ignoreInitialTextRef.current = null;
           prevInitialTextRef.current = newText;
           setText(newText);
+          setLongTextCollapsed(isLongComposerText(newText));
           if (nextAttachments && nextAttachments.length > 0) {
             restoreAttachments(
               nextAttachments.map((attachment) => ({ ...attachment })),
@@ -350,6 +373,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       ) {
         prevInitialTextRef.current = initialText;
         setText(initialText);
+        setLongTextCollapsed(isLongComposerText(initialText));
         // Focus the textarea so the user can immediately start editing
         setTimeout(() => {
           const el = textareaRef.current;
@@ -369,7 +393,9 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       userHasEditedRef.current = false;
       ignoreInitialTextRef.current = null;
       prevInitialTextRef.current = "";
-      setText(readInputDraft(agentId, threadId));
+      const draft = readInputDraft(agentId, threadId);
+      setText(draft);
+      setLongTextCollapsed(isLongComposerText(draft));
       const pendingAttachments = consumePendingPrefillAttachments();
       if (pendingAttachments.length > 0) {
         restoreAttachments(pendingAttachments);
@@ -501,6 +527,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const resetComposerAfterSubmit = useCallback(
       (prevHeight: number, submittedText: string) => {
         setText("");
+        setLongTextCollapsed(false);
         writeInputDraft(agentId, threadId, "");
         clearAttachments();
         userHasEditedRef.current = false;
@@ -613,6 +640,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 )
               : item.text;
           setText(restoredText);
+          setLongTextCollapsed(isLongComposerText(restoredText));
           restoreAttachments(item.attachments ?? []);
           if (ctx) {
             onConnectorsChange?.(ctx.connectors ?? []);
@@ -715,7 +743,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     useEffect(() => {
       adjustHeight();
-    }, [text, adjustHeight]);
+    }, [text, longTextCollapsed, adjustHeight]);
 
     const handlePolish = useCallback(async () => {
       const draft = text.trim();
@@ -799,24 +827,74 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           />
 
           <div className={styles.inputRow} style={{ position: "relative" }}>
-            <textarea
-              ref={textareaRef}
-              className={styles.textarea}
-              value={text}
-              onChange={(e) => {
-                userHasEditedRef.current = true;
-                handleTextChange(e.target.value);
-              }}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              placeholder={t(
-                "chatWelcome.inputPlaceholder",
-                "Message HomeMind...",
-              )}
-              rows={1}
-              disabled={disabled}
-              enterKeyHint={isMobile ? "enter" : undefined}
-            />
+            {longTextCollapsed ? (
+              <div data-testid="long-text-card" className={styles.longTextCard}>
+                <button
+                  type="button"
+                  className={styles.longTextEdit}
+                  disabled={disabled}
+                  onClick={() => {
+                    setLongTextCollapsed(false);
+                    requestAnimationFrame(() => {
+                      const el = textareaRef.current;
+                      el?.focus();
+                      el?.setSelectionRange(el.value.length, el.value.length);
+                    });
+                  }}
+                  aria-label={t("chat.longText.expand")}
+                >
+                  <span className={styles.longTextIcon}>
+                    <FileText size={18} />
+                  </span>
+                  <span className={styles.longTextMeta}>
+                    <span className={styles.longTextTitle}>
+                      {text.replace(/\s+/g, " ").trim()}
+                    </span>
+                    <span className={styles.longTextCount}>
+                      {t("chat.longText.characterCount", {
+                        count: text.length,
+                      })}
+                    </span>
+                  </span>
+                  <span className={styles.longTextAction}>
+                    {t("chat.longText.expand")}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="long-text-remove"
+                  className={styles.longTextRemove}
+                  disabled={disabled}
+                  onClick={() => {
+                    userHasEditedRef.current = true;
+                    setText("");
+                    setLongTextCollapsed(false);
+                  }}
+                  aria-label={t("chat.longText.remove")}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <textarea
+                ref={textareaRef}
+                className={styles.textarea}
+                value={text}
+                onChange={(e) => {
+                  userHasEditedRef.current = true;
+                  handleTextChange(e.target.value);
+                }}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                placeholder={t(
+                  "chatWelcome.inputPlaceholder",
+                  "Message HomeMind...",
+                )}
+                rows={1}
+                disabled={disabled}
+                enterKeyHint={isMobile ? "enter" : undefined}
+              />
+            )}
             {/*
             Slash badge (plan §14.5): octop's HarnessProcessor handles slash
             commands server-side. The composer doesn't intercept them — it

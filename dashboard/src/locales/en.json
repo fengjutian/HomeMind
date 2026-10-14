@@ -1544,6 +1544,11 @@
     "path_outside_root": "The file path is outside this expert's storage root, so it cannot be read or written. Use a path under the storage root, or widen the storage root in expert settings (on Windows, set an explicit drive path such as D:/octop-data)."
   },
   "chat": {
+    "longText": {
+      "characterCount": "{{count}} characters",
+      "expand": "Expand to edit",
+      "remove": "Remove text"
+    },
     "sharedExpert": {
       "banner": "Shared expert · provided by {{name}}",
       "flag": "Shared"

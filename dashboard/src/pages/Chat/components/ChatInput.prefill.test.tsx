@@ -128,10 +128,79 @@ vi.mock("../hooks/useSlashMentionInput", () => ({
   }),
 }));
 
-import ChatInput, { type ChatInputHandle } from "./ChatInput";
+import ChatInput, {
+  LONG_TEXT_CHARACTER_THRESHOLD,
+  LONG_TEXT_LINE_THRESHOLD,
+  isLongComposerText,
+  type ChatInputHandle,
+} from "./ChatInput";
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("long composer text", () => {
+  it("collapses by character count or line count", () => {
+    expect(
+      isLongComposerText("a".repeat(LONG_TEXT_CHARACTER_THRESHOLD - 1)),
+    ).toBe(false);
+    expect(isLongComposerText("a".repeat(LONG_TEXT_CHARACTER_THRESHOLD))).toBe(
+      true,
+    );
+    expect(
+      isLongComposerText(
+        Array(LONG_TEXT_LINE_THRESHOLD).fill("line").join("\n"),
+      ),
+    ).toBe(true);
+  });
+
+  it("shows a document card while preserving the full text for editing and sending", () => {
+    const longText = `preview from the beginning ${"a".repeat(
+      LONG_TEXT_CHARACTER_THRESHOLD,
+    )}`;
+    const onSend = vi.fn();
+
+    render(
+      <ChatInput
+        onSend={onSend}
+        onCancel={vi.fn()}
+        onNewChat={vi.fn()}
+        isStreaming={false}
+        initialText={longText}
+        agentId="agent-1"
+        threadId="thread-1"
+      />,
+    );
+
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByText(longText)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("long-text-card"));
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+      longText,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "send" }));
+    expect(onSend).toHaveBeenCalledWith(longText, undefined);
+  });
+
+  it("removes collapsed text from the composer", () => {
+    render(
+      <ChatInput
+        onSend={vi.fn()}
+        onCancel={vi.fn()}
+        onNewChat={vi.fn()}
+        isStreaming={false}
+        initialText={"a".repeat(LONG_TEXT_CHARACTER_THRESHOLD)}
+        agentId="agent-1"
+        threadId="thread-1"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("long-text-remove"));
+
+    expect(screen.queryByTestId("long-text-card")).toBeNull();
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+  });
 });
 
 describe("ChatInput prefill clear-on-send", () => {
