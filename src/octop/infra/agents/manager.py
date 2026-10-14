@@ -994,6 +994,8 @@ class AgentManager:
             raise OctopError(ErrorCode.AGENT_NOT_FOUND, f"agent {agent_id!r} not found")
         current = parse_config_json(row.config_json)
         current_root = local_backend_root_dir(current)
+        if current.get("backend") is None:
+            current_root = "/"
         requested = self._preserve_internal_layout(agent_id, dict(config))
         requested_root = local_backend_root_dir(requested)
         if current_root is None or requested_root is None:

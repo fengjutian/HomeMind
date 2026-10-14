@@ -410,9 +410,7 @@ async def patch_agent(
         }
     }
     if body.config is not None and body.migrate_workspace:
-        row = await server.app_runtime.agent_registry.migrate_workspace_root(
-            agent_id, body.config
-        )
+        row = await server.app_runtime.agent_registry.migrate_workspace_root(agent_id, body.config)
     elif body.config is not None:
         updates["config_json"] = json.dumps(body.config)
     if body.welcome_message is not None:

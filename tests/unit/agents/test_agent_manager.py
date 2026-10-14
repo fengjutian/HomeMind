@@ -2311,6 +2311,61 @@ async def test_update_config_json_cannot_move_the_workspace(
 
 
 @pytest.mark.asyncio
+async def test_migrate_workspace_root_copies_files_and_updates_layout(
+    manager: AgentManager, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from octop.infra.agents.manager import AgentCreateSpec
+
+    row = await manager.create(AgentCreateSpec(name="root-migrate"), defer_bootstrap=True)
+    monkeypatch.setattr(manager, "_schedule_reload", lambda _aid: None)
+    source = manager.resolve_workspace_dir(row.agent_id)
+    (source / "kept.txt").write_text("workspace data", encoding="utf-8")
+    new_root = tmp_path / "new-root"
+    new_root.mkdir()
+    config = manager.get_config(row.agent_id)
+    config["backend"] = {
+        "type": "local_shell",
+        "root_dir": str(new_root),
+        "virtual_mode": True,
+    }
+
+    await manager.migrate_workspace_root(row.agent_id, config)
+
+    target = new_root / ".octop" / "workspaces" / row.agent_id
+    assert (target / "kept.txt").read_text(encoding="utf-8") == "workspace data"
+    assert (source / "kept.txt").exists()
+    saved = manager.get_config(row.agent_id)
+    assert saved["workspace_dir"] == f"/.octop/workspaces/{row.agent_id}"
+    assert saved["backend"]["root_dir"] == str(new_root)
+
+
+@pytest.mark.asyncio
+async def test_migrate_workspace_root_rejects_existing_destination(
+    manager: AgentManager, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from octop.infra.agents.manager import AgentCreateSpec
+
+    row = await manager.create(AgentCreateSpec(name="root-conflict"), defer_bootstrap=True)
+    monkeypatch.setattr(manager, "_schedule_reload", lambda _aid: None)
+    original = manager.get_config(row.agent_id)
+    new_root = tmp_path / "occupied-root"
+    target = new_root / ".octop" / "workspaces" / row.agent_id
+    target.mkdir(parents=True)
+    config = dict(original)
+    config["backend"] = {
+        "type": "filesystem",
+        "root_dir": str(new_root),
+        "virtual_mode": True,
+    }
+
+    with pytest.raises(OctopError) as exc_info:
+        await manager.migrate_workspace_root(row.agent_id, config)
+
+    assert exc_info.value.code == ErrorCode.WORKSPACE_MIGRATION_CONFLICT
+    assert manager.get_config(row.agent_id) == original
+
+
+@pytest.mark.asyncio
 async def test_internal_persist_can_still_set_the_workspace(manager: AgentManager) -> None:
     """The internal writer must keep writing ``workspace_dir`` (no over-pinning)."""
     from octop.infra.agents.manager import AgentCreateSpec
