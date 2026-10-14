@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -75,6 +76,29 @@ def test_corrupt_and_foreign_backups_do_not_modify_current_store(tmp_path):
     assert not list(tmp_path.glob("*.before-restore.*"))
     with pytest.raises(ValueError):
         backup_path(path, "../" + old.name, "en")
+
+
+def test_restore_flushes_safety_backup_with_writable_handle(tmp_path, monkeypatch):
+    from octop.infra.agents.memory import sqlite_restore
+
+    path = tmp_path / "memory.sqlite"
+    create_store(path)
+    old = snapshot(path)
+    real_fsync = os.fsync
+    flushed = []
+
+    def require_writable_fsync(fd):
+        # A zero-byte write enforces Windows' writable-handle requirement on
+        # POSIX too, without changing the SQLite backup's contents.
+        os.write(fd, b"")
+        real_fsync(fd)
+        flushed.append(fd)
+
+    monkeypatch.setattr(sqlite_restore.os, "fsync", require_writable_fsync)
+    report = restore_sqlite(path, "agent_a", old.name, locale="en", progress=lambda _: None)
+    assert len(flushed) == 1
+    assert count(Path(report["backup_path"])) == 1
+    assert count(path) == 1
 
 
 def test_validation_failure_after_restore_rolls_back_current_state(tmp_path, monkeypatch):

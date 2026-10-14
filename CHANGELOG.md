@@ -5,6 +5,7 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号遵循 [语义化版本规范](https://semver.org/spec/v2.0.0.html)。
 
 ## [Unreleased]
+- 修复 Windows 上 SQLite 记忆备份恢复时文件句柄不可写的问题
 - 将 octop-harness 升级到 1.0.3，以支持记忆存储维护控制
 - 新增专家级记忆存储维护、SQLite 备份恢复及 PostgreSQL 存储支持
 - 修复 steering、审批续跑与流式错误状态不一致，避免候补消息或审批卡被错误刷新

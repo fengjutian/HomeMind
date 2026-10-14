@@ -101,7 +101,9 @@ def restore_sqlite(
                 with closing(sqlite3.connect(safety)) as saved:
                     dest.backup(saved)
                     _validate(saved, namespace, locale)
-                with safety.open("rb") as saved_file:
+                # Windows requires a writable handle for fsync. Do not truncate
+                # the snapshot: it must be durable before overwriting the store.
+                with safety.open("r+b") as saved_file:
                     os.fsync(saved_file.fileno())
             except BaseException:
                 safety.unlink(missing_ok=True)
