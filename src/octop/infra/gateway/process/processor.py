@@ -60,8 +60,8 @@ from octop.infra.gateway.process.harness_request import (
 from octop.infra.gateway.process.message_keys import (
     INBOUND_ATTACHMENTS_KEY,
     resolve_user_id_for_message,
-    sanitize_im_metadata,
     session_key_from_message,
+    session_metadata_from_message,
 )
 from octop.infra.gateway.process.stream_project import (
     StreamProjectionState,
@@ -625,7 +625,7 @@ class GlobalProcessor:
         )
         session_key = session_key_from_message(msg, agent_id=agent_id)
         channel_type = msg.channel_type or "unknown"
-        im_meta = sanitize_im_metadata(msg)
+        im_meta = session_metadata_from_message(msg)
 
         cmd = parse_slash(msg.text)
         locale = resolve_user_locale(
@@ -926,7 +926,7 @@ class GlobalProcessor:
         )
         session_key = session_key_from_message(msg, agent_id=agent_id)
         channel_type = msg.channel_type or "unknown"
-        im_meta = sanitize_im_metadata(msg)
+        im_meta = session_metadata_from_message(msg)
         meta = msg.metadata or {}
         locale = resolve_user_locale(
             user_repo=self._user_repo,
