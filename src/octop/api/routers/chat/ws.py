@@ -110,12 +110,13 @@ async def dashboard_chat_ws(
                     )
                     continue
                 hub.subscribe(thread_id, connection_id)
+                activity_value = gateway.processor.teams.active_members(thread_id)
                 await send_frame(
                     {
                         "type": "turn_status",
                         "thread_id": thread_id,
                         "active": hub.is_turn_active(thread_id),
-                        "team_activity": gateway.processor.teams.active_members(thread_id),
+                        "team_activity": activity_value if isinstance(activity_value, list) else [],
                     },
                 )
                 continue

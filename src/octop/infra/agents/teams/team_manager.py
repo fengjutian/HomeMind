@@ -197,7 +197,7 @@ class TeamManager:
     def _finish_member_activity(
         self, room_thread_id: str, speaker_id: str, row: dict[str, Any]
     ) -> None:
-        self._set_member_stage(row, "finalizing")
+        self._set_member_stage(row, "done")
         total_ms = round((time.time() - float(row["started_at"])) * 1000)
         logger.info(
             "team member task finish room=%s speaker=%s total_ms=%d timings_ms=%s",
@@ -566,17 +566,20 @@ class TeamManager:
             )
             raise
         finally:
-            await release_held_room()
-            self._finish_member_activity(room_thread_id, speaker_id, activity)
-            done: dict[str, Any] = {"type": "done"}
-            if extra_stamp:
-                done = {**done, **extra_stamp}
-            await self._relay_chunk(
-                done,
-                room_thread_id=room_thread_id,
-                member_thread_id=member_tid,
-                speaker_id=speaker_id,
-            )
+            self._set_member_stage(activity, "finalizing")
+            try:
+                await release_held_room()
+                done: dict[str, Any] = {"type": "done"}
+                if extra_stamp:
+                    done = {**done, **extra_stamp}
+                await self._relay_chunk(
+                    done,
+                    room_thread_id=room_thread_id,
+                    member_thread_id=member_tid,
+                    speaker_id=speaker_id,
+                )
+            finally:
+                self._finish_member_activity(room_thread_id, speaker_id, activity)
         stream_text = "".join(text_parts).strip()
         return {
             "messages": await self._peer_result_messages(

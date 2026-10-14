@@ -1796,10 +1796,14 @@ class AgentManager:
             if not callable(snapshot_getter) or not callable(compact):
                 return
             usage = snapshot_getter(thread_id)
-            used = int(getattr(usage, "used_tokens", 0) or 0)
-            maximum = int(
-                getattr(usage, "max_tokens", 0) or self.resolve_context_max_tokens(agent_id)
-            )
+            raw_used = getattr(usage, "used_tokens", 0)
+            raw_maximum = getattr(usage, "max_tokens", 0)
+            if not isinstance(raw_used, (int, float)) or isinstance(raw_used, bool):
+                return
+            if not isinstance(raw_maximum, (int, float)) or isinstance(raw_maximum, bool):
+                raw_maximum = 0
+            used = int(raw_used)
+            maximum = int(raw_maximum or self.resolve_context_max_tokens(agent_id))
             ratio = used / maximum if maximum > 0 else 0.0
             if ratio < 0.8:
                 return

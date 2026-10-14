@@ -1169,6 +1169,36 @@ async def test_stream_compacts_and_retries_provider_context_overflow(
 
 
 @pytest.mark.asyncio
+async def test_stream_proactively_compacts_at_eighty_percent(
+    manager: AgentManager,
+) -> None:
+    agent = MagicMock()
+    agent._context_usage_mw.get_snapshot.return_value = SimpleNamespace(
+        used_tokens=80_000,
+        max_tokens=100_000,
+    )
+    agent.acompact_conversation = AsyncMock(return_value=SimpleNamespace(ok=True))
+    harness_manager = MagicMock()
+
+    async def fake_stream(*_args: Any, **_kwargs: Any) -> AsyncIterator[dict[str, str]]:
+        yield {"type": "token", "content": "after compact"}
+
+    harness_manager.stream = fake_stream
+    harness_manager.get_agent.return_value = SimpleNamespace(agent=agent)
+    manager._harness_manager = harness_manager
+
+    chunks = [
+        chunk
+        async for chunk in manager.stream(
+            "AGT_STREAM", {"thread_id": "thr1", "model": "provider/model"}
+        )
+    ]
+
+    assert chunks == [{"type": "token", "content": "after compact"}]
+    agent.acompact_conversation.assert_awaited_once_with("thr1", model="provider/model")
+
+
+@pytest.mark.asyncio
 async def test_stream_does_not_retry_context_overflow_after_emitting_chunk(
     manager: AgentManager,
 ) -> None:

@@ -386,7 +386,9 @@ async def get_thread_history(
         user_id=effective_uid,
     )
     workspace_dir = _agent_facing_workspace_dir(server, agent_id)
-    team_activity = server.app_runtime.gateway.processor.teams.active_members(thread_id)
+    activity_fn = getattr(server.app_runtime.gateway.processor.teams, "active_members", None)
+    activity_value = activity_fn(thread_id) if callable(activity_fn) else []
+    team_activity = activity_value if isinstance(activity_value, list) else []
     return {
         "thread_id": thread_id,
         "messages": messages,
