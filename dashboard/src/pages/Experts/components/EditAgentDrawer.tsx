@@ -1378,7 +1378,7 @@ export default function EditAgentDrawer({
     <Drawer
       open={open}
       title={<EditExpertDrawerTitle agent={agent} />}
-      width={520}
+      width="50vw"
       onClose={onClose}
       destroyOnHidden
       footer={
