@@ -5,6 +5,7 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号遵循 [语义化版本规范](https://semver.org/spec/v2.0.0.html)。
 
 ## [Unreleased]
+- 将 octop-harness 升级到 1.0.3，以支持记忆存储维护控制
 - 新增专家级记忆存储维护、SQLite 备份恢复及 PostgreSQL 存储支持
 - 修复 steering、审批续跑与流式错误状态不一致，避免候补消息或审批卡被错误刷新
 - 对话支持 mid-turn steering（#1300）：智能体执行期间可以追加纠正指令，并在安全边界续跑当前回合
