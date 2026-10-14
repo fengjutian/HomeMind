@@ -1034,7 +1034,6 @@ class AgentManager:
                 f"destination workspace already exists: {target}",
             )
 
-        copied = False
         try:
             async with self._lifecycle_lock_for(agent_id):
                 if self._octop_harness_or_none(agent_id) is not None:
@@ -1042,7 +1041,6 @@ class AgentManager:
                     assert self._harness_manager is not None
                     await self._harness_manager.aremove_agent(agent_id)
                 await asyncio.to_thread(shutil.copytree, source, target)
-                copied = True
                 self._repos.agent_repo.update_config(
                     agent_id,
                     config_json=dumps_config(requested),
@@ -1051,7 +1049,7 @@ class AgentManager:
         except OctopError:
             raise
         except Exception as exc:
-            if copied:
+            if target.exists():
                 with suppress(OSError):
                     await asyncio.to_thread(shutil.rmtree, target)
             self._schedule_reload(agent_id)

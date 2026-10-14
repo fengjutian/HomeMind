@@ -24,7 +24,10 @@ import { copyText } from "../../utils/copyText";
 import { loadMermaid } from "./mermaidLoader";
 import { HighlightedCode } from "./syntaxHighlight";
 import { useMathPlugins } from "./mathPlugins";
-import { stabilizeStreamingMarkdown } from "./stabilizeStreamingMarkdown";
+import {
+  repairOrphanedDirectoryTreeFence,
+  stabilizeStreamingMarkdown,
+} from "./stabilizeStreamingMarkdown";
 import styles from "./index.module.less";
 
 /* ---- Mermaid block component ---- */
@@ -389,10 +392,10 @@ const Markdown = memo(function Markdown({
 }: MarkdownProps) {
   const { t } = useTranslation();
   const runLabel = shellCommandLabel ?? t("terminal.ai.execBtn");
-  const renderContent = useMemo(
-    () => (isStreaming ? stabilizeStreamingMarkdown(content) : content),
-    [content, isStreaming],
-  );
+  const renderContent = useMemo(() => {
+    const repaired = repairOrphanedDirectoryTreeFence(content);
+    return isStreaming ? stabilizeStreamingMarkdown(repaired) : repaired;
+  }, [content, isStreaming]);
   const { remarkPlugins: mathRemark, rehypePlugins: mathRehype } =
     useMathPlugins(renderContent);
   const remarkPlugins = useMemo(() => [remarkGfm, ...mathRemark], [mathRemark]);

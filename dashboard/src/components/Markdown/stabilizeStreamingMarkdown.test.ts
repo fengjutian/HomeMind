@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { stabilizeStreamingMarkdown } from "./stabilizeStreamingMarkdown";
+import {
+  repairOrphanedDirectoryTreeFence,
+  stabilizeStreamingMarkdown,
+} from "./stabilizeStreamingMarkdown";
 
 describe("stabilizeStreamingMarkdown", () => {
   it("leaves complete fences alone", () => {
@@ -21,5 +24,48 @@ describe("stabilizeStreamingMarkdown", () => {
 
   it("is a no-op for empty content", () => {
     expect(stabilizeStreamingMarkdown("")).toBe("");
+  });
+});
+
+describe("repairOrphanedDirectoryTreeFence", () => {
+  it("restores a missing opening fence before a directory tree", () => {
+    const src = [
+      "## Project layout",
+      "",
+      "services/",
+      "├── api/",
+      "└── repository/",
+      "```",
+      "",
+      "---",
+      "",
+      "## Request flow",
+    ].join("\n");
+
+    expect(repairOrphanedDirectoryTreeFence(src)).toBe(
+      [
+        "## Project layout",
+        "",
+        "```text",
+        "services/",
+        "├── api/",
+        "└── repository/",
+        "```",
+        "",
+        "---",
+        "",
+        "## Request flow",
+      ].join("\n"),
+    );
+  });
+
+  it("does not reinterpret an ordinary unclosed code fence", () => {
+    const src = "Intro\n```python\nprint('hello')";
+    expect(repairOrphanedDirectoryTreeFence(src)).toBe(src);
+  });
+
+  it("does not touch complete fenced Markdown", () => {
+    const src = "```text\nroot/\n├── a/\n└── b/\n```";
+    expect(repairOrphanedDirectoryTreeFence(src)).toBe(src);
   });
 });
