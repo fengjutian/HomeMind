@@ -5,6 +5,7 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，版本号遵循 [语义化版本规范](https://semver.org/spec/v2.0.0.html)。
 
 ## [Unreleased]
+- 新增专家级记忆存储维护、SQLite 备份恢复及 PostgreSQL 存储支持
 - 修复 steering、审批续跑与流式错误状态不一致，避免候补消息或审批卡被错误刷新
 - 对话支持 mid-turn steering（#1300）：智能体执行期间可以追加纠正指令，并在安全边界续跑当前回合
 - 微信定时任务：从旧版本升上来的库不再因为 `cron_jobs` 仍使用 `trigger` 列而创建失败，启动时会改成 `schedule_spec` 并保留原有任务。微信对话用的发送票会写入会话，进程重启后定时推送仍可投递；机器人登录掉线（`errcode=-14`）时仍需重新扫码
