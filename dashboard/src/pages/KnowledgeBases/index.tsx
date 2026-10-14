@@ -3387,20 +3387,22 @@ export default function KnowledgeBasesPage() {
                       </Radio>
                     </Radio.Group>
                     {ocrBackend === "onnx" ? (
-                      <div
-                        className={`${styles.onnxModelItem} ${styles.onnxModelItemActive}`}
-                      >
-                        <div className={styles.onnxModelInfo}>
-                          <span className={styles.onnxModelName}>
-                            RapidOCR (ONNX)
-                          </span>
+                      <>
+                        <div
+                          className={`${styles.onnxModelItem} ${styles.onnxModelItemActive}`}
+                        >
+                          <div className={styles.onnxModelInfo}>
+                            <span className={styles.onnxModelName}>
+                              RapidOCR (ONNX)
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <Alert
-                        type="info"
-                        showIcon
-                        message={t("knowledgeBases.ocrLocalInstallNotice")}
-                      />
+                        <Alert
+                          type="info"
+                          showIcon
+                          message={t("knowledgeBases.ocrLocalInstallNotice")}
+                        />
+                      </>
                     ) : (
                       <>
                         <Alert

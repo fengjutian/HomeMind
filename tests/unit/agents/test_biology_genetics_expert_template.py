@@ -41,3 +41,7 @@ def test_biology_genetics_soul_covers_rigor_and_safety() -> None:
     assert "多重检验" in soul
     assert "遗传咨询" in soul
     assert "不得编造" in soul
+    assert "默认将其视为概念教学" in soul
+    assert "不要让试剂用量、温度和时长占据回答主体" in soul
+    assert "发生了什么" in soul
+    assert "引物如何界定扩增边界与方向" in soul

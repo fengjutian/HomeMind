@@ -1,0 +1,76 @@
+{
+  "id": "english-expert",
+  "label": {
+    "zh": "英语专家",
+    "en": "English Expert"
+  },
+  "description": {
+    "zh": "擅长解释单词、拆解语法和中英互译的英语专家。讲得准确、地道，也会适时抖个机灵，让英语少一点拧巴、多一点好记。",
+    "en": "A witty English expert for vocabulary, grammar, and Chinese-English translation. Clear, idiomatic explanations with humor that helps the lesson stick."
+  },
+  "welcome_message": {
+    "zh": "单词不懂、语法打结，还是翻译卡壳？把它扔给我。",
+    "en": "Puzzled by a word, tangled in grammar, or stuck on a translation? Throw it my way."
+  },
+  "icon_name": "languages",
+  "color": "#7C3AED",
+  "prompt_files": [
+    "SOUL.md"
+  ],
+  "quick_prompts": [
+    {
+      "title": {"zh": "解释一个单词", "en": "Explain a word"},
+      "description": {"zh": "讲清含义、语感、搭配和例句", "en": "Meaning, nuance, collocations, and examples"},
+      "prompt": {"zh": "请解释这个英语单词，包括音标、核心含义、语感、常见搭配、易混词和三个自然例句：", "en": "Please explain this English word, including pronunciation, core meaning, nuance, common collocations, confusing alternatives, and three natural examples:"},
+      "color": "#ede9fe",
+      "icon_name": "book-open"
+    },
+    {
+      "title": {"zh": "拆解语法", "en": "Break down grammar"},
+      "description": {"zh": "从句子结构讲到为什么这样写", "en": "See the structure and why it works"},
+      "prompt": {"zh": "请拆解下面句子的语法结构，用通俗语言解释每一部分的作用，并指出可以替换的表达：\n\n", "en": "Please break down the grammar of this sentence in plain language, explain each part, and suggest alternative phrasings:\n\n"},
+      "color": "#dbeafe",
+      "icon_name": "brackets"
+    },
+    {
+      "title": {"zh": "翻译成自然英语", "en": "Translate into natural English"},
+      "description": {"zh": "拒绝翻译腔，保留原意和语气", "en": "Keep the meaning and lose the translationese"},
+      "prompt": {"zh": "请把下面内容翻译成自然、地道的英语。先给最佳版本，再简要说明关键取舍：\n\n", "en": "Please translate the following into natural, idiomatic English. Give the best version first, then briefly explain the key choices:\n\n"},
+      "color": "#dcfce7",
+      "icon_name": "languages"
+    },
+    {
+      "title": {"zh": "翻译成流畅中文", "en": "Translate into fluent Chinese"},
+      "description": {"zh": "准确传意，不逐字硬搬", "en": "Convey the meaning without word-for-word stiffness"},
+      "prompt": {"zh": "请把下面英文翻译成准确、流畅的中文。先给译文，再解释难点或双关：\n\n", "en": "Please translate the following English into accurate, fluent Chinese. Give the translation first, then explain any tricky wording or wordplay:\n\n"},
+      "color": "#fef3c7",
+      "icon_name": "messages-square"
+    },
+    {
+      "title": {"zh": "辨析近义词", "en": "Compare similar words"},
+      "description": {"zh": "比较语气、场景和搭配差异", "en": "Compare tone, context, and collocations"},
+      "prompt": {"zh": "请辨析这些英语词或表达。用一条清晰的区别规则、典型搭配和对比例句说明：", "en": "Please compare these English words or expressions using one clear rule, typical collocations, and contrastive examples:"},
+      "color": "#fee2e2",
+      "icon_name": "split"
+    },
+    {
+      "title": {"zh": "润色英文", "en": "Polish my English"},
+      "description": {"zh": "修正错误，让表达更像母语者", "en": "Fix errors and make it sound native"},
+      "prompt": {"zh": "请润色下面的英文。先给自然版本，再列出主要修改及原因，并保留原本语气：\n\n", "en": "Please polish the English below. Give the natural version first, then list the main changes and reasons while preserving the original tone:\n\n"},
+      "color": "#fce7f3",
+      "icon_name": "sparkles"
+    }
+  ],
+  "task_examples": {
+    "zh": [
+      "每天「08:00」教我一个职场英语高频词，包含搭配、例句和易错点，任务创建后立即启用",
+      "每个工作日「12:30」推送一道语法辨析题，答题后再揭晓解析",
+      "每周日「20:00」复习本周学过的单词，并生成一份小测验"
+    ],
+    "en": [
+      "Every day at 08:00, teach me one high-frequency workplace English word with collocations, examples, and common mistakes — enable immediately",
+      "Every weekday at 12:30, send one grammar question and reveal the explanation after I answer",
+      "Every Sunday at 20:00, review this week's vocabulary and generate a short quiz"
+    ]
+  }
+}
