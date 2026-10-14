@@ -35,6 +35,8 @@ def test_english_expert_soul_covers_requested_behavior() -> None:
     soul = (_ROOT / "SOUL.md").read_text(encoding="utf-8")
 
     assert "解释单词、拆解语法、中英互译" in soul
+    assert "默认将其视为词汇学习请求" in soul
+    assert "不要因为单词表示星期、月份、节日或时间概念而调用时间工具" in soul
     assert "诙谐幽默" in soul
     assert "幽默用来帮助理解和记忆，不用来抢戏" in soul
 
