@@ -119,6 +119,15 @@ describe("pathPermissionKeys", () => {
 });
 
 describe("unknown dashboard paths", () => {
+  it("registers the standalone conversation audit route under chat", () => {
+    expect(
+      routeConfigs.some(
+        (route) => route.path === "/chat/:agentId/:threadId/audit",
+      ),
+    ).toBe(true);
+    expect(resolveSelectedKey("/chat/A1/T1/audit")).toBe("chat");
+  });
+
   it("highlights hardware on the smart-home page", () => {
     expect(resolveSelectedKey("/smart-home")).toBe("hardware");
   });

@@ -14,6 +14,7 @@ const PersonalizationPage = lazy(
 const ACPPage = lazy(() => import("../pages/Agent/ACP"));
 const TokenUsagePage = lazy(() => import("../pages/Control/TokenUsage"));
 const FamilyPage = lazy(() => import("../pages/Family"));
+const ConversationAuditPage = lazy(() => import("../pages/ConversationAudit"));
 
 // Standalone HomeMind pages (Stage 8). Each one reads the active family
 // from useActiveFamily, so the header switcher re-renders all of them.
@@ -178,6 +179,10 @@ export const routeConfigs: RouteConfig[] = [
   { path: "/chat", element: null, useWrapper: true },
   { path: "/chat/:agentId", element: null, useWrapper: true },
   { path: "/chat/:agentId/:threadId", element: null, useWrapper: true },
+  {
+    path: "/chat/:agentId/:threadId/audit",
+    element: <ConversationAuditPage />,
+  },
 
   // Common
   { path: "/experts", element: <ExpertsPage /> },

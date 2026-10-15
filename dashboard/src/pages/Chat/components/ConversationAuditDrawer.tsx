@@ -33,6 +33,7 @@ interface Props {
   threadId: string | null;
   open: boolean;
   onClose: () => void;
+  standalone?: boolean;
 }
 
 const ALL_KINDS: AuditKind[] = [
@@ -73,6 +74,7 @@ export default function ConversationAuditDrawer({
   threadId,
   open,
   onClose,
+  standalone = false,
 }: Props) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -185,7 +187,9 @@ export default function ConversationAuditDrawer({
       title={t("chat.audit.title")}
       open={open}
       onClose={onClose}
-      width={isMobile ? "100%" : "80vw"}
+      width={standalone || isMobile ? "100%" : "80vw"}
+      getContainer={standalone ? false : undefined}
+      rootStyle={standalone ? { position: "absolute" } : undefined}
       destroyOnHidden
     >
       {!threadId ? (
