@@ -9,6 +9,7 @@ opened anywhere.
 
 from __future__ import annotations
 
+import re
 import secrets
 import tempfile
 import threading
@@ -17,6 +18,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 LINK_TTL_SECONDS = 10 * 60
+_UNSAFE_NAME = re.compile(r'[\\/:\0<>"|?*]')
+
+
+def sanitize_download_filename(raw: str | None) -> str:
+    name = _UNSAFE_NAME.sub("_", (raw or "").strip()) or "download"
+    name = name.lstrip(".")
+    if name in {"", ".", ".."}:
+        return "download"
+    return name[:200]
 
 
 @dataclass(frozen=True)
