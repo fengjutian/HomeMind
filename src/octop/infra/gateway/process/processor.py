@@ -1417,6 +1417,11 @@ class GlobalProcessor:
             message_kwargs=message_kwargs or None,
             reasoning_overrides=reasoning_overrides,
         )
+        configurable = dict(request.get("configurable") or {})
+        audit_turn_id = meta.get("workspace_audit_turn_id")
+        if isinstance(audit_turn_id, str) and audit_turn_id:
+            configurable["workspace_audit_turn_id"] = audit_turn_id
+        request["configurable"] = configurable
         self.teams.stamp_host_runtime(request, agent_id)
         self._attach_turn_knowledge_config(
             request,

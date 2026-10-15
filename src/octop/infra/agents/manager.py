@@ -84,7 +84,7 @@ from octop.infra.skills.workspace_catalog import (
     repair_workspace_skill_manifests,
 )
 from octop.infra.utils.locale import Locale
-from octop.infra.utils.ulid import new_short_id
+from octop.infra.utils.ulid import new_short_id, new_ulid
 
 if TYPE_CHECKING:
     from octop.config import OctopConfig
@@ -95,6 +95,7 @@ if TYPE_CHECKING:
     from octop.infra.db.services import RepoBundle
     from octop.infra.proactive.scheduler import ProactiveCareScheduler
     from octop.infra.utils.paths import PathLayout
+    from octop.infra.workspace_audit import WorkspaceAuditContext
 
 logger = logging.getLogger(__name__)
 
@@ -1870,11 +1871,23 @@ class AgentManager:
         ):
             self._apply_pending_bootstrap_graph_refresh(agent_id)
             req = self._prepare_stream_request(agent_id, request)
-            with hitl_thread_scope(thread_id_from_request(req)):
+            from octop.infra.workspace_audit.context import (  # noqa: PLC0415
+                set_workspace_audit_tool_call,
+                workspace_audit_scope,
+            )
+
+            audit_context = self._workspace_audit_context(agent_id, req)
+            with (
+                hitl_thread_scope(thread_id_from_request(req)),
+                workspace_audit_scope(audit_context),
+            ):
                 await self._compact_before_context_pressure(agent_id, req)
                 has_side_effect = False
                 try:
                     async for chunk in self._harness_manager.stream(agent_id, cast(Any, req)):
+                        self._update_workspace_audit_tool_call(
+                            chunk, setter=set_workspace_audit_tool_call
+                        )
                         has_side_effect = has_side_effect or _stream_chunk_has_side_effect(chunk)
                         yield chunk
                 except Exception as exc:
@@ -1885,6 +1898,9 @@ class AgentManager:
                     ):
                         raise
                     async for chunk in self._harness_manager.stream(agent_id, cast(Any, req)):
+                        self._update_workspace_audit_tool_call(
+                            chunk, setter=set_workspace_audit_tool_call
+                        )
                         yield chunk
             self._apply_pending_bootstrap_graph_refresh(agent_id)
 
@@ -1948,7 +1964,12 @@ class AgentManager:
         async with self._track_invocation(agent_id):
             self._apply_pending_bootstrap_graph_refresh(agent_id)
             req = self._prepare_stream_request(agent_id, request)
-            with hitl_thread_scope(thread_id_from_request(req)):
+            from octop.infra.workspace_audit.context import workspace_audit_scope  # noqa: PLC0415
+
+            with (
+                hitl_thread_scope(thread_id_from_request(req)),
+                workspace_audit_scope(self._workspace_audit_context(agent_id, req)),
+            ):
                 try:
                     result = await self._harness_manager.call(agent_id, cast(Any, req))
                 except Exception as exc:
@@ -1959,6 +1980,40 @@ class AgentManager:
         if not isinstance(result, dict):
             return {"result": result}
         return result
+
+    def _workspace_audit_context(
+        self, agent_id: str, request: dict[str, Any]
+    ) -> WorkspaceAuditContext:
+        from octop.infra.workspace_audit import WorkspaceAuditContext  # noqa: PLC0415
+
+        configurable = request.get("configurable")
+        cfg = configurable if isinstance(configurable, dict) else {}
+        raw_user = request.get("user")
+        try:
+            user_id = int(raw_user) if raw_user is not None else None
+        except (TypeError, ValueError):
+            user_id = None
+        return WorkspaceAuditContext(
+            actor_type="user" if user_id is not None else "agent",
+            actor_id=str(user_id) if user_id is not None else agent_id,
+            user_id=user_id,
+            agent_id=agent_id,
+            source="agent_tool",
+            thread_id=thread_id_from_request(request) or None,
+            turn_id=str(cfg.get("workspace_audit_turn_id") or new_ulid()),
+            request_id=str(cfg.get("workspace_audit_request_id") or new_ulid()),
+            correlation_id=str(cfg.get("workspace_audit_correlation_id") or new_ulid()),
+        )
+
+    @staticmethod
+    def _update_workspace_audit_tool_call(chunk: Any, *, setter: Any) -> None:
+        if not isinstance(chunk, dict):
+            return
+        chunk_type = str(chunk.get("type") or "")
+        if chunk_type == "tool_call_chunk":
+            setter(str(chunk.get("id") or chunk.get("tool_call_id") or chunk.get("index", 0)))
+        elif chunk_type == "tool_result":
+            setter(None)
 
     async def _compact_after_context_overflow(
         self,
@@ -4071,6 +4126,31 @@ class AgentManager:
                 or is_remote_backend_spec(backend)
             )
             else backend
+        )
+
+        from octop_harness.backends import resolve_backend  # noqa: PLC0415
+        from octop_harness.backends.workspace import BackendWorkspace  # noqa: PLC0415
+
+        from octop.infra.backend.compat import adapt_backend_protocol  # noqa: PLC0415
+        from octop.infra.workspace_audit.backend import AuditedBackend  # noqa: PLC0415
+        from octop.infra.workspace_audit.service import WorkspaceChangeService  # noqa: PLC0415
+
+        resolved_harness_backend = adapt_backend_protocol(
+            resolve_backend(
+                harness_backend,
+                workspace_dir=harness_workspace,
+                system_files_path=system_files_path_from_config(cfg),
+            )
+        )
+        audit_workspace = BackendWorkspace(
+            resolved_harness_backend,
+            harness_workspace,
+            system_files_path=system_files_path_from_config(cfg),
+        )
+        harness_backend = AuditedBackend(
+            resolved_harness_backend,
+            workspace=audit_workspace,
+            service=WorkspaceChangeService(self._repos.workspace_change_repo),
         )
 
         harness_cfg = HarnessAgentConfig(

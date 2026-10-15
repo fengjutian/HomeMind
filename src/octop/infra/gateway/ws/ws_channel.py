@@ -156,6 +156,9 @@ class WebSocketChannel(BaseChannel):
             return
 
         turn_id, started_seq, replaced = self._steer.begin_turn(thread_id)
+        metadata = dict(message.metadata or {})
+        metadata["workspace_audit_turn_id"] = turn_id
+        message.metadata = metadata
         if replaced is not None:
             await _push_discarded(self._hub, thread_id, replaced)
         self._steer.remember_context(

@@ -13,7 +13,9 @@ from octop.infra.workspace_audit.service import WorkspaceChangeService
 class AuditedBackend:
     """Delegate reads unchanged and observe writes when a turn context is active."""
 
-    def __init__(self, backend: Any, *, workspace: BackendWorkspace, service: WorkspaceChangeService):
+    def __init__(
+        self, backend: Any, *, workspace: BackendWorkspace, service: WorkspaceChangeService
+    ):
         self._backend = backend
         self._workspace = workspace
         self._service = service
