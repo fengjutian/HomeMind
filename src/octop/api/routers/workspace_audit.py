@@ -54,11 +54,7 @@ class WorkspaceChangeListOut(BaseModel):
 
 def _out(row: WorkspaceChangeRow) -> WorkspaceChangeOut:
     return WorkspaceChangeOut(
-        **{
-            key: value
-            for key, value in row.__dict__.items()
-            if key not in {"metadata_json"}
-        },
+        **{key: value for key, value in row.__dict__.items() if key not in {"metadata_json"}},
         metadata=json.loads(row.metadata_json),
     )
 

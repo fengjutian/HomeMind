@@ -76,9 +76,7 @@ class WorkspaceChangeService:
             context=context,
         )
 
-    async def mkdir(
-        self, workspace: Any, path: str, *, context: WorkspaceAuditContext
-    ) -> None:
+    async def mkdir(self, workspace: Any, path: str, *, context: WorkspaceAuditContext) -> None:
         before = await self._state(workspace, path, read_content=False)
 
         async def mutate() -> None:
@@ -95,9 +93,7 @@ class WorkspaceChangeService:
             read_after_content=False,
         )
 
-    async def delete(
-        self, workspace: Any, path: str, *, context: WorkspaceAuditContext
-    ) -> None:
+    async def delete(self, workspace: Any, path: str, *, context: WorkspaceAuditContext) -> None:
         before = await self._state(workspace, path)
 
         async def mutate() -> None:
@@ -179,9 +175,7 @@ class WorkspaceChangeService:
             status="succeeded",
         )
 
-    async def _state(
-        self, workspace: Any, path: str, *, read_content: bool = True
-    ) -> _State:
+    async def _state(self, workspace: Any, path: str, *, read_content: bool = True) -> _State:
         exists = bool(await workspace.aexists(path))
         if not exists or not read_content:
             return _State(exists, None)

@@ -69,6 +69,7 @@ def test_run_migrations_creates_tables(db: SqlitePool):
         "sso_login_states",
         "trajectory_events",
         "desktop_notifications",
+        "workspace_change_log",
     }
     assert expected.issubset(names)
     assert "knowledge_base_members" not in names

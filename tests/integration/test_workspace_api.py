@@ -124,6 +124,38 @@ async def test_write_then_read_roundtrip(env: Any) -> None:
     assert body["content"] == payload
 
 
+async def test_workspace_write_is_audited_with_diff(env: Any) -> None:
+    c, _srv, auth, aid = env
+    endpoint = f"/api/agents/{aid}/workspace/file"
+    params = {**FROM_WORKSPACE, "path": "/audit.txt"}
+
+    first = await c.put(endpoint, params=params, headers=auth, json={"content": "old\n"})
+    assert first.status_code == 200, first.text
+    second = await c.put(endpoint, params=params, headers=auth, json={"content": "new\n"})
+    assert second.status_code == 200, second.text
+
+    response = await c.get(
+        f"/api/agents/{aid}/workspace/changes",
+        params={"path": "audit.txt"},
+        headers=auth,
+    )
+    assert response.status_code == 200, response.text
+    items = response.json()["items"]
+    assert [item["operation"] for item in items] == ["overwrite", "create"]
+    latest = items[0]
+    assert latest["source"] == "dashboard"
+    assert latest["status"] == "succeeded"
+    assert latest["before_hash"] != latest["after_hash"]
+    assert "-old" in latest["diff_text"]
+    assert "+new" in latest["diff_text"]
+    assert latest["thread_id"] is None
+    assert latest["tool_call_id"] is None
+
+    detail = await c.get(f"/api/agents/{aid}/workspace/changes/{latest['change_id']}", headers=auth)
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["integrity_hash"] == latest["integrity_hash"]
+
+
 async def test_read_missing_file_404(env: Any) -> None:
     c, _srv, auth, aid = env
     r = await c.get(

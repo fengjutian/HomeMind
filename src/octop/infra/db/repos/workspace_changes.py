@@ -52,15 +52,11 @@ class WorkspaceChangeRow:
             agent_id=str(row["agent_id"]),
             thread_id=str(row["thread_id"]) if row["thread_id"] is not None else None,
             turn_id=str(row["turn_id"]) if row["turn_id"] is not None else None,
-            tool_call_id=(
-                str(row["tool_call_id"]) if row["tool_call_id"] is not None else None
-            ),
+            tool_call_id=(str(row["tool_call_id"]) if row["tool_call_id"] is not None else None),
             source=str(row["source"]),
             operation=str(row["operation"]),
             path=str(row["path"]),
-            destination=(
-                str(row["destination"]) if row["destination"] is not None else None
-            ),
+            destination=(str(row["destination"]) if row["destination"] is not None else None),
             before_exists=bool(row["before_exists"]),
             after_exists=bool(row["after_exists"]),
             before_size=int(row["before_size"]) if row["before_size"] is not None else None,
@@ -71,9 +67,7 @@ class WorkspaceChangeRow:
             diff_text=str(row["diff_text"]) if row["diff_text"] is not None else None,
             status=str(row["status"]),
             error_code=str(row["error_code"]) if row["error_code"] is not None else None,
-            error_message=(
-                str(row["error_message"]) if row["error_message"] is not None else None
-            ),
+            error_message=(str(row["error_message"]) if row["error_message"] is not None else None),
             request_id=str(row["request_id"]) if row["request_id"] is not None else None,
             correlation_id=(
                 str(row["correlation_id"]) if row["correlation_id"] is not None else None
