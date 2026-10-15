@@ -305,9 +305,16 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
               value={status}
               onChange={setStatus}
               placeholder={t("chat.audit.status")}
-              options={["complete", "succeeded", "failed", "error"].map(
-                (value) => ({ value }),
-              )}
+              options={[
+                "pending",
+                "running",
+                "complete",
+                "succeeded",
+                "failed",
+                "error",
+                "cancelled",
+                "timeout",
+              ].map((value) => ({ value }))}
             />
             <Checkbox
               checked={autoRefresh}
@@ -359,6 +366,17 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
                 return (
                   <List.Item
                     onClick={() => setSelected(item)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelected(item);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${t(
+                      `chat.audit.kind.${item.kind}`,
+                    )} ${auditItemPreview(item)}`}
                     style={{ cursor: "pointer" }}
                   >
                     <List.Item.Meta

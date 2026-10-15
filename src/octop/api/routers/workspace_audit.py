@@ -16,6 +16,30 @@ from octop.infra.errors import ErrorCode, OctopError
 
 router = APIRouter()
 
+_SENSITIVE_KEYS = {
+    "api_key",
+    "apikey",
+    "authorization",
+    "cookie",
+    "password",
+    "secret",
+    "token",
+    "access_token",
+    "refresh_token",
+    "client_secret",
+}
+
+
+def _redact_sensitive(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: "[REDACTED]" if key.lower() in _SENSITIVE_KEYS else _redact_sensitive(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_sensitive(item) for item in value]
+    return value
+
 
 class WorkspaceChangeOut(BaseModel):
     change_id: str
@@ -160,6 +184,7 @@ async def get_thread_audit(
     turn_id: str | None = Query(default=None),
     tool_call_id: str | None = Query(default=None),
     status: str | None = Query(default=None),
+    include_sensitive: bool = Query(default=False),
     as_user: int | None = None,
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
@@ -190,7 +215,7 @@ async def get_thread_audit(
                 kind="message",
                 ts=float(row.created_at),
                 status="complete",
-                payload=body,
+                payload=body if include_sensitive else _redact_sensitive(body),
             )
         )
 
@@ -224,7 +249,7 @@ async def get_thread_audit(
                 tool_call_id=str(event.payload.get("tool_call_id"))
                 if event.payload.get("tool_call_id") is not None
                 else None,
-                payload=payload,
+                payload=payload if include_sensitive else _redact_sensitive(payload),
             )
         )
 
@@ -246,7 +271,11 @@ async def get_thread_audit(
                 status=row.status,
                 turn_id=row.turn_id,
                 tool_call_id=row.tool_call_id,
-                payload=change.model_dump(),
+                payload=(
+                    change.model_dump()
+                    if include_sensitive
+                    else _redact_sensitive(change.model_dump())
+                ),
             )
         )
 
