@@ -53,6 +53,32 @@ class WorkspaceChangeService:
     def __init__(self, repo: WorkspaceChangeRepo) -> None:
         self._repo = repo
 
+    def record_observed_change(
+        self,
+        *,
+        context: WorkspaceAuditContext,
+        operation: str,
+        path: str,
+        before: bytes | None,
+        after: bytes | None,
+        succeeded: bool,
+        error_message: str | None = None,
+        before_exists: bool | None = None,
+        after_exists: bool | None = None,
+    ) -> None:
+        """Append an event for a mutation performed by an external backend API."""
+        error = RuntimeError(error_message) if error_message else None
+        self._record(
+            context=context,
+            operation=operation,
+            path=path,
+            destination=None,
+            before=_State(before is not None if before_exists is None else before_exists, before),
+            after=_State(after is not None if after_exists is None else after_exists, after),
+            status="succeeded" if succeeded else "failed",
+            error=error,
+        )
+
     async def write_bytes(
         self,
         workspace: Any,
@@ -155,7 +181,7 @@ class WorkspaceChangeService:
                 path=path,
                 destination=destination,
                 before=before,
-                after=_State(False, None),
+                after=before,
                 status="failed",
                 error=exc,
             )

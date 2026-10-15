@@ -1691,12 +1691,13 @@ def _ensure_workspace_change_log_schema(db: DatabasePool) -> None:
         if db.dialect == "postgresql"
         else "INTEGER PRIMARY KEY AUTOINCREMENT"
     )
+    large_integer = "BIGINT" if db.dialect == "postgresql" else "INTEGER"
     with db.connect() as conn:
         conn.execute(
             f"""CREATE TABLE IF NOT EXISTS workspace_change_log (
               id {identity},
               change_id TEXT NOT NULL UNIQUE,
-              ts INTEGER NOT NULL,
+              ts {large_integer} NOT NULL,
               actor_type TEXT NOT NULL,
               actor_id TEXT,
               user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -1710,8 +1711,8 @@ def _ensure_workspace_change_log_schema(db: DatabasePool) -> None:
               destination TEXT,
               before_exists INTEGER NOT NULL,
               after_exists INTEGER NOT NULL,
-              before_size INTEGER,
-              after_size INTEGER,
+              before_size {large_integer},
+              after_size {large_integer},
               before_hash TEXT,
               after_hash TEXT,
               diff_kind TEXT,
