@@ -228,6 +228,32 @@ class ThreadMessageRepo:
         page.reverse()
         return page, has_more
 
+    def page_before_time(
+        self,
+        thread_id: str,
+        *,
+        before_ts: float | None,
+        limit: int,
+    ) -> tuple[list[ThreadMessageRow], bool]:
+        clauses = ["thread_id = ?"]
+        params: list[object] = [thread_id]
+        if before_ts is not None:
+            clauses.append("created_at < ?")
+            params.append(before_ts)
+        params.append(limit + 1)
+        with self._db.connect() as conn:
+            rows = conn.execute(
+                "SELECT seq, message_id, role, message_json, created_at "
+                "FROM thread_messages WHERE "
+                + " AND ".join(clauses)
+                + " ORDER BY created_at DESC, seq DESC LIMIT ?",
+                tuple(params),
+            ).fetchall()
+        has_more = len(rows) > limit
+        page = [ThreadMessageRow.from_row(row) for row in rows[:limit]]
+        page.reverse()
+        return page, has_more
+
     def append_if_ready(
         self,
         thread_id: str,

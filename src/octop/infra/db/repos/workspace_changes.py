@@ -127,7 +127,7 @@ class WorkspaceChangeRepo:
         if before_ts is not None:
             clauses.append("ts < ?")
             params.append(before_ts)
-        params.append(max(1, min(limit, 200)))
+        params.append(max(1, min(limit, 500)))
         sql = (
             "SELECT * FROM workspace_change_log WHERE "
             + " AND ".join(clauses)

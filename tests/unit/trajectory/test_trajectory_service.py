@@ -361,3 +361,17 @@ def test_list_from_seq_returns_inclusive_tail(tmp_path: Path) -> None:
     assert len(page) == 2
     replay = service.list_from_seq("T1", from_seq=page[1].seq, limit=10)
     assert [event.seq for event in replay] == [page[1].seq]
+
+
+def test_list_events_before_time_pages_older_events(tmp_path: Path) -> None:
+    service, _bus = _service(tmp_path)
+    for value in (10.0, 20.0, 30.0):
+        service.observe_chunk("A1", "T1", {"type": "user", "content": str(value), "ts": value})
+
+    recent, more = service.list_events_before_time("T1", before_ts=None, limit=2)
+    older, older_more = service.list_events_before_time("T1", before_ts=20.0, limit=2)
+
+    assert [event.ts for event in recent] == [20.0, 30.0]
+    assert more is True
+    assert [event.ts for event in older] == [10.0]
+    assert older_more is False

@@ -280,9 +280,7 @@ export default function ConversationAuditDrawer({
             <Button icon={<RotateCcw size={14} />} onClick={resetFilters}>
               {t("chat.audit.resetFilters")}
             </Button>
-            <Tag>
-              {t("chat.audit.resultCount", { count: items.length })}
-            </Tag>
+            <Tag>{t("chat.audit.resultCount", { count: items.length })}</Tag>
           </Space>
           {pendingNew && (
             <Alert
@@ -410,7 +408,13 @@ export default function ConversationAuditDrawer({
                 {formatServerDateTime(selected.ts, timeZone)}
               </Descriptions.Item>
             </Descriptions>
-            <pre style={{ maxHeight: "65vh", overflow: "auto", whiteSpace: "pre-wrap" }}>
+            <pre
+              style={{
+                maxHeight: "65vh",
+                overflow: "auto",
+                whiteSpace: "pre-wrap",
+              }}
+            >
               {JSON.stringify(selected.payload, null, 2)}
             </pre>
           </Space>

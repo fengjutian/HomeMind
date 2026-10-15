@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ConversationAuditDrawer from "./ConversationAuditDrawer";
 
@@ -63,5 +63,9 @@ describe("ConversationAuditDrawer", () => {
     expect(screen.getByText("call-1")).toBeInTheDocument();
     expect(screen.getByText("chat.audit.notice.binary")).toBeInTheDocument();
     expect(screen.getByText("chat.audit.loadMore")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("notes.txt"));
+    expect(screen.getByText("chat.audit.detail")).toBeInTheDocument();
+    expect(screen.getByText("workspace:C1")).toBeInTheDocument();
   });
 });

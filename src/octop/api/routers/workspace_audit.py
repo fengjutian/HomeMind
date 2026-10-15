@@ -176,7 +176,9 @@ async def get_thread_audit(
         {value.strip() for value in kinds.split(",") if value.strip()} if kinds else None
     )
     source_limit = min(500, max(limit * 3, limit + 1))
-    messages, _ = server.services.thread_message_repo.page(thread_id, limit=source_limit)
+    messages, messages_have_more = server.services.thread_message_repo.page_before_time(
+        thread_id, before_ts=before_ts, limit=source_limit
+    )
     for row in messages:
         try:
             body = json.loads(row.message_json)
@@ -194,10 +196,12 @@ async def get_thread_audit(
 
     runtime = getattr(server, "app_runtime", None)
     trajectory_service = getattr(runtime, "trajectory_service", None)
-    events = (
-        trajectory_service.list_events(thread_id, before_seq=None, limit=source_limit, kinds=None)
+    events, events_have_more = (
+        trajectory_service.list_events_before_time(
+            thread_id, before_ts=before_ts, limit=source_limit
+        )
         if trajectory_service is not None
-        else []
+        else ([], False)
     )
     for event in events:
         payload = asdict(event)
@@ -228,8 +232,10 @@ async def get_thread_audit(
         thread.agent_id,
         thread_id=thread_id,
         before_ts=int(before_ts) + 1 if before_ts is not None else None,
-        limit=source_limit,
+        limit=source_limit + 1,
     )
+    changes_have_more = len(changes) > source_limit
+    changes = changes[:source_limit]
     for row in changes:
         change = _out(row)
         timeline.append(
@@ -258,7 +264,17 @@ async def get_thread_audit(
         return status is None or item.status == status
 
     timeline = sorted((item for item in timeline if included(item)), key=lambda item: item.ts)
-    has_more = len(timeline) > limit
+    wants_messages = requested_kinds is None or "message" in requested_kinds
+    wants_events = requested_kinds is None or bool(
+        requested_kinds & {"trajectory", "model_call", "tool_call"}
+    )
+    wants_changes = requested_kinds is None or "workspace_change" in requested_kinds
+    has_more = (
+        len(timeline) > limit
+        or (wants_messages and messages_have_more)
+        or (wants_events and events_have_more)
+        or (wants_changes and changes_have_more)
+    )
     timeline = timeline[-limit:]
     totals = server.services.usage_repo.thread_totals(agent_id=thread.agent_id, thread_id=thread_id)
     has_errors = any(event.is_error for event in events) or any(

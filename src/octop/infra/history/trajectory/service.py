@@ -92,6 +92,22 @@ class TrajectoryService:
     ) -> list[TrajectoryEvent]:
         return self._store.list_before(thread_id, before_seq=before_seq, limit=limit, kinds=kinds)
 
+    def list_events_before_time(
+        self,
+        thread_id: str,
+        *,
+        before_ts: float | None,
+        limit: int,
+    ) -> tuple[list[TrajectoryEvent], bool]:
+        events = [
+            event
+            for event in self._store.iter_for_export(thread_id)
+            if before_ts is None or event.ts < before_ts
+        ]
+        events.sort(key=lambda event: (event.ts, event.seq))
+        has_more = len(events) > limit
+        return events[-limit:], has_more
+
     def list_from_seq(
         self,
         thread_id: str,

@@ -56,6 +56,35 @@ def test_new_thread_projection_appends_and_pages(tmp_path: Path) -> None:
     assert older_more is False
 
 
+def test_page_before_time_uses_timestamp_cursor(tmp_path: Path) -> None:
+    _db, threads, messages = _repos(tmp_path)
+    threads.insert(
+        thread_id="timed",
+        agent_id="agt",
+        user_id=1,
+        channel_type="dashboard",
+        session_key="timed",
+    )
+    rows = [
+        ThreadMessageInput(
+            message_id=f"m{ts}",
+            role="human",
+            message_json="{}",
+            created_at=ts,
+        )
+        for ts in (10, 20, 30)
+    ]
+    messages.append_if_ready("timed", rows)
+
+    recent, more = messages.page_before_time("timed", before_ts=None, limit=2)
+    older, older_more = messages.page_before_time("timed", before_ts=20, limit=2)
+
+    assert [row.created_at for row in recent] == [20, 30]
+    assert more is True
+    assert [row.created_at for row in older] == [10]
+    assert older_more is False
+
+
 def test_pending_legacy_thread_only_publishes_after_replace(tmp_path: Path) -> None:
     _db, threads, messages = _repos(tmp_path)
     threads.insert(
