@@ -156,6 +156,64 @@ async def test_workspace_write_is_audited_with_diff(env: Any) -> None:
     assert detail.json()["integrity_hash"] == latest["integrity_hash"]
 
 
+async def test_thread_audit_returns_summary_and_filterable_timeline(env: Any) -> None:
+    c, srv, auth, aid = env
+    assert srv.services is not None
+    agent_row = srv.services.agent_repo.get(aid)
+    assert agent_row is not None
+    srv.services.thread_repo.insert(
+        thread_id="audit-thread",
+        agent_id=aid,
+        user_id=agent_row.user_id,
+        channel_type="web",
+        session_key="audit-thread",
+    )
+    srv.services.workspace_change_repo.insert(
+        {
+            "change_id": "audit-change",
+            "ts": 1_700_000_000,
+            "actor_type": "agent",
+            "actor_id": aid,
+            "user_id": agent_row.user_id,
+            "agent_id": aid,
+            "thread_id": "audit-thread",
+            "turn_id": "turn-1",
+            "tool_call_id": "call-1",
+            "source": "agent_tool",
+            "operation": "create",
+            "path": "report.txt",
+            "destination": None,
+            "before_exists": 0,
+            "after_exists": 1,
+            "before_size": None,
+            "after_size": 2,
+            "before_hash": None,
+            "after_hash": "hash",
+            "diff_kind": "unified",
+            "diff_text": "+ok",
+            "status": "succeeded",
+            "error_code": None,
+            "error_message": None,
+            "request_id": None,
+            "correlation_id": None,
+            "metadata_json": "{}",
+            "integrity_hash": "integrity",
+            "schema_version": 1,
+        }
+    )
+
+    response = await c.get(
+        "/api/threads/audit-thread/audit",
+        params={"kinds": "workspace_change", "turn_id": "turn-1"},
+        headers=auth,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["summary"]["total_tokens"] == 0
+    assert body["timeline"][0]["id"] == "workspace:audit-change"
+    assert body["timeline"][0]["tool_call_id"] == "call-1"
+
+
 async def test_read_missing_file_404(env: Any) -> None:
     c, _srv, auth, aid = env
     r = await c.get(

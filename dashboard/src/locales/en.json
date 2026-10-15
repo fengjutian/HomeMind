@@ -1566,6 +1566,8 @@
       "loadMore": "Load earlier events",
       "kind": {
         "message": "Message",
+        "model_call": "Model call",
+        "tool_call": "Tool call",
         "trajectory": "Model / tool",
         "workspace_change": "File change"
       },

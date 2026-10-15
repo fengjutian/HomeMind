@@ -1566,6 +1566,8 @@
       "loadMore": "加载更早事件",
       "kind": {
         "message": "消息",
+        "model_call": "模型调用",
+        "tool_call": "工具调用",
         "trajectory": "模型 / 工具",
         "workspace_change": "文件变更"
       },

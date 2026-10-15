@@ -46,7 +46,11 @@ function payloadText(item: ThreadAuditItem): string {
   if (item.kind === "workspace_change") {
     return String(payload.path ?? "");
   }
-  if (item.kind === "trajectory" || item.kind === "model_call" || item.kind === "tool_call") {
+  if (
+    item.kind === "trajectory" ||
+    item.kind === "model_call" ||
+    item.kind === "tool_call"
+  ) {
     return String(payload.summary ?? payload.kind ?? "");
   }
   const content = payload.content;
