@@ -66,6 +66,7 @@ export interface RouteConfig {
 
 export const pathToKey: Record<string, string> = {
   "/chat": "chat",
+  "/conversation-audit": "conversation-audit",
   "/family": "family",
   // HomeMind standalone pages
   "/home": "family",
@@ -183,6 +184,7 @@ export const routeConfigs: RouteConfig[] = [
     path: "/chat/:agentId/:threadId/audit",
     element: <ConversationAuditPage />,
   },
+  { path: "/conversation-audit", element: <ConversationAuditPage /> },
 
   // Common
   { path: "/experts", element: <ExpertsPage /> },

@@ -31,9 +31,6 @@ import { formatServerDateTime } from "../../../utils/formatMessageTime";
 
 interface Props {
   threadId: string | null;
-  open: boolean;
-  onClose: () => void;
-  standalone?: boolean;
 }
 
 const ALL_KINDS: AuditKind[] = [
@@ -70,12 +67,7 @@ function contentNotice(item: ThreadAuditItem): string | null {
   return null;
 }
 
-export default function ConversationAuditDrawer({
-  threadId,
-  open,
-  onClose,
-  standalone = false,
-}: Props) {
+export default function ConversationAuditDrawer({ threadId }: Props) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const timeZone = useServerTimezone();
@@ -125,11 +117,11 @@ export default function ConversationAuditDrawer({
   }, [filters, threadId]);
 
   useEffect(() => {
-    if (open) void load();
-  }, [load, open]);
+    void load();
+  }, [load]);
 
   useEffect(() => {
-    if (!open || !autoRefresh || !threadId) return;
+    if (!autoRefresh || !threadId) return;
     const timer = window.setInterval(() => {
       void auditApi
         .getThreadAudit(threadId, filters)
@@ -140,7 +132,7 @@ export default function ConversationAuditDrawer({
         .catch(() => undefined);
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [autoRefresh, filters, open, threadId]);
+  }, [autoRefresh, filters, threadId]);
 
   const loadMore = async () => {
     if (!threadId || !page?.next_before_ts) return;
@@ -183,15 +175,7 @@ export default function ConversationAuditDrawer({
   };
 
   return (
-    <Drawer
-      title={t("chat.audit.title")}
-      open={open}
-      onClose={onClose}
-      width={standalone || isMobile ? "100%" : "80vw"}
-      getContainer={standalone ? false : undefined}
-      rootStyle={standalone ? { position: "absolute" } : undefined}
-      destroyOnHidden
-    >
+    <>
       {!threadId ? (
         <Empty description={t("chat.audit.selectThread")} />
       ) : (
@@ -424,6 +408,6 @@ export default function ConversationAuditDrawer({
           </Space>
         )}
       </Drawer>
-    </Drawer>
+    </>
   );
 }

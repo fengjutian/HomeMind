@@ -51,9 +51,7 @@ describe("ConversationAuditDrawer", () => {
   });
 
   it("renders summary, classified event, identifiers, and content notice", async () => {
-    render(
-      <ConversationAuditDrawer threadId="T1" open onClose={() => undefined} />,
-    );
+    render(<ConversationAuditDrawer threadId="T1" />);
 
     await waitFor(() => expect(getThreadAudit).toHaveBeenCalled());
     expect(screen.getByText("openai:gpt")).toBeInTheDocument();

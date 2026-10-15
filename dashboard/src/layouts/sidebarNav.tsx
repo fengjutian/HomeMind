@@ -21,6 +21,7 @@ import {
   PanelsTopLeft,
   HouseHeart,
   Wifi,
+  ScrollText,
 } from "lucide-react";
 import type { OctopUser } from "../api/modules/auth";
 import { navAllowed, userCan } from "../utils/permissions";
@@ -57,6 +58,7 @@ export const SIDEBAR_NAV_KEYS = [
   "experts",
   "tasks",
   "token-usage",
+  "conversation-audit",
   "personalization",
   "channels",
   "connectors",
@@ -177,6 +179,12 @@ export function buildNavSections(
           path: "/token-usage",
           icon: <Activity size={iconSize} strokeWidth={iconStroke} />,
           labelKey: "nav.tokenUsage",
+        },
+        {
+          key: "conversation-audit",
+          path: "/conversation-audit",
+          icon: <ScrollText size={iconSize} strokeWidth={iconStroke} />,
+          labelKey: "nav.conversationAudit",
         },
       ],
     },

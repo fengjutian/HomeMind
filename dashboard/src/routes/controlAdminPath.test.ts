@@ -126,6 +126,12 @@ describe("unknown dashboard paths", () => {
       ),
     ).toBe(true);
     expect(resolveSelectedKey("/chat/A1/T1/audit")).toBe("chat");
+    expect(
+      routeConfigs.some((route) => route.path === "/conversation-audit"),
+    ).toBe(true);
+    expect(resolveSelectedKey("/conversation-audit")).toBe(
+      "conversation-audit",
+    );
   });
 
   it("highlights hardware on the smart-home page", () => {

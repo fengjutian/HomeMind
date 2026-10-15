@@ -41,6 +41,7 @@ const BUILTIN_ID_BY_LABEL: Record<string, string> = {
 };
 
 const NAV_KEY_SET = new Set<string>(SIDEBAR_NAV_KEYS);
+const DEFAULT_VISIBLE_NEW_KEYS = new Set(["conversation-audit"]);
 
 export function catalogItems(sections: NavSection[]): Map<string, NavItem> {
   const items = new Map<string, NavItem>();
@@ -114,7 +115,9 @@ export function editorFromCatalog(
     }
   }
   for (const key of defaultKeyOrder(base)) {
-    if (!seen.has(key)) hidden.push(key);
+    if (seen.has(key)) continue;
+    if (DEFAULT_VISIBLE_NEW_KEYS.has(key)) ungrouped.push(key);
+    else hidden.push(key);
   }
   return { groups, ungrouped, itemsByGroup, hidden };
 }

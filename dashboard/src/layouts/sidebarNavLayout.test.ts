@@ -41,6 +41,7 @@ describe("sidebarNavLayout", () => {
       "experts",
       "tasks",
       "token-usage",
+      "conversation-audit",
     ]);
     expect(editor.groups.map((group) => group.id)).toEqual([
       "settings",
@@ -70,7 +71,10 @@ describe("sidebarNavLayout", () => {
       "settings",
       "control",
     ]);
-    expect(applied[0]?.items.map((item) => item.key)).toEqual(["chat"]);
+    expect(applied[0]?.items.map((item) => item.key)).toEqual([
+      "chat",
+      "conversation-audit",
+    ]);
     expect(applied[1]?.title).toBe("配置");
     expect(applied[1]?.items.map((item) => item.key)).toEqual([
       "personalization",
@@ -78,12 +82,12 @@ describe("sidebarNavLayout", () => {
     expect(applied[2]?.groupKey).toBe("nav.control");
   });
 
-  it("sends keys missing from a saved layout to hidden", () => {
+  it("shows the new audit item while sending other missing keys to hidden", () => {
     const editor = editorFromCatalog(catalog(), {
       groups: [{ id: "settings" }],
       items: [{ key: "chat" }],
     });
-    expect(editor.ungrouped).toEqual(["chat"]);
+    expect(editor.ungrouped).toEqual(["chat", "conversation-audit"]);
     expect(editor.hidden).toContain("experts");
     expect(editor.hidden).toContain("personalization");
     expect(
