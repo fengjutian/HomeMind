@@ -1564,6 +1564,12 @@
       "loadError": "Failed to load conversation audit",
       "empty": "No matching audit events",
       "loadMore": "Load earlier events",
+      "resetFilters": "Reset filters",
+      "resultCount": "{{count}} loaded",
+      "detail": "Audit event detail",
+      "eventId": "Event ID",
+      "eventType": "Event type",
+      "time": "Time",
       "kind": {
         "message": "Message",
         "model_call": "Model call",

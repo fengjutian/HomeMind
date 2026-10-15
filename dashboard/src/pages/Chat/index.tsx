@@ -1646,7 +1646,7 @@ function ChatPageInner() {
                               "chat.audit.selectThread",
                               "Select a session to view trajectory",
                             )
-                          : t("chat.openTrajectory", "运行轨迹")
+                          : t("chat.audit.open")
                       }
                       mouseEnterDelay={0.35}
                       placement="left"
@@ -1657,7 +1657,7 @@ function ChatPageInner() {
                           className={styles.chatFloatBtn}
                           disabled={!activeThreadId || !agentChatReady}
                           onClick={() => setTrajectoryDrawerOpen(true)}
-                          aria-label={t("chat.openTrajectory", "运行轨迹")}
+                          aria-label={t("chat.audit.open")}
                         >
                           <Activity size={20} strokeWidth={2.1} />
                         </button>

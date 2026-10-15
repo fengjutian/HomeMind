@@ -5,6 +5,7 @@ import {
   Card,
   Checkbox,
   DatePicker,
+  Descriptions,
   Drawer,
   Empty,
   Input,
@@ -15,7 +16,7 @@ import {
   Statistic,
   Tag,
 } from "antd";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -87,7 +88,9 @@ export default function ConversationAuditDrawer({
   const [status, setStatus] = useState<string>();
   const [sinceTs, setSinceTs] = useState<number>();
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [filterResetKey, setFilterResetKey] = useState(0);
   const [pendingNew, setPendingNew] = useState<ThreadAuditPage>();
+  const [selected, setSelected] = useState<ThreadAuditItem>();
   const newestIdRef = useRef<string>();
 
   const filters = useMemo(
@@ -126,10 +129,13 @@ export default function ConversationAuditDrawer({
   useEffect(() => {
     if (!open || !autoRefresh || !threadId) return;
     const timer = window.setInterval(() => {
-      void auditApi.getThreadAudit(threadId, filters).then((next) => {
-        const newest = next.timeline.at(-1)?.id;
-        if (newest && newest !== newestIdRef.current) setPendingNew(next);
-      });
+      void auditApi
+        .getThreadAudit(threadId, filters)
+        .then((next) => {
+          const newest = next.timeline.at(-1)?.id;
+          if (newest && newest !== newestIdRef.current) setPendingNew(next);
+        })
+        .catch(() => undefined);
     }, 5000);
     return () => window.clearInterval(timer);
   }, [autoRefresh, filters, open, threadId]);
@@ -163,6 +169,15 @@ export default function ConversationAuditDrawer({
     setItems(pendingNew.timeline);
     newestIdRef.current = pendingNew.timeline.at(-1)?.id;
     setPendingNew(undefined);
+  };
+
+  const resetFilters = () => {
+    setKinds(ALL_KINDS);
+    setTurnId("");
+    setToolCallId("");
+    setStatus(undefined);
+    setSinceTs(undefined);
+    setFilterResetKey((value) => value + 1);
   };
 
   return (
@@ -222,9 +237,12 @@ export default function ConversationAuditDrawer({
                 value,
               }))}
               value={kinds}
-              onChange={(values) => setKinds(values as AuditKind[])}
+              onChange={(values) => {
+                if (values.length > 0) setKinds(values as AuditKind[]);
+              }}
             />
             <DatePicker
+              key={filterResetKey}
               showTime
               onChange={(value) => setSinceTs(value?.unix())}
               placeholder={t("chat.audit.since")}
@@ -259,6 +277,12 @@ export default function ConversationAuditDrawer({
             <Button icon={<RefreshCw size={14} />} onClick={() => void load()}>
               {t("common.refresh")}
             </Button>
+            <Button icon={<RotateCcw size={14} />} onClick={resetFilters}>
+              {t("chat.audit.resetFilters")}
+            </Button>
+            <Tag>
+              {t("chat.audit.resultCount", { count: items.length })}
+            </Tag>
           </Space>
           {pendingNew && (
             <Alert
@@ -288,8 +312,16 @@ export default function ConversationAuditDrawer({
               locale={{ emptyText: t("chat.audit.empty") }}
               renderItem={(item) => {
                 const notice = contentNotice(item);
+                const diff =
+                  item.kind === "workspace_change" &&
+                  typeof item.payload.diff_text === "string"
+                    ? item.payload.diff_text
+                    : null;
                 return (
-                  <List.Item>
+                  <List.Item
+                    onClick={() => setSelected(item)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <List.Item.Meta
                       title={
                         <Space wrap>
@@ -309,18 +341,33 @@ export default function ConversationAuditDrawer({
                         </Space>
                       }
                       description={
-                        <Space wrap>
-                          <span>{formatServerDateTime(item.ts, timeZone)}</span>
-                          {item.turn_id && <code>{item.turn_id}</code>}
-                          {item.tool_call_id && (
-                            <code>{item.tool_call_id}</code>
+                        <div>
+                          <Space wrap>
+                            <span>
+                              {formatServerDateTime(item.ts, timeZone)}
+                            </span>
+                            {item.turn_id && <code>{item.turn_id}</code>}
+                            {item.tool_call_id && (
+                              <code>{item.tool_call_id}</code>
+                            )}
+                            {notice && (
+                              <Tag color="warning">
+                                {t(`chat.audit.notice.${notice}`)}
+                              </Tag>
+                            )}
+                          </Space>
+                          {diff && (
+                            <pre
+                              style={{
+                                maxHeight: 240,
+                                overflow: "auto",
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              {diff}
+                            </pre>
                           )}
-                          {notice && (
-                            <Tag color="warning">
-                              {t(`chat.audit.notice.${notice}`)}
-                            </Tag>
-                          )}
-                        </Space>
+                        </div>
                       }
                     />
                   </List.Item>
@@ -335,6 +382,40 @@ export default function ConversationAuditDrawer({
           )}
         </Space>
       )}
+      <Drawer
+        title={t("chat.audit.detail")}
+        open={selected != null}
+        onClose={() => setSelected(undefined)}
+        width={isMobile ? "100%" : 680}
+      >
+        {selected && (
+          <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+            <Descriptions column={1} size="small" bordered>
+              <Descriptions.Item label={t("chat.audit.eventId")}>
+                <code>{selected.id}</code>
+              </Descriptions.Item>
+              <Descriptions.Item label={t("chat.audit.eventType")}>
+                {t(`chat.audit.kind.${selected.kind}`)}
+              </Descriptions.Item>
+              <Descriptions.Item label={t("chat.audit.status")}>
+                {selected.status || "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="turn_id">
+                <code>{selected.turn_id || "-"}</code>
+              </Descriptions.Item>
+              <Descriptions.Item label="tool_call_id">
+                <code>{selected.tool_call_id || "-"}</code>
+              </Descriptions.Item>
+              <Descriptions.Item label={t("chat.audit.time")}>
+                {formatServerDateTime(selected.ts, timeZone)}
+              </Descriptions.Item>
+            </Descriptions>
+            <pre style={{ maxHeight: "65vh", overflow: "auto", whiteSpace: "pre-wrap" }}>
+              {JSON.stringify(selected.payload, null, 2)}
+            </pre>
+          </Space>
+        )}
+      </Drawer>
     </Drawer>
   );
 }
