@@ -228,8 +228,34 @@ HomeMind 与 Octop 运行时在同一 FastAPI 进程中组合，不需要 Redis 
 
 ## 开发
 
+运行环境要求：
+
+- Python 3.12
+- Node.js 20（npm 10）
+- [uv](https://docs.astral.sh/uv/)
+
+按照锁文件安装后端和前端依赖：
+
 ```bash
 uv sync
+cd dashboard && npm ci && cd ..
+```
+
+使用跨平台启动脚本启动开发服务（支持 macOS、Linux 和 Windows）：
+
+```bash
+python3 start-dev.py              # 后端 + 前端 + 桌面端
+python3 start-dev.py web          # 后端 + 前端
+python3 start-dev.py backend      # 仅后端
+python3 start-dev.py frontend     # 仅前端
+python3 start-dev.py desktop      # 后端 + 前端 + 桌面端
+```
+
+`desktop` 和 `all` 目标还要求 `PATH` 中存在 Wails v3（`wails3`）。脚本会复用已监听 `8088` 端口的后端，从 `5173` 开始选择可用的前端端口；按 Ctrl+C 会停止本次由脚本启动的进程。
+
+安装 Git hooks 并运行完整项目检查：
+
+```bash
 make install-hooks
 make all
 ```
@@ -238,7 +264,7 @@ make all
 
 ```bash
 cd dashboard
-npm install
+npm ci
 npm run dev
 ```
 

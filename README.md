@@ -228,8 +228,34 @@ Read [SECURITY.md](SECURITY.md) and the [configuration reference](docs/configura
 
 ## Development
 
+Required runtimes:
+
+- Python 3.12
+- Node.js 20 (npm 10)
+- [uv](https://docs.astral.sh/uv/)
+
+Install the locked backend and frontend dependencies:
+
 ```bash
 uv sync
+cd dashboard && npm ci && cd ..
+```
+
+Start the development services with the cross-platform launcher (macOS, Linux, or Windows):
+
+```bash
+python3 start-dev.py              # backend + frontend + desktop
+python3 start-dev.py web          # backend + frontend
+python3 start-dev.py backend      # backend only
+python3 start-dev.py frontend     # frontend only
+python3 start-dev.py desktop      # backend + frontend + desktop
+```
+
+The `desktop` and `all` targets additionally require Wails v3 (`wails3`) in `PATH`. The launcher reuses a backend already listening on port `8088`, chooses an available frontend port starting at `5173`, and stops the processes it started when you press Ctrl+C.
+
+Install the Git hooks and run the full project checks:
+
+```bash
 make install-hooks
 make all
 ```
@@ -238,7 +264,7 @@ Frontend development:
 
 ```bash
 cd dashboard
-npm install
+npm ci
 npm run dev
 ```
 
