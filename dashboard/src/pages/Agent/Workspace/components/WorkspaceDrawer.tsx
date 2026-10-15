@@ -39,6 +39,7 @@ import {
   ChevronRight,
   FolderPlus,
   FilePlus,
+  History,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { request, requestBlob, requestUpload } from "../../../../api/request";
@@ -59,6 +60,7 @@ import { fileTreeIcon } from "../../../../utils/fileTreeIcon";
 import { dedupeFileTreeInfos } from "../../../../utils/fileTreeNodes";
 import { workspaceEntryPath } from "../../../../utils/workspacePath";
 import FileViewer from "./FileViewer";
+import WorkspaceChangesModal from "./WorkspaceChangesModal";
 import {
   getPreviewKind,
   previewNeedsFillLayout,
@@ -270,6 +272,7 @@ export default function WorkspaceDrawer({
   const [saving, setSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState(true);
   const [archiveExporting, setArchiveExporting] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const [archiveImportOpen, setArchiveImportOpen] = useState(false);
   const [archiveImportMode, setArchiveImportMode] = useState<
     "merge" | "replace"
@@ -1059,6 +1062,16 @@ export default function WorkspaceDrawer({
         </span>
       )}
       <Space size={isMobile ? 4 : 8} className={styles.drawerTitleActions}>
+        <Tooltip title={t("workspace.audit.title")}>
+          <Button
+            size="small"
+            icon={<History size={13} />}
+            onClick={() => setAuditOpen(true)}
+            aria-label={t("workspace.audit.title")}
+          >
+            {isMobile ? null : t("workspace.audit.button")}
+          </Button>
+        </Tooltip>
         <Tooltip
           title={
             isMobile
@@ -1125,6 +1138,11 @@ export default function WorkspaceDrawer({
 
   const workspaceBody = (
     <>
+      <WorkspaceChangesModal
+        agentId={agentId}
+        open={auditOpen}
+        onClose={() => setAuditOpen(false)}
+      />
       <Modal
         title={t("workspace.archiveImportTitle")}
         open={archiveImportOpen}

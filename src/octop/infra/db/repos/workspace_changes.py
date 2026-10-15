@@ -105,6 +105,8 @@ class WorkspaceChangeRepo:
         *,
         thread_id: str | None = None,
         path: str | None = None,
+        source: str | None = None,
+        operation: str | None = None,
         limit: int = 100,
         before_ts: int | None = None,
     ) -> list[WorkspaceChangeRow]:
@@ -116,6 +118,12 @@ class WorkspaceChangeRepo:
         if path is not None:
             clauses.append("path = ?")
             params.append(path)
+        if source is not None:
+            clauses.append("source = ?")
+            params.append(source)
+        if operation is not None:
+            clauses.append("operation = ?")
+            params.append(operation)
         if before_ts is not None:
             clauses.append("ts < ?")
             params.append(before_ts)

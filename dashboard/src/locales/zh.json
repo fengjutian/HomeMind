@@ -2191,6 +2191,15 @@
     }
   },
   "workspace": {
+    "audit": {
+      "title": "文件变更审计",
+      "button": "变更记录",
+      "pathFilter": "按完整路径筛选",
+      "operation": "操作",
+      "source": "来源",
+      "empty": "暂无文件变更",
+      "noDiff": "此变更没有可展示的文本差异。"
+    },
     "refreshHint": "只刷新根目录；子目录在展开时按需加载",
     "refreshFailed": "刷新失败",
     "uploaded": "已上传 {{name}}",

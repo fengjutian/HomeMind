@@ -7,6 +7,7 @@ import io
 import os
 import shutil
 import zipfile
+from collections.abc import Awaitable, Callable
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -238,6 +239,7 @@ async def import_workspace_zip(
     *,
     mode: WorkspaceImportMode,
     local_workspace_dir: Path | None = None,
+    write_file: Callable[[str, bytes], Awaitable[None]] | None = None,
 ) -> dict[str, int | str | list[str]]:
     """Import a zip archive into the workspace."""
     entries = _iter_zip_entries(data)
@@ -260,7 +262,11 @@ async def import_workspace_zip(
             f"skipped {skipped} {OCTOP_BUILTIN_SKILLS_ROOT!r} entry/entries (owned by Octop)"
         )
     if pairs:
-        await workspace.aupload_many(pairs)
+        if write_file is None:
+            await workspace.aupload_many(pairs)
+        else:
+            for rel, blob in pairs:
+                await write_file(rel, blob)
 
     return {
         "mode": mode,

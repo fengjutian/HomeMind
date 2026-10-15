@@ -19,6 +19,7 @@ from octop.api.deps import current_user, get_server
 from octop.config import DEFAULT_MAX_UPLOAD_MB, upload_mb_to_bytes
 from octop.infra.gateway.media.attachment_hints import sniff_image_media_type
 from octop.infra.gateway.media.inbound_store import INBOUND_EXTENSION_MEDIA_TYPES
+from octop.infra.workspace_audit import WorkspaceAuditContext, WorkspaceChangeService
 
 router = APIRouter()
 
@@ -80,4 +81,21 @@ async def upload_attachment(
         data=data,
         max_bytes=max_bytes,
     )
+    if server.services is not None:
+        WorkspaceChangeService(server.services.workspace_change_repo).record_observed_change(
+            context=WorkspaceAuditContext(
+                actor_type="user",
+                actor_id=str(user.id),
+                user_id=user.id,
+                agent_id=agent_id,
+                source="attachment",
+            ),
+            operation="create",
+            path=stored.data_path,
+            before=None,
+            after=data,
+            succeeded=True,
+            before_exists=False,
+            after_exists=True,
+        )
     return _attachment_payload(agent_id, stored)

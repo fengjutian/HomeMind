@@ -11,7 +11,41 @@ import type {
   SyncFromOpenClawResponse,
 } from "../types";
 
+export interface WorkspaceChange {
+  change_id: string;
+  ts: number;
+  source: string;
+  operation: string;
+  path: string;
+  destination?: string | null;
+  status: string;
+  diff_kind?: string | null;
+  diff_text?: string | null;
+  error_message?: string | null;
+  actor_type: string;
+  turn_id?: string | null;
+  tool_call_id?: string | null;
+}
+
 export const workspaceApi = {
+  listWorkspaceChanges: (
+    agentId: string,
+    filters: { path?: string; source?: string; operation?: string } = {},
+  ) => {
+    const params = new URLSearchParams({ limit: "200" });
+    if (filters.path) params.set("path", filters.path);
+    if (filters.source) params.set("source", filters.source);
+    if (filters.operation) params.set("operation", filters.operation);
+    return request<{ items: WorkspaceChange[] }>(
+      `/agents/${agentId}/workspace/changes?${params}`,
+    );
+  },
+
+  getWorkspaceChange: (agentId: string, changeId: string) =>
+    request<WorkspaceChange>(
+      `/agents/${agentId}/workspace/changes/${changeId}`,
+    ),
+
   getWorkspaceTree: () => request<FileTreeNode[]>("/workspace/tree"),
 
   getTreeChildren: (path: string) =>

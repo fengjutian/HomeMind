@@ -2191,6 +2191,15 @@
     }
   },
   "workspace": {
+    "audit": {
+      "title": "File change audit",
+      "button": "Changes",
+      "pathFilter": "Filter by exact path",
+      "operation": "Operation",
+      "source": "Source",
+      "empty": "No file changes",
+      "noDiff": "No text diff is available for this change."
+    },
     "refreshHint": "Refreshes root only; subfolders load on expand",
     "refreshFailed": "Refresh failed",
     "uploaded": "Uploaded {{name}}",

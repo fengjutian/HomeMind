@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
 from langchain_core.messages import ToolMessage
@@ -30,6 +31,19 @@ class _Workspace:
 
     def present_path(self, path: str) -> str:
         return path.lstrip("/")
+
+    async def als(self, path: str) -> Any:
+        prefix = "" if path == "." else path.rstrip("/") + "/"
+        children: dict[str, bool] = {}
+        for file_path in self.files:
+            if not file_path.startswith(prefix):
+                continue
+            remainder = file_path[len(prefix) :]
+            first, separator, _rest = remainder.partition("/")
+            children[prefix + first] = bool(separator)
+        return SimpleNamespace(
+            entries=[{"path": child, "is_dir": is_dir} for child, is_dir in children.items()]
+        )
 
 
 def _request(name: str, path: str) -> ToolCallRequest:
@@ -96,3 +110,27 @@ async def test_read_tool_and_calls_without_turn_context_are_not_audited() -> Non
         await middleware.awrap_tool_call(_request("read_file", "notes.txt"), handler)
 
     assert repo.rows == []
+
+
+async def test_execute_records_each_file_changed_by_script() -> None:
+    workspace = _Workspace()
+    workspace.files = {"keep.txt": b"same", "old.txt": b"old"}
+    repo = _Repo()
+    middleware = WorkspaceAuditMiddleware(
+        workspace=workspace,
+        service=WorkspaceChangeService(repo),  # type: ignore[arg-type]
+    )
+
+    async def handler(_request: ToolCallRequest) -> ToolMessage:
+        workspace.files["old.txt"] = b"new"
+        workspace.files["created.py"] = b"print('ok')\n"
+        return ToolMessage(content="ok", tool_call_id="call-42")
+
+    with workspace_audit_scope(_context()):
+        await middleware.awrap_tool_call(_request("execute", "ignored"), handler)
+
+    assert {(row["operation"], row["path"]) for row in repo.rows} == {
+        ("create", "created.py"),
+        ("overwrite", "old.txt"),
+    }
+    assert {row["tool_call_id"] for row in repo.rows} == {"call-42"}

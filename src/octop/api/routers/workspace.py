@@ -125,14 +125,16 @@ def _audit_service(server: Any) -> WorkspaceChangeService:
     return WorkspaceChangeService(server.services.workspace_change_repo)
 
 
-def _dashboard_audit_context(*, agent_id: str, user: Any) -> WorkspaceAuditContext:
+def _dashboard_audit_context(
+    *, agent_id: str, user: Any, source: str = "dashboard"
+) -> WorkspaceAuditContext:
     request_id = new_ulid()
     return WorkspaceAuditContext(
         actor_type="user",
         actor_id=str(user.id),
         user_id=int(user.id),
         agent_id=agent_id,
-        source="dashboard",
+        source=source,
         request_id=request_id,
         correlation_id=request_id,
     )
@@ -615,10 +617,21 @@ async def import_workspace_archive(
         agent_id, user=user, as_user=as_user, server=server, owner_only=True
     )
     local_ws = resolve_agent_workspace_dir(server, agent_id)
+    audit = _audit_service(server)
+    context = _dashboard_audit_context(
+        agent_id=agent_id,
+        user=user,
+        source="backup_restore",
+    )
+
+    async def write_imported_file(path: str, data: bytes) -> None:
+        await audit.write_bytes(ws, path, data, context=context)
+
     result = await import_workspace_zip(
         ws,
         raw,
         mode=mode,
         local_workspace_dir=local_ws,
+        write_file=write_imported_file,
     )
     return {"ok": True, **result}
