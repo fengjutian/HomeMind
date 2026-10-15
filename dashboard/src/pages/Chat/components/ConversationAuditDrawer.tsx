@@ -17,7 +17,15 @@ import {
   Tag,
 } from "antd";
 import { RefreshCw, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   auditApi,
@@ -27,7 +35,10 @@ import {
 } from "../../../api/modules/audit";
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import { useServerTimezone } from "../../../hooks/useServerTimezone";
+import { useTheme } from "../../../context/ThemeContext";
 import { formatServerDateTime } from "../../../utils/formatMessageTime";
+
+const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 
 interface Props {
   threadId: string | null;
@@ -37,25 +48,44 @@ const ALL_KINDS: AuditKind[] = [
   "message",
   "model_call",
   "tool_call",
+  "trajectory",
   "workspace_change",
 ];
 
-function payloadText(item: ThreadAuditItem): string {
+const PREVIEW_LIMIT = 320;
+
+export function auditItemPreview(item: ThreadAuditItem): string {
   const payload = item.payload;
+  let text: string;
   if (item.kind === "workspace_change") {
-    return String(payload.path ?? "");
-  }
-  if (
+    text = String(payload.path ?? "");
+  } else if (
     item.kind === "trajectory" ||
     item.kind === "model_call" ||
     item.kind === "tool_call"
   ) {
-    return String(payload.summary ?? payload.kind ?? "");
+    text = String(payload.summary ?? payload.kind ?? "");
+  } else {
+    const content = payload.content;
+    text =
+      typeof content === "string"
+        ? content
+        : JSON.stringify(content ?? payload);
   }
-  const content = payload.content;
-  return typeof content === "string"
-    ? content
-    : JSON.stringify(content ?? payload);
+  return text.length > PREVIEW_LIMIT
+    ? `${text.slice(0, PREVIEW_LIMIT).trimEnd()}…`
+    : text;
+}
+
+export function mergeAuditItems(
+  current: ThreadAuditItem[],
+  incoming: ThreadAuditItem[],
+): ThreadAuditItem[] {
+  const byId = new Map(current.map((item) => [item.id, item]));
+  for (const item of incoming) byId.set(item.id, item);
+  return [...byId.values()].sort(
+    (left, right) => left.ts - right.ts || left.id.localeCompare(right.id),
+  );
 }
 
 function contentNotice(item: ThreadAuditItem): string | null {
@@ -70,6 +100,7 @@ function contentNotice(item: ThreadAuditItem): string | null {
 export default function ConversationAuditDrawer({ threadId }: Props) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
+  const { isDark } = useTheme();
   const timeZone = useServerTimezone();
   const [page, setPage] = useState<ThreadAuditPage>();
   const [items, setItems] = useState<ThreadAuditItem[]>([]);
@@ -86,6 +117,7 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
   const [pendingNew, setPendingNew] = useState<ThreadAuditPage>();
   const [selected, setSelected] = useState<ThreadAuditItem>();
   const newestIdRef = useRef<string>();
+  const loadRequestRef = useRef(0);
 
   const filters = useMemo(
     () => ({
@@ -100,21 +132,33 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
   );
 
   const load = useCallback(async () => {
-    if (!threadId) return;
+    const requestId = ++loadRequestRef.current;
+    if (!threadId) {
+      setPage(undefined);
+      setItems([]);
+      return;
+    }
     setLoading(true);
     setError(false);
     try {
       const next = await auditApi.getThreadAudit(threadId, filters);
+      if (requestId !== loadRequestRef.current) return;
       setPage(next);
       setItems(next.timeline);
       newestIdRef.current = next.timeline.at(-1)?.id;
       setPendingNew(undefined);
     } catch {
-      setError(true);
+      if (requestId === loadRequestRef.current) setError(true);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
   }, [filters, threadId]);
+
+  useEffect(() => {
+    setSelected(undefined);
+    setPendingNew(undefined);
+    newestIdRef.current = undefined;
+  }, [threadId]);
 
   useEffect(() => {
     void load();
@@ -122,16 +166,21 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
 
   useEffect(() => {
     if (!autoRefresh || !threadId) return;
+    let active = true;
     const timer = window.setInterval(() => {
       void auditApi
         .getThreadAudit(threadId, filters)
         .then((next) => {
+          if (!active) return;
           const newest = next.timeline.at(-1)?.id;
           if (newest && newest !== newestIdRef.current) setPendingNew(next);
         })
         .catch(() => undefined);
     }, 5000);
-    return () => window.clearInterval(timer);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, [autoRefresh, filters, threadId]);
 
   const loadMore = async () => {
@@ -159,8 +208,12 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
 
   const acceptNew = () => {
     if (!pendingNew) return;
-    setPage(pendingNew);
-    setItems(pendingNew.timeline);
+    setItems((current) => mergeAuditItems(current, pendingNew.timeline));
+    setPage((current) => ({
+      ...pendingNew,
+      has_more: Boolean(current?.has_more || pendingNew.has_more),
+      next_before_ts: current?.next_before_ts ?? pendingNew.next_before_ts,
+    }));
     newestIdRef.current = pendingNew.timeline.at(-1)?.id;
     setPendingNew(undefined);
   };
@@ -323,7 +376,7 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
                               text={item.status}
                             />
                           )}
-                          <span>{payloadText(item)}</span>
+                          <span>{auditItemPreview(item)}</span>
                         </Space>
                       }
                       description={
@@ -396,15 +449,28 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
                 {formatServerDateTime(selected.ts, timeZone)}
               </Descriptions.Item>
             </Descriptions>
-            <pre
-              style={{
-                maxHeight: "65vh",
-                overflow: "auto",
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {JSON.stringify(selected.payload, null, 2)}
-            </pre>
+            <Suspense fallback={<Spin />}>
+              <MonacoEditor
+                height="65vh"
+                language="json"
+                theme={isDark ? "vs-dark" : "light"}
+                value={JSON.stringify(selected.payload, null, 2)}
+                options={{
+                  readOnly: true,
+                  domReadOnly: true,
+                  automaticLayout: true,
+                  minimap: { enabled: false },
+                  lineNumbers: "on",
+                  folding: true,
+                  wordWrap: "on",
+                  scrollBeyondLastLine: false,
+                  formatOnPaste: true,
+                  contextmenu: true,
+                  fontSize: 13,
+                  tabSize: 2,
+                }}
+              />
+            </Suspense>
           </Space>
         )}
       </Drawer>
