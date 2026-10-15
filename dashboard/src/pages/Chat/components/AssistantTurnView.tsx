@@ -69,7 +69,6 @@ function TurnErrorBubbles({
   agentId,
   showAvatar,
   onRegenerate,
-  onDisableStreamUsage,
   onEditUserMessage,
   onForkAssistantMessage,
   forkDisabled,
@@ -82,7 +81,6 @@ function TurnErrorBubbles({
   agentId?: string | null;
   showAvatar: boolean;
   onRegenerate?: (messageId: string) => void;
-  onDisableStreamUsage?: () => Promise<boolean>;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
   forkDisabled?: boolean;
@@ -102,7 +100,6 @@ function TurnErrorBubbles({
             showAvatar={showAvatar && index === 0}
             groupPosition="only"
             onRegenerate={onRegenerate}
-            onDisableStreamUsage={onDisableStreamUsage}
             onEditUserMessage={onEditUserMessage}
             onForkAssistantMessage={onForkAssistantMessage}
             forkDisabled={forkDisabled}
@@ -299,7 +296,6 @@ export default function AssistantTurnView({
               agentId={agentId}
               showAvatar={!showProcess && !split.answerMessage}
               onRegenerate={onRegenerate}
-              onDisableStreamUsage={onDisableStreamUsage}
               onEditUserMessage={onEditUserMessage}
               onForkAssistantMessage={onForkAssistantMessage}
               forkDisabled={forkDisabled}
@@ -379,7 +375,6 @@ export default function AssistantTurnView({
           !trailingSplit.answerMessage
         }
         onRegenerate={onRegenerate}
-        onDisableStreamUsage={onDisableStreamUsage}
         onEditUserMessage={onEditUserMessage}
         onForkAssistantMessage={onForkAssistantMessage}
         forkDisabled={forkDisabled}

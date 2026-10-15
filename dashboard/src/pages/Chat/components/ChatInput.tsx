@@ -860,6 +860,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const canSend = Boolean(
       (completeComposerText.trim() || attachments.length > 0) && !disabled,
     );
+    const showDrop = dragOver;
 
     return (
       <div
