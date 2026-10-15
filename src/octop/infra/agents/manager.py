@@ -1871,10 +1871,7 @@ class AgentManager:
         ):
             self._apply_pending_bootstrap_graph_refresh(agent_id)
             req = self._prepare_stream_request(agent_id, request)
-            from octop.infra.workspace_audit.context import (  # noqa: PLC0415
-                set_workspace_audit_tool_call,
-                workspace_audit_scope,
-            )
+            from octop.infra.workspace_audit.context import workspace_audit_scope  # noqa: PLC0415
 
             audit_context = self._workspace_audit_context(agent_id, req)
             with (
@@ -1885,9 +1882,6 @@ class AgentManager:
                 has_side_effect = False
                 try:
                     async for chunk in self._harness_manager.stream(agent_id, cast(Any, req)):
-                        self._update_workspace_audit_tool_call(
-                            chunk, setter=set_workspace_audit_tool_call
-                        )
                         has_side_effect = has_side_effect or _stream_chunk_has_side_effect(chunk)
                         yield chunk
                 except Exception as exc:
@@ -1898,9 +1892,6 @@ class AgentManager:
                     ):
                         raise
                     async for chunk in self._harness_manager.stream(agent_id, cast(Any, req)):
-                        self._update_workspace_audit_tool_call(
-                            chunk, setter=set_workspace_audit_tool_call
-                        )
                         yield chunk
             self._apply_pending_bootstrap_graph_refresh(agent_id)
 
@@ -2004,16 +1995,6 @@ class AgentManager:
             request_id=str(cfg.get("workspace_audit_request_id") or new_ulid()),
             correlation_id=str(cfg.get("workspace_audit_correlation_id") or new_ulid()),
         )
-
-    @staticmethod
-    def _update_workspace_audit_tool_call(chunk: Any, *, setter: Any) -> None:
-        if not isinstance(chunk, dict):
-            return
-        chunk_type = str(chunk.get("type") or "")
-        if chunk_type == "tool_call_chunk":
-            setter(str(chunk.get("id") or chunk.get("tool_call_id") or chunk.get("index", 0)))
-        elif chunk_type == "tool_result":
-            setter(None)
 
     async def _compact_after_context_overflow(
         self,
@@ -3948,6 +3929,8 @@ class AgentManager:
         from octop.infra.agents.middleware.reasoning import ReasoningRequestMiddleware
         from octop.infra.agents.middleware.thread_artifacts import ThreadArtifactsMiddleware
         from octop.infra.agents.middleware.token_quota import TokenQuotaMiddleware
+        from octop.infra.agents.middleware.workspace_audit import WorkspaceAuditMiddleware
+        from octop.infra.workspace_audit.service import WorkspaceChangeService  # noqa: PLC0415
         from octop.infra.agents.middleware.workspace_image import (
             WorkspaceImageMaterializeMiddleware,
         )
@@ -3971,6 +3954,10 @@ class AgentManager:
             BrowserProfileMiddleware(),
             BinaryReadGuardMiddleware(),
             WorkspaceImageMaterializeMiddleware(workspace=ws),
+            WorkspaceAuditMiddleware(
+                workspace=ws,
+                service=WorkspaceChangeService(self._repos.workspace_change_repo),
+            ),
             ThreadArtifactsMiddleware(
                 thread_repo=self._repos.thread_repo,
                 workspace_dir=harness_workspace,
@@ -4126,31 +4113,6 @@ class AgentManager:
                 or is_remote_backend_spec(backend)
             )
             else backend
-        )
-
-        from octop_harness.backends import resolve_backend  # noqa: PLC0415
-        from octop_harness.backends.workspace import BackendWorkspace  # noqa: PLC0415
-
-        from octop.infra.backend.compat import adapt_backend_protocol  # noqa: PLC0415
-        from octop.infra.workspace_audit.backend import AuditedBackend  # noqa: PLC0415
-        from octop.infra.workspace_audit.service import WorkspaceChangeService  # noqa: PLC0415
-
-        resolved_harness_backend = adapt_backend_protocol(
-            resolve_backend(
-                harness_backend,
-                workspace_dir=harness_workspace,
-                system_files_path=system_files_path_from_config(cfg),
-            )
-        )
-        audit_workspace = BackendWorkspace(
-            resolved_harness_backend,
-            harness_workspace,
-            system_files_path=system_files_path_from_config(cfg),
-        )
-        harness_backend = AuditedBackend(
-            resolved_harness_backend,
-            workspace=audit_workspace,
-            service=WorkspaceChangeService(self._repos.workspace_change_repo),
         )
 
         harness_cfg = HarnessAgentConfig(
