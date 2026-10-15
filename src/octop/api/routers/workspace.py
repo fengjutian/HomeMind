@@ -32,6 +32,8 @@ from octop.infra.gateway.media.backend_files import (
     resolve_preview_payload,
 )
 from octop.infra.utils.doc_edit import DocConverter, get_doc_converter
+from octop.infra.utils.ulid import new_ulid
+from octop.infra.workspace_audit import WorkspaceAuditContext, WorkspaceChangeService
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +120,24 @@ _FROM_WORKSPACE_DESC = (
 router = APIRouter()
 
 
+def _audit_service(server: Any) -> WorkspaceChangeService:
+    assert server.services is not None
+    return WorkspaceChangeService(server.services.workspace_change_repo)
+
+
+def _dashboard_audit_context(*, agent_id: str, user: Any) -> WorkspaceAuditContext:
+    request_id = new_ulid()
+    return WorkspaceAuditContext(
+        actor_type="user",
+        actor_id=str(user.id),
+        user_id=int(user.id),
+        agent_id=agent_id,
+        source="dashboard",
+        request_id=request_id,
+        correlation_id=request_id,
+    )
+
+
 @router.get("/agents/{agent_id}/workspace/tree")
 async def list_tree(
     agent_id: str,
@@ -200,7 +220,12 @@ async def write_file(
     else:
         data = body.content.encode("utf-8")
     try:
-        await ws.aupload_bytes(_workspace_io_path(path, from_workspace=from_workspace), data)
+        await _audit_service(server).write_bytes(
+            ws,
+            _workspace_io_path(path, from_workspace=from_workspace),
+            data,
+            context=_dashboard_audit_context(agent_id=agent_id, user=user),
+        )
     except Exception as exc:
         raise OctopError(ErrorCode.NOT_FOUND, f"cannot write {path!r}: {exc}") from exc
     return {"path": path, "size": len(data)}
@@ -234,7 +259,11 @@ async def mkdir_workspace_dir(
         agent_id, user=user, as_user=as_user, server=server, owner_only=True
     )
     try:
-        await ws.amkdir(rel)
+        await _audit_service(server).mkdir(
+            ws,
+            rel,
+            context=_dashboard_audit_context(agent_id=agent_id, user=user),
+        )
     except Exception as exc:
         raise _map_workspace_fs_error(exc, operation="mkdir", path=path) from exc
     api_path = path if path.startswith("/") else f"/{path}"
@@ -264,7 +293,11 @@ async def delete_workspace_file(
         agent_id, user=user, as_user=as_user, server=server, owner_only=True
     )
     try:
-        await ws.adelete(rel)
+        await _audit_service(server).delete(
+            ws,
+            rel,
+            context=_dashboard_audit_context(agent_id=agent_id, user=user),
+        )
     except Exception as exc:
         raise _map_workspace_fs_error(exc, operation="delete", path=path) from exc
     return Response(status_code=204)
@@ -294,7 +327,12 @@ async def move_workspace_file(
         agent_id, user=user, as_user=as_user, server=server, owner_only=True
     )
     try:
-        await ws.amove(src, dest)
+        await _audit_service(server).move(
+            ws,
+            src,
+            dest,
+            context=_dashboard_audit_context(agent_id=agent_id, user=user),
+        )
     except Exception as exc:
         raise _map_workspace_fs_error(exc, operation="move", path=path) from exc
     dest_api = body.destination if body.destination.startswith("/") else f"/{body.destination}"
@@ -318,9 +356,11 @@ async def upload_file(
     target = path or f"/{file.filename or 'upload.bin'}"
     data = await file.read()
     try:
-        await ws.aupload_bytes(
+        await _audit_service(server).write_bytes(
+            ws,
             _workspace_io_path(target, from_workspace=from_workspace),
             data,
+            context=_dashboard_audit_context(agent_id=agent_id, user=user),
         )
     except Exception as exc:
         raise OctopError(ErrorCode.NOT_FOUND, f"cannot upload to {target!r}: {exc}") from exc
@@ -418,7 +458,12 @@ async def write_doc(
             f"cannot build document for {path!r}: {exc}",
         ) from exc
     try:
-        await ws.aupload_bytes(rel, data)
+        await _audit_service(server).write_bytes(
+            ws,
+            rel,
+            data,
+            context=_dashboard_audit_context(agent_id=agent_id, user=user),
+        )
     except Exception as exc:
         raise _map_workspace_fs_error(exc, operation="write", path=path) from exc
     return {"path": path, "size": len(data)}
