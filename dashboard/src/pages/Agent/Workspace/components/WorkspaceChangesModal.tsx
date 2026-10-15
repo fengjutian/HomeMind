@@ -96,7 +96,11 @@ export default function WorkspaceChangesModal({
             locale={{ emptyText: t("workspace.audit.empty") }}
             renderItem={(item) => (
               <List.Item
-                onClick={() => setSelected(item)}
+                onClick={() => {
+                  void workspaceApi
+                    .getWorkspaceChange(agentId, item.change_id)
+                    .then(setSelected);
+                }}
                 style={{ cursor: "pointer" }}
               >
                 <List.Item.Meta

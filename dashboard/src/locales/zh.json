@@ -1547,6 +1547,34 @@
     "path_outside_root": "文件路径超出当前专家的存储根目录，无法读写。请改用存储根目录内的路径，或在专家设置中扩大存储根目录（Windows 上请显式指定盘符路径，例如 D:/octop-data）。"
   },
   "chat": {
+    "audit": {
+      "title": "对话审计",
+      "open": "打开对话审计",
+      "selectThread": "选择一个对话以查看审计时间线",
+      "model": "模型",
+      "totalTokens": "总 Token",
+      "inputOutput": "输入 / 输出",
+      "calls": "模型调用",
+      "status": "状态",
+      "error": "错误",
+      "since": "起始时间",
+      "autoRefresh": "自动刷新",
+      "newEvents": "发现新的审计事件",
+      "showNew": "显示新事件",
+      "loadError": "对话审计加载失败",
+      "empty": "没有符合条件的审计事件",
+      "loadMore": "加载更早事件",
+      "kind": {
+        "message": "消息",
+        "trajectory": "模型 / 工具",
+        "workspace_change": "文件变更"
+      },
+      "notice": {
+        "binary": "二进制内容",
+        "truncated": "差异内容已截断",
+        "redacted": "敏感内容已脱敏"
+      }
+    },
     "longText": {
       "characterCount": "{{count}} 个字符",
       "expand": "展开编辑",

@@ -54,8 +54,10 @@ class WorkspaceChangeListOut(BaseModel):
 
 
 class ThreadAuditItemOut(BaseModel):
+    id: str
     kind: str
     ts: float
+    status: str | None = None
     turn_id: str | None = None
     tool_call_id: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
@@ -76,6 +78,8 @@ class ThreadAuditOut(BaseModel):
     agent_id: str
     summary: ThreadAuditSummaryOut
     timeline: list[ThreadAuditItemOut]
+    next_before_ts: float | None = None
+    has_more: bool = False
 
 
 def _out(row: WorkspaceChangeRow) -> WorkspaceChangeOut:
@@ -150,6 +154,12 @@ async def get_workspace_change(
 async def get_thread_audit(
     thread_id: str,
     limit: int = Query(default=200, ge=1, le=500),
+    before_ts: float | None = Query(default=None),
+    since_ts: float | None = Query(default=None),
+    kinds: str | None = Query(default=None),
+    turn_id: str | None = Query(default=None),
+    tool_call_id: str | None = Query(default=None),
+    status: str | None = Query(default=None),
     as_user: int | None = None,
     user: Any = Depends(current_user),
     server: Any = Depends(get_server),
@@ -162,18 +172,30 @@ async def get_thread_audit(
     _require_owner(thread.agent_id, user=user, as_user=as_user, server=server)
 
     timeline: list[ThreadAuditItemOut] = []
-    messages, _ = server.services.thread_message_repo.page(thread_id, limit=limit)
+    requested_kinds = (
+        {value.strip() for value in kinds.split(",") if value.strip()} if kinds else None
+    )
+    source_limit = min(500, max(limit * 3, limit + 1))
+    messages, _ = server.services.thread_message_repo.page(thread_id, limit=source_limit)
     for row in messages:
         try:
             body = json.loads(row.message_json)
         except json.JSONDecodeError:
             body = {"role": row.role, "content": row.message_json}
-        timeline.append(ThreadAuditItemOut(kind="message", ts=float(row.created_at), payload=body))
+        timeline.append(
+            ThreadAuditItemOut(
+                id=f"message:{row.seq}",
+                kind="message",
+                ts=float(row.created_at),
+                status="complete",
+                payload=body,
+            )
+        )
 
     runtime = getattr(server, "app_runtime", None)
     trajectory_service = getattr(runtime, "trajectory_service", None)
     events = (
-        trajectory_service.list_events(thread_id, before_seq=None, limit=limit, kinds=None)
+        trajectory_service.list_events(thread_id, before_seq=None, limit=source_limit, kinds=None)
         if trajectory_service is not None
         else []
     )
@@ -181,10 +203,19 @@ async def get_thread_audit(
         payload = asdict(event)
         payload.pop("thread_id", None)
         payload.pop("agent_id", None)
+        item_kind = (
+            "tool_call"
+            if event.kind == "tool"
+            else "model_call"
+            if event.kind in {"assistant", "token", "reasoning"}
+            else "trajectory"
+        )
         timeline.append(
             ThreadAuditItemOut(
-                kind="trajectory",
+                id=f"trajectory:{event.event_id}",
+                kind=item_kind,
                 ts=event.ts,
+                status="error" if event.is_error else "complete",
                 turn_id=event.turn_id,
                 tool_call_id=str(event.payload.get("tool_call_id"))
                 if event.payload.get("tool_call_id") is not None
@@ -194,21 +225,40 @@ async def get_thread_audit(
         )
 
     changes = server.services.workspace_change_repo.list_for_agent(
-        thread.agent_id, thread_id=thread_id, limit=limit
+        thread.agent_id,
+        thread_id=thread_id,
+        before_ts=int(before_ts) + 1 if before_ts is not None else None,
+        limit=source_limit,
     )
     for row in changes:
         change = _out(row)
         timeline.append(
             ThreadAuditItemOut(
+                id=f"workspace:{row.change_id}",
                 kind="workspace_change",
                 ts=float(row.ts),
+                status=row.status,
                 turn_id=row.turn_id,
                 tool_call_id=row.tool_call_id,
                 payload=change.model_dump(),
             )
         )
 
-    timeline.sort(key=lambda item: item.ts)
+    def included(item: ThreadAuditItemOut) -> bool:
+        if before_ts is not None and item.ts >= before_ts:
+            return False
+        if since_ts is not None and item.ts < since_ts:
+            return False
+        if requested_kinds is not None and item.kind not in requested_kinds:
+            return False
+        if turn_id is not None and item.turn_id != turn_id:
+            return False
+        if tool_call_id is not None and item.tool_call_id != tool_call_id:
+            return False
+        return status is None or item.status == status
+
+    timeline = sorted((item for item in timeline if included(item)), key=lambda item: item.ts)
+    has_more = len(timeline) > limit
     timeline = timeline[-limit:]
     totals = server.services.usage_repo.thread_totals(agent_id=thread.agent_id, thread_id=thread_id)
     has_errors = any(event.is_error for event in events) or any(
@@ -227,4 +277,6 @@ async def get_thread_audit(
             model_calls=totals["model_calls"],
         ),
         timeline=timeline,
+        next_before_ts=timeline[0].ts if has_more and timeline else None,
+        has_more=has_more,
     )

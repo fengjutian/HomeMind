@@ -1547,6 +1547,34 @@
     "path_outside_root": "The file path is outside this expert's storage root, so it cannot be read or written. Use a path under the storage root, or widen the storage root in expert settings (on Windows, set an explicit drive path such as D:/octop-data)."
   },
   "chat": {
+    "audit": {
+      "title": "Conversation audit",
+      "open": "Open conversation audit",
+      "selectThread": "Select a conversation to view its audit timeline",
+      "model": "Model",
+      "totalTokens": "Total tokens",
+      "inputOutput": "Input / output",
+      "calls": "Model calls",
+      "status": "Status",
+      "error": "Error",
+      "since": "From time",
+      "autoRefresh": "Auto refresh",
+      "newEvents": "New audit events are available",
+      "showNew": "Show new events",
+      "loadError": "Failed to load conversation audit",
+      "empty": "No matching audit events",
+      "loadMore": "Load earlier events",
+      "kind": {
+        "message": "Message",
+        "trajectory": "Model / tool",
+        "workspace_change": "File change"
+      },
+      "notice": {
+        "binary": "Binary content",
+        "truncated": "Diff truncated",
+        "redacted": "Sensitive content redacted"
+      }
+    },
     "longText": {
       "characterCount": "{{count}} characters",
       "expand": "Expand to edit",

@@ -417,6 +417,7 @@ Bundled experts live in `src/octop/infra/agents/experts/library/`
 | `GET`    | `/agents/{aid}/workspace/grep` | owner | grep backend files |
 | `GET`    | `/agents/{aid}/workspace/changes` | owner | newest-first workspace mutation audit; filters: `thread_id`, `path`, `before_ts`, `limit` |
 | `GET`    | `/agents/{aid}/workspace/changes/{change_id}` | owner | change hashes, bounded text diff, status, and correlation metadata |
+| `GET`    | `/threads/{thread_id}/audit` | owner | unified chronological messages, trajectory/tool events, file changes, model, token, completion, and error summary |
 | `GET`    | `/agents/{aid}/workspace/...` | owner | see `api/routers/workspace.py` |
 | `GET`    | `/agents/{aid}/skills` | owner | list installed skills |
 | `PUT`    | `/agents/{aid}/skills/{slug}` | owner | enable / disable a skill |

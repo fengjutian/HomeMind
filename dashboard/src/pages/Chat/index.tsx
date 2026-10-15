@@ -61,7 +61,7 @@ import WelcomeScreen from "./components/WelcomeScreen";
 import AgentNotReadyScreen from "./components/AgentNotReadyScreen";
 import ModelConfigEmpty from "./components/ModelConfigEmpty";
 import AgentProfileDrawer from "../../components/AgentProfileDrawer";
-import TrajectoryDrawer from "./components/TrajectoryDrawer";
+import ConversationAuditDrawer from "./components/ConversationAuditDrawer";
 import { useExpertChatWelcome } from "./hooks/useExpertQuickCards";
 import { useSkills } from "../Agent/Skills/useSkills";
 import { useChatSubagents } from "./hooks/useChatSubagents";
@@ -1643,7 +1643,7 @@ function ChatPageInner() {
                           ? t("workspace.requiresRunning")
                           : !activeThreadId
                           ? t(
-                              "chat.trajectorySelectSession",
+                              "chat.audit.selectThread",
                               "Select a session to view trajectory",
                             )
                           : t("chat.openTrajectory", "运行轨迹")
@@ -1876,8 +1876,7 @@ function ChatPageInner() {
             />
           )}
           {trajectoryEnabled && (
-            <TrajectoryDrawer
-              agentId={resolvedAgentId ?? ""}
+            <ConversationAuditDrawer
               threadId={activeThreadId}
               open={trajectoryDrawerOpen}
               onClose={() => setTrajectoryDrawerOpen(false)}
