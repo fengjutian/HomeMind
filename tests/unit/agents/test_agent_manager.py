@@ -818,6 +818,8 @@ def test_build_harness_config_includes_search_knowledge_without_cron(
 
 
 def test_build_harness_config_defaults_local_shell_backend(manager: AgentManager) -> None:
+    from octop.infra.agents.middleware.workspace_audit import WorkspaceAuditMiddleware
+
     cfg = manager._build_harness_config(_row(agent_id="AGT001"))
     assert cfg.backend == _expected_default_backend(manager, "AGT001")
     assert cfg.workspace_dir.name == "AGT001"
@@ -825,6 +827,7 @@ def test_build_harness_config_defaults_local_shell_backend(manager: AgentManager
     assert cfg.bootstrap_enabled is True
     # Kept for harness FilesystemGuardMiddleware (not passed to deepagents).
     assert cfg.permissions is not None
+    assert any(isinstance(item, WorkspaceAuditMiddleware) for item in (cfg.middleware or []))
 
 
 @pytest.mark.asyncio

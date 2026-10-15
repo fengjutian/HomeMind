@@ -3930,11 +3930,11 @@ class AgentManager:
         from octop.infra.agents.middleware.thread_artifacts import ThreadArtifactsMiddleware
         from octop.infra.agents.middleware.token_quota import TokenQuotaMiddleware
         from octop.infra.agents.middleware.workspace_audit import WorkspaceAuditMiddleware
-        from octop.infra.workspace_audit.service import WorkspaceChangeService  # noqa: PLC0415
         from octop.infra.agents.middleware.workspace_image import (
             WorkspaceImageMaterializeMiddleware,
         )
         from octop.infra.knowledge.hint import KnowledgeSearchHintMiddleware
+        from octop.infra.workspace_audit.service import WorkspaceChangeService  # noqa: PLC0415
 
         # FilesystemGuard + ModelSettings live in octop-harness (auto-mounted).
         # BinaryReadGuard stays Octop-specific (inbound/attachment product policy).
