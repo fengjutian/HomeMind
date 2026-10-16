@@ -25,6 +25,8 @@ def test_novel_writing_expert_is_discoverable() -> None:
         "CONTINUITY.md",
         "STYLE_GUIDE.md",
         "CHAPTER_LOG.md",
+        "CHAPTER_BRIEF.md",
+        "CHAPTER_QA.md",
     } <= set(expert.files)
     assert len(expert.quick_prompts) == 6
 
@@ -53,3 +55,17 @@ def test_novel_writing_soul_preserves_authorial_control() -> None:
     assert "用户明确要求或确认结构后，才写小说正文" in soul
     assert "写正文前执行一致性闸门" in soul
     assert "不得在一次回答中连续生成多章" in soul
+    assert "上下文包未经用户确认，不直接成稿" in soul
+    assert "关键项失败时先修正文" in soul
+
+
+def test_novel_writing_expert_tracks_knowledge_and_chapter_quality() -> None:
+    continuity = (_ROOT / "CONTINUITY.md").read_text(encoding="utf-8")
+    brief = (_ROOT / "CHAPTER_BRIEF.md").read_text(encoding="utf-8")
+    qa = (_ROOT / "CHAPTER_QA.md").read_text(encoding="utf-8")
+
+    assert "人物知识矩阵" in continuity
+    assert "作者真相" in continuity
+    assert "禁止提前揭晓的信息" in brief
+    assert "人员、武器、弹药与战损是否守恒" in qa
+    assert "允许更新正史档案：否" in qa
