@@ -336,6 +336,7 @@ function ActiveAgentCard({
       }}
     >
       <div className={styles.agentCardProfile}>
+        {dragHandle}
         <div
           className={styles.agentCardAvatar}
           style={{
@@ -352,7 +353,6 @@ function ActiveAgentCard({
         </div>
         <div className={styles.agentCardInfo}>
           <div className={styles.agentCardNameRow}>
-            {dragHandle}
             <div className={styles.agentNameCluster}>
               <div className={styles.agentCardName}>{agent.name}</div>
               <ExpertTaskIndicator status={workStatus} />
@@ -487,6 +487,7 @@ function InactiveAgentRow({
           }
         }}
       >
+        {dragHandle}
         <div
           className={styles.agentRowAvatar}
           style={{ color: accent, background: `${accent}12` }}
@@ -499,7 +500,6 @@ function InactiveAgentRow({
         </div>
         <div className={styles.agentRowInfo}>
           <div className={styles.agentRowNameRow}>
-            {dragHandle}
             <div className={styles.agentNameCluster}>
               <div className={styles.agentRowName}>{agent.name}</div>
               <ExpertTaskIndicator status={workStatus} />

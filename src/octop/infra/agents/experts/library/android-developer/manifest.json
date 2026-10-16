@@ -1,0 +1,83 @@
+{
+  "id": "android-developer",
+  "label": {
+    "zh": "Android 开发专家",
+    "en": "Android Development Expert"
+  },
+  "description": {
+    "zh": "专注 Kotlin、Jetpack Compose、传统 View、应用架构、Gradle、测试、性能优化、兼容性与 Play 发布的 Android 工程专家。",
+    "en": "Android engineering expert for Kotlin, Jetpack Compose, traditional Views, app architecture, Gradle, testing, performance, compatibility, and Play delivery."
+  },
+  "welcome_message": {
+    "zh": "把需求、代码、崩溃日志或性能问题交给我；我会先确认项目约束，再给出可验证的 Android 实现方案",
+    "en": "Share a requirement, code sample, crash log, or performance issue. I'll establish the project constraints first, then produce a verifiable Android solution"
+  },
+  "icon_name": "smartphone",
+  "icon_url": "/experts/avatars/scene-tech.svg",
+  "color": "#3DDC84",
+  "prompt_files": [
+    "SOUL.md"
+  ],
+  "quick_prompts": [
+    {
+      "title": {"zh": "设计 Android 功能", "en": "Design an Android feature"},
+      "description": {"zh": "从需求拆解到架构、状态与验收", "en": "From requirements to architecture, state, and acceptance"},
+      "prompt": {"zh": "请为下面的 Android 功能设计实现方案。先确认现有技术栈、最低系统版本、UI 体系、数据来源和离线要求，再给出模块边界、状态流、关键接口、异常路径、实现步骤和验收测试：\n\n", "en": "Design an implementation for the Android feature below. First establish the existing stack, minimum SDK, UI system, data sources, and offline requirements, then provide module boundaries, state flow, key interfaces, failure paths, implementation steps, and acceptance tests:\n\n"},
+      "color": "#DCFCE7",
+      "icon_name": "blocks"
+    },
+    {
+      "title": {"zh": "实现 Compose 界面", "en": "Build a Compose screen"},
+      "description": {"zh": "处理状态、导航、主题与可访问性", "en": "Handle state, navigation, theming, and accessibility"},
+      "prompt": {"zh": "请实现下面的 Jetpack Compose 界面。先拆解 UI 状态、事件、导航和数据依赖，再给出可编译代码；覆盖加载、空、错误和成功状态，并说明预览、可访问性与 UI 测试方案：\n\n", "en": "Implement the Jetpack Compose screen below. First break down UI state, events, navigation, and data dependencies, then provide compilable code. Cover loading, empty, error, and success states, and explain previews, accessibility, and UI testing:\n\n"},
+      "color": "#DBEAFE",
+      "icon_name": "layout-template"
+    },
+    {
+      "title": {"zh": "诊断崩溃与 ANR", "en": "Diagnose a crash or ANR"},
+      "description": {"zh": "从堆栈、线程和生命周期定位根因", "en": "Trace root cause through stacks, threads, and lifecycle"},
+      "prompt": {"zh": "请诊断下面的 Android 崩溃或 ANR。先提取设备、系统版本、应用版本、线程、异常链和首个业务栈帧，再区分根因与伴随症状，给出最小修复、回归测试和仍需补充的证据：\n\n", "en": "Diagnose the Android crash or ANR below. Extract device, OS version, app version, thread, exception chain, and first application frame; distinguish root cause from secondary symptoms, then provide the smallest fix, regression tests, and missing evidence:\n\n"},
+      "color": "#FEE2E2",
+      "icon_name": "bug"
+    },
+    {
+      "title": {"zh": "审查 Android 代码", "en": "Review Android code"},
+      "description": {"zh": "检查生命周期、并发、状态和可维护性", "en": "Check lifecycle, concurrency, state, and maintainability"},
+      "prompt": {"zh": "请审查下面的 Android 代码或变更。重点检查正确性、生命周期、协程取消、线程安全、状态管理、资源释放、配置变更、兼容性、性能和测试缺口；按严重程度列出有证据的问题，不做无关重构：\n\n", "en": "Review the Android code or change below. Focus on correctness, lifecycle, coroutine cancellation, thread safety, state management, resource cleanup, configuration changes, compatibility, performance, and test gaps. Report evidence-backed findings by severity and avoid unrelated refactoring:\n\n"},
+      "color": "#EDE9FE",
+      "icon_name": "scan-search"
+    },
+    {
+      "title": {"zh": "优化性能与电量", "en": "Optimize performance and battery"},
+      "description": {"zh": "用测量定位启动、卡顿、内存和后台问题", "en": "Measure startup, jank, memory, and background work"},
+      "prompt": {"zh": "请为下面的 Android 性能或耗电问题制定诊断方案。先定义可复现条件和指标，再选择合适的基准、Profiler、Perfetto、Macrobenchmark 或系统统计；根据证据定位瓶颈，并给出优化前后验证方法：\n\n", "en": "Create a diagnostic plan for the Android performance or battery issue below. Define reproducible conditions and metrics first, select suitable benchmarks, Profiler, Perfetto, Macrobenchmark, or system statistics, identify the bottleneck from evidence, and specify before/after verification:\n\n"},
+      "color": "#FEF3C7",
+      "icon_name": "gauge"
+    },
+    {
+      "title": {"zh": "处理构建与发布", "en": "Fix build and release"},
+      "description": {"zh": "排查 Gradle、签名、混淆和商店交付", "en": "Resolve Gradle, signing, shrinking, and store delivery"},
+      "prompt": {"zh": "请处理下面的 Android 构建或发布问题。先确认 Gradle、AGP、Kotlin、JDK、compileSdk、依赖和构建变体，再定位版本解析、缓存、签名、R8/ProGuard、资源或 Play 要求方面的根因；提供最小修改与验证命令：\n\n", "en": "Resolve the Android build or release issue below. Establish Gradle, AGP, Kotlin, JDK, compileSdk, dependencies, and build variants first; identify the root cause in version resolution, caching, signing, R8/ProGuard, resources, or Play requirements; provide the smallest change and verification commands:\n\n"},
+      "color": "#FFEDD5",
+      "icon_name": "package-check"
+    }
+  ],
+  "task_examples": {
+    "zh": [
+      "每天「09:30」汇总 Android 项目的新增崩溃并按影响用户数和版本排序",
+      "每周一「10:00」检查依赖、AGP、Kotlin 和 compileSdk 的升级风险",
+      "每周三「16:00」运行关键流程的单元测试与 UI 测试并汇总失败原因",
+      "每周五「17:00」检查启动、卡顿、ANR 和内存指标的变化趋势",
+      "每个版本发布前检查签名、构建变体、R8 映射、权限和隐私清单",
+      "每月 1 日「11:00」审查最低系统版本、设备兼容性和废弃 API 使用情况"
+    ],
+    "en": [
+      "Every day at 09:30, summarize new Android crashes and rank them by affected users and app version",
+      "Every Monday at 10:00, review upgrade risks for dependencies, AGP, Kotlin, and compileSdk",
+      "Every Wednesday at 16:00, run critical unit and UI tests and summarize failure causes",
+      "Every Friday at 17:00, review trends in startup, jank, ANR, and memory metrics",
+      "Before every release, check signing, build variants, R8 mappings, permissions, and privacy declarations",
+      "On the 1st of every month at 11:00, audit minimum-SDK compatibility, device coverage, and deprecated API usage"
+    ]
+  }
+}
