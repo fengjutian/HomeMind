@@ -19,6 +19,13 @@ def test_novel_writing_expert_is_discoverable() -> None:
     assert expert.summary.label_zh == "末世小说家"
     assert expert.prompt_files == ["SOUL.md"]
     assert "SOUL.md" in expert.files
+    assert {
+        "STORY_BIBLE.md",
+        "OUTLINE.md",
+        "CONTINUITY.md",
+        "STYLE_GUIDE.md",
+        "CHAPTER_LOG.md",
+    } <= set(expert.files)
     assert len(expert.quick_prompts) == 6
 
 
@@ -44,3 +51,5 @@ def test_novel_writing_soul_preserves_authorial_control() -> None:
     assert "军事细节服务人物与情节" in soul
     assert "默认先拆解，不直接写小说正文" in soul
     assert "用户明确要求或确认结构后，才写小说正文" in soul
+    assert "写正文前执行一致性闸门" in soul
+    assert "不得在一次回答中连续生成多章" in soul
