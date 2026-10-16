@@ -1858,6 +1858,8 @@
     "expertPickerEmpty": "No other experts available",
     "expertPickerManage": "Manage experts",
     "expertHide": "Hide shared expert",
+    "expertHasActiveTask": "Has an active task",
+    "reorderExpert": "Drag to reorder expert",
     "expertUnhide": "Show expert again",
     "expertPickerHidden": "Hidden experts ({{count}})",
     "expertPickerShowVisible": "Back to experts",

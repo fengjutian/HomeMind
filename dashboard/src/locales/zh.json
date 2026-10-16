@@ -1858,6 +1858,8 @@
     "expertPickerEmpty": "暂无其他专家",
     "expertPickerManage": "管理专家",
     "expertHide": "隐藏共享专家",
+    "expertHasActiveTask": "有进行中的任务",
+    "reorderExpert": "拖拽排序专家",
     "expertUnhide": "重新显示专家",
     "expertPickerHidden": "已隐藏专家（{{count}}）",
     "expertPickerShowVisible": "返回专家列表",

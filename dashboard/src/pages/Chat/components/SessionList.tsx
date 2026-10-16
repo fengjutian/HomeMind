@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo, useState, useRef, useEffect } from "react";
+import type { DragEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Dropdown } from "antd";
@@ -14,6 +15,7 @@ import {
   GitFork,
   Eye,
   EyeOff,
+  GripVertical,
 } from "lucide-react";
 import type { Session } from "../hooks/useSessions";
 import type { OctopAgent } from "../../../context/AgentContext";
@@ -32,6 +34,12 @@ import {
   resolveSessionWorkStatus,
   type SessionWorkStatus,
 } from "../utils/sessionWorkStatus";
+import {
+  mergeExpertOrder,
+  moveExpert,
+  readExpertOrder,
+  writeExpertOrder,
+} from "../utils/expertOrder";
 import styles from "../index.module.less";
 
 function AgentUnreadBadge({ count }: { count: number }) {
@@ -241,6 +249,7 @@ interface AgentCardProps {
   activeForkDisabledHint?: string;
   onHide?: () => void;
   liveWorkingIds: ReadonlySet<string>;
+  dragHandle?: ReactNode;
 }
 
 function ActiveAgentCard({
@@ -262,6 +271,7 @@ function ActiveAgentCard({
   activeForkDisabledHint,
   onHide,
   liveWorkingIds,
+  dragHandle,
 }: AgentCardProps) {
   const { t } = useTranslation();
   const accent = agent.color || "#6366f1";
@@ -286,6 +296,9 @@ function ActiveAgentCard({
 
   const showExpandMore = hasMore && !searchQuery.trim();
   const sessionsEnabled = isAgentChatReady(agent.state);
+  const hasTask = sessions.some(
+    (session) => resolveSessionWorkStatus(session, liveWorkingIds) !== "idle",
+  );
 
   return (
     <div
@@ -312,8 +325,16 @@ function ActiveAgentCard({
         </div>
         <div className={styles.agentCardInfo}>
           <div className={styles.agentCardNameRow}>
+            {dragHandle}
             <div className={styles.agentNameCluster}>
               <div className={styles.agentCardName}>{agent.name}</div>
+              {hasTask ? (
+                <span
+                  className={styles.agentTaskPulse}
+                  aria-label={t("chat.expertHasActiveTask", "有进行中的任务")}
+                  title={t("chat.expertHasActiveTask", "有进行中的任务")}
+                />
+              ) : null}
               <TeamChatBadge agent={agent} />
               <SharedExpertHint agent={agent} />
               <RemoteExpertHint agent={agent} />
@@ -415,6 +436,7 @@ interface AgentRowProps {
   onNewChat?: () => void;
   onHide?: () => void;
   onUnhide?: () => void;
+  dragHandle?: ReactNode;
 }
 
 function InactiveAgentRow({
@@ -423,6 +445,7 @@ function InactiveAgentRow({
   onNewChat,
   onHide,
   onUnhide,
+  dragHandle,
 }: AgentRowProps) {
   const { t } = useTranslation();
   const accent = agent.color || "#6366f1";
@@ -453,6 +476,7 @@ function InactiveAgentRow({
         </div>
         <div className={styles.agentRowInfo}>
           <div className={styles.agentRowNameRow}>
+            {dragHandle}
             <div className={styles.agentNameCluster}>
               <div className={styles.agentRowName}>{agent.name}</div>
               <TeamChatBadge agent={agent} />
@@ -548,20 +572,85 @@ export default function SessionList({
   const liveWorkingIds = useSessionWorkIds();
   const [searchQuery, setSearchQuery] = useState("");
   const [showingHidden, setShowingHidden] = useState(false);
+  const [expertOrder, setExpertOrder] = useState<string[]>(() =>
+    readExpertOrder(window.localStorage),
+  );
+  const [draggedAgentId, setDraggedAgentId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const { filterVisible, pickHidden, hide, unhide, canHide } =
     useHiddenSharedExperts();
 
-  const hiddenAgents = useMemo(
-    () => [...pickHidden(agents)].sort((a, b) => b.id - a.id),
-    [agents, pickHidden],
-  );
+  const hiddenAgents = useMemo(() => {
+    const hidden = [...pickHidden(agents)].sort((a, b) => b.id - a.id);
+    const order = mergeExpertOrder(
+      expertOrder,
+      hidden.map((agent) => agent.agent_id),
+    );
+    const index = new Map(order.map((id, position) => [id, position]));
+    return hidden.sort(
+      (a, b) =>
+        (index.get(a.agent_id) ?? Number.MAX_SAFE_INTEGER) -
+        (index.get(b.agent_id) ?? Number.MAX_SAFE_INTEGER),
+    );
+  }, [agents, pickHidden, expertOrder]);
 
   const sortedAgents = useMemo(() => {
     const visible = filterVisible(agents, {
       keepAgentIds: activeAgentId ? [activeAgentId] : [],
     });
-    return [...visible].sort((a, b) => b.id - a.id);
-  }, [agents, filterVisible, activeAgentId]);
+    const byCreation = [...visible].sort((a, b) => b.id - a.id);
+    const order = mergeExpertOrder(
+      expertOrder,
+      byCreation.map((agent) => agent.agent_id),
+    );
+    const index = new Map(order.map((id, position) => [id, position]));
+    return byCreation.sort(
+      (a, b) =>
+        (index.get(a.agent_id) ?? Number.MAX_SAFE_INTEGER) -
+        (index.get(b.agent_id) ?? Number.MAX_SAFE_INTEGER),
+    );
+  }, [agents, filterVisible, activeAgentId, expertOrder]);
+
+  const handleDrop = useCallback(
+    (targetId: string) => {
+      if (!draggedAgentId) return;
+      const current = mergeExpertOrder(
+        expertOrder,
+        sortedAgents.map((agent) => agent.agent_id),
+      );
+      const next = moveExpert(current, draggedAgentId, targetId);
+      setExpertOrder(next);
+      writeExpertOrder(window.localStorage, next);
+      setDraggedAgentId(null);
+      setDropTargetId(null);
+    },
+    [draggedAgentId, expertOrder, sortedAgents],
+  );
+
+  const dragHandle = useCallback(
+    (agentId: string) => (
+      <span
+        className={styles.agentDragHandle}
+        draggable
+        role="button"
+        tabIndex={0}
+        aria-label={t("chat.reorderExpert", "拖拽排序专家")}
+        title={t("chat.reorderExpert", "拖拽排序专家")}
+        onDragStart={(event: DragEvent<HTMLSpanElement>) => {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", agentId);
+          setDraggedAgentId(agentId);
+        }}
+        onDragEnd={() => {
+          setDraggedAgentId(null);
+          setDropTargetId(null);
+        }}
+      >
+        <GripVertical size={13} aria-hidden />
+      </span>
+    ),
+    [t],
+  );
 
   // Leave the hidden-only view once nothing remains hidden.
   const viewingHidden = showingHidden && hiddenAgents.length > 0;
@@ -628,43 +717,78 @@ export default function SessionList({
               ))
             : agentsToRender.map((agent) => {
                 const expanded = agent.agent_id === expandedAgentId;
-                if (expanded) {
-                  return (
-                    <ActiveAgentCard
-                      key={agent.agent_id}
-                      agent={agent}
-                      sessions={sessions}
-                      activeId={activeId}
-                      searchQuery={searchQuery}
-                      hasMore={hasMore}
-                      loadingMore={loadingMore}
-                      onLoadMore={onLoadMore}
-                      onFetchAllSessions={onFetchAllSessions}
-                      onSelect={onSelect}
-                      onNewChat={onNewChat}
-                      onDelete={onDelete}
-                      onRename={onRename}
-                      onPin={onPin}
-                      onFork={onFork}
-                      activeForkDisabled={activeForkDisabled}
-                      activeForkDisabledHint={activeForkDisabledHint}
-                      onHide={
-                        canHide(agent) ? () => hide(agent.agent_id) : undefined
-                      }
-                      liveWorkingIds={liveWorkingIds}
-                    />
-                  );
-                }
-                return (
+                const content = expanded ? (
+                  <ActiveAgentCard
+                    agent={agent}
+                    sessions={sessions}
+                    activeId={activeId}
+                    searchQuery={searchQuery}
+                    hasMore={hasMore}
+                    loadingMore={loadingMore}
+                    onLoadMore={onLoadMore}
+                    onFetchAllSessions={onFetchAllSessions}
+                    onSelect={onSelect}
+                    onNewChat={onNewChat}
+                    onDelete={onDelete}
+                    onRename={onRename}
+                    onPin={onPin}
+                    onFork={onFork}
+                    activeForkDisabled={activeForkDisabled}
+                    activeForkDisabledHint={activeForkDisabledHint}
+                    onHide={
+                      canHide(agent) ? () => hide(agent.agent_id) : undefined
+                    }
+                    liveWorkingIds={liveWorkingIds}
+                    dragHandle={dragHandle(agent.agent_id)}
+                  />
+                ) : (
                   <InactiveAgentRow
-                    key={agent.agent_id}
                     agent={agent}
                     onSelect={() => onAgentSelect(agent.agent_id)}
                     onNewChat={() => onNewChat(agent.agent_id)}
                     onHide={
                       canHide(agent) ? () => hide(agent.agent_id) : undefined
                     }
+                    dragHandle={dragHandle(agent.agent_id)}
                   />
+                );
+                return (
+                  <div
+                    key={agent.agent_id}
+                    className={`${styles.draggableAgentItem} ${
+                      draggedAgentId === agent.agent_id
+                        ? styles.draggableAgentItemDragging
+                        : ""
+                    } ${
+                      dropTargetId === agent.agent_id
+                        ? styles.draggableAgentItemTarget
+                        : ""
+                    }`}
+                    onDragOver={(event) => {
+                      if (!draggedAgentId || draggedAgentId === agent.agent_id)
+                        return;
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                      setDropTargetId(agent.agent_id);
+                    }}
+                    onDragLeave={(event) => {
+                      if (
+                        !event.currentTarget.contains(
+                          event.relatedTarget as Node,
+                        )
+                      ) {
+                        setDropTargetId((current) =>
+                          current === agent.agent_id ? null : current,
+                        );
+                      }
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      handleDrop(agent.agent_id);
+                    }}
+                  >
+                    {content}
+                  </div>
                 );
               })}
           {hiddenAgents.length > 0 ? (

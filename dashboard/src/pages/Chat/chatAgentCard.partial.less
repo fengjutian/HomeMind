@@ -103,6 +103,102 @@
   text-overflow: ellipsis;
 }
 
+.agentTaskPulse {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--fn-color-success, #22c55e);
+  box-shadow: 0 0 0 0
+    color-mix(in srgb, var(--fn-color-success, #22c55e) 45%, transparent);
+  animation: agent-task-breathe 1.8s ease-in-out infinite;
+}
+
+@keyframes agent-task-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    box-shadow: 0 0 0 0
+      color-mix(in srgb, var(--fn-color-success, #22c55e) 42%, transparent);
+  }
+
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 0 5px
+      color-mix(in srgb, var(--fn-color-success, #22c55e) 0%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agentTaskPulse {
+    animation: none;
+  }
+}
+
+.agentDragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 20px;
+  flex: 0 0 14px;
+  margin-left: -3px;
+  color: var(--fn-text-quaternary);
+  cursor: grab;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--fn-text-secondary);
+    outline: none;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.agentCardProfile:hover .agentDragHandle,
+.agentCardProfile:focus-within .agentDragHandle,
+.agentRow:hover .agentDragHandle,
+.agentRow:focus-within .agentDragHandle {
+  opacity: 1;
+}
+
+.draggableAgentItem {
+  position: relative;
+  border-radius: 12px;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.draggableAgentItemDragging {
+  opacity: 0.45;
+}
+
+.draggableAgentItemTarget::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -3px;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--fn-color-brand);
+}
+
+@media (hover: none) {
+  .agentDragHandle {
+    opacity: 1;
+  }
+}
+
 .sharedExpertFlag {
   display: inline-flex;
   align-items: center;
