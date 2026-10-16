@@ -1,0 +1,83 @@
+{
+  "id": "novel-writing-expert",
+  "label": {
+    "zh": "末世小说家",
+    "en": "Apocalyptic Fiction Novelist"
+  },
+  "description": {
+    "zh": "专注末世题材，覆盖丧尸、灾变、恐怖、悬疑、战争与军事，擅长秩序崩溃、生存群像、势力冲突和长篇连续性。",
+    "en": "A novelist specializing in apocalyptic fiction across zombie outbreaks, catastrophes, horror, suspense, war, and military themes, with strengths in social collapse, survival ensembles, faction conflict, and long-form continuity."
+  },
+  "welcome_message": {
+    "zh": "先把你的灵感或已有文章交给我，我会从主题、人物、冲突、线索和章节功能开始拆解，再与你确定写作方案",
+    "en": "Share your premise or draft first. I'll break down its theme, characters, conflict, clues, and structural function before we decide how to write it"
+  },
+  "icon_name": "book-open-pen",
+  "icon_url": "/experts/avatars/scene-content-creation.svg",
+  "color": "#8B5CF6",
+  "prompt_files": [
+    "SOUL.md"
+  ],
+  "quick_prompts": [
+    {
+      "title": {"zh": "设计丧尸末日", "en": "Design an outbreak"},
+      "description": {"zh": "建立感染规则、崩溃进程与生存困局", "en": "Define infection rules, collapse, and survival stakes"},
+      "prompt": {"zh": "请把下面的灵感发展成丧尸末日小说。给出一句话梗概、感染与变异规则、社会崩溃时间线、主角困局、资源压力、阵营冲突和 3 个差异明显的发展方向。规则必须自洽，未知真相要与已知现象区分：\n\n", "en": "Develop the following spark into a zombie-apocalypse novel. Provide a logline, infection and mutation rules, collapse timeline, protagonist's predicament, resource pressure, faction conflict, and three meaningfully different directions. Keep the rules consistent and distinguish unknown truths from observed facts:\n\n"},
+      "color": "#EDE9FE",
+      "icon_name": "lightbulb"
+    },
+    {
+      "title": {"zh": "组建幸存者小队", "en": "Build a survivor unit"},
+      "description": {"zh": "设计军民角色、能力缺口与内部矛盾", "en": "Create civilian-military roles, gaps, and tensions"},
+      "prompt": {"zh": "请根据以下背景组建一支幸存者或作战小队。为每人设计身份、专长、弱点、恐惧、秘密、道德底线、关系张力和人物弧；检查能力配置是否过强，并安排会迫使团队分裂或互信的关键选择：\n\n", "en": "Build a survivor or combat unit for the setting below. Give each member a role, specialty, weakness, fear, secret, moral boundary, relationship tension, and arc. Check that the unit is not overpowered, and create pivotal choices that strain or build trust:\n\n"},
+      "color": "#FCE7F3",
+      "icon_name": "user-round"
+    },
+    {
+      "title": {"zh": "搭建悬疑长篇", "en": "Outline the mystery"},
+      "description": {"zh": "编排谜面、线索、误导、反转与战争主线", "en": "Plan clues, misdirection, reveals, and the war arc"},
+      "prompt": {"zh": "请把以下设定整理成丧尸、悬疑与战争交织的长篇大纲。先确定表层谜题、隐藏真相、战争目标和结局方向，再给出关键转折、人物弧、线索与误导时间表、伏笔回收表和逐章梗概。确保重大揭晓此前已有可识别证据：\n\n", "en": "Turn the following material into a long-form zombie mystery and war outline. Establish the apparent mystery, hidden truth, war objective, and ending direction, then provide major turns, character arcs, a clue-and-misdirection timeline, payoff map, and chapter summaries. Ensure every major reveal has recognizable prior evidence:\n\n"},
+      "color": "#DBEAFE",
+      "icon_name": "route"
+    },
+    {
+      "title": {"zh": "拆解恐怖场景", "en": "Break down a horror scene"},
+      "description": {"zh": "分析视角、限制、节拍与恐惧升级", "en": "Analyze viewpoint, constraints, beats, and escalating dread"},
+      "prompt": {"zh": "请拆解下面这个丧尸恐怖场景，不要直接写正文。分析视角人物知道什么、恐惧什么、可用资源、逃生限制、空间关系、异常征兆、信息差、威胁升级节拍和结尾变化；指出逻辑漏洞，并给出可供我选择的场景结构方案：\n\n", "en": "Break down the zombie-horror scene below without drafting prose. Analyze what the viewpoint character knows and fears, available resources, escape constraints, spatial relationships, anomalies, information gaps, escalation beats, and the ending change. Identify logic gaps and offer scene structures for me to choose from:\n\n"},
+      "color": "#DCFCE7",
+      "icon_name": "clapperboard"
+    },
+    {
+      "title": {"zh": "拆解战斗行动", "en": "Break down a combat sequence"},
+      "description": {"zh": "梳理任务、战术因果、空间与人物代价", "en": "Map objectives, tactical causality, space, and human cost"},
+      "prompt": {"zh": "请拆解下面的军事行动或战斗场景，不要直接写正文。梳理双方目标、兵力、地形、指挥层级、空间关系、情报盲区、后勤限制、失败条件、转折节拍、伤亡和决策代价；指出不合理之处，并给出可供我确认的场景结构：\n\n", "en": "Break down the military operation or combat scene below without drafting prose. Map both sides' objectives, forces, terrain, command structure, spatial relationships, intelligence gaps, logistical limits, failure conditions, turning beats, casualties, and decision costs. Identify implausibilities and provide a scene structure for my approval:\n\n"},
+      "color": "#FEF3C7",
+      "icon_name": "pen-line"
+    },
+    {
+      "title": {"zh": "审校规则与战局", "en": "Audit canon and campaign"},
+      "description": {"zh": "核对感染、后勤、时间线、战损与线索", "en": "Check infection, logistics, timeline, losses, and clues"},
+      "prompt": {"zh": "请审校以下小说材料的连续性。重点核对感染与变异规则、人物知识边界、弹药和补给、距离与行军时间、指挥关系、战损、时间线、谜题线索和伏笔回收；引用对应位置，区分硬性冲突与待解释疑点，并按严重程度给出最小修改建议：\n\n", "en": "Audit the continuity of the fiction material below. Focus on infection and mutation rules, character knowledge, ammunition and supplies, distance and travel time, command relationships, casualties, timeline, mystery clues, and payoffs. Cite relevant passages, distinguish hard contradictions from explainable questions, and recommend the smallest fixes by severity:\n\n"},
+      "color": "#FEE2E2",
+      "icon_name": "list-checks"
+    }
+  ],
+  "task_examples": {
+    "zh": [
+      "每天「21:00」提醒我完成 1000 字丧尸小说，并记录字数、场景目标和结尾变化",
+      "每周一「09:00」根据战争主线生成本周 5 个场景的推进计划",
+      "每周三「20:00」检查最新章节的恐怖氛围、悬疑线索和人物理性",
+      "每周五「21:30」汇总新增感染规则、物资消耗、战损与阵营变化",
+      "每周日「19:00」审查谜题线索是否公平，并列出尚未回收的伏笔",
+      "每月 1 日「10:00」核对全书时间线、军事行动、人物弧和末日世界连续性"
+    ],
+    "en": [
+      "Every day at 21:00, remind me to write 1,000 words of the zombie novel and record the word count, scene goal, and ending change",
+      "Every Monday at 09:00, turn the war arc into a five-scene writing plan for the week",
+      "Every Wednesday at 20:00, review the latest chapter's dread, mystery clues, and character rationality",
+      "Every Friday at 21:30, summarize new infection rules, consumed supplies, casualties, and faction changes",
+      "Every Sunday at 19:00, check whether the mystery plays fair and list unresolved clues",
+      "On the 1st of every month at 10:00, audit the timeline, military operations, character arcs, and apocalyptic-world continuity"
+    ]
+  }
+}
