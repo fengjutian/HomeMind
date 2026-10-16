@@ -2,14 +2,20 @@
 .windows {
   position: fixed;
   top: 0;
+  left: 0;
   right: 0;
   z-index: 10000;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   height: 32px;
   flex-shrink: 0;
   user-select: none;
   -webkit-app-region: no-drag;
+  background: var(--fn-bg-primary, #fff);
+  border-bottom: 1px solid var(--fn-border-primary, #e5e7eb);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+  --wails-draggable: drag;
 }
 
 .mac {
@@ -31,6 +37,7 @@
   align-items: center;
   justify-content: center;
   line-height: 0;
+  --wails-draggable: no-drag;
 
   &:focus-visible {
     outline: 2px solid currentColor;
@@ -86,6 +93,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  --wails-draggable: no-drag;
 }
 
 .winBtn:hover {

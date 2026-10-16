@@ -289,6 +289,8 @@ export type StreamEventKind = "streamStart" | "streamEnd" | "streamResume";
 export interface StreamEvent {
   kind: StreamEventKind;
   sessionId: string;
+  agentId?: string;
+  outcome?: "completed" | "waiting" | "interrupted";
 }
 export type SlashActionEvent = {
   action: string;
@@ -923,6 +925,7 @@ export function cancelStream(sessionId: string) {
   const state = sessionStates.get(sessionId);
   if (!state) return;
   const live = liveSockets.get(sessionId);
+  const agentId = live?.agentId;
   if (live) {
     live.intentionalClose = true;
     live.userCancelled = true;
@@ -947,6 +950,12 @@ export function cancelStream(sessionId: string) {
   }
   if (hadAbort || hadStreaming || hadStreamingMsgs || hadLive) {
     notify(state);
+    emitStreamEvent({
+      kind: "streamEnd",
+      sessionId,
+      agentId,
+      outcome: "interrupted",
+    });
   }
 }
 
@@ -2504,7 +2513,7 @@ export async function attachThread(
               usageSamplesByState.delete(state);
               beginStream(state, sessionId);
               notify(state);
-              emitStreamEvent({ kind: "streamStart", sessionId });
+              emitStreamEvent({ kind: "streamStart", sessionId, agentId });
             } else {
               touchStreamActivity(sessionId);
             }
@@ -2517,7 +2526,7 @@ export async function attachThread(
                 turnActive: true,
               })
             ) {
-              emitStreamEvent({ kind: "streamResume", sessionId });
+              emitStreamEvent({ kind: "streamResume", sessionId, agentId });
             }
           } else if (state.isStreaming) {
             // Host thread went idle — seal the host turn, but keep this
@@ -2978,7 +2987,7 @@ export async function sendTurn(
   usageSamplesByState.delete(state);
   notify(state);
 
-  emitStreamEvent({ kind: "streamStart", sessionId });
+  emitStreamEvent({ kind: "streamStart", sessionId, agentId });
 
   const controller = new AbortController();
   state.abortController = controller;
@@ -3037,6 +3046,12 @@ export async function sendTurn(
         timestamp: Date.now(),
       },
     ];
+    emitStreamEvent({
+      kind: "streamEnd",
+      sessionId,
+      agentId,
+      outcome: "interrupted",
+    });
     finish();
   }
 }
@@ -3125,7 +3140,7 @@ export async function resumeHitl(
   } else {
     beginStream(state, sessionId);
     notify(state);
-    emitStreamEvent({ kind: "streamStart", sessionId });
+    emitStreamEvent({ kind: "streamStart", sessionId, agentId });
   }
 
   const controller = new AbortController();
@@ -3307,7 +3322,12 @@ function parkLiveSocketForHitl(
   live.listenOnly = true;
   if (data.type !== "hitl_required") return;
   notify(state);
-  emitStreamEvent({ kind: "streamEnd", sessionId });
+  emitStreamEvent({
+    kind: "streamEnd",
+    sessionId,
+    agentId: live.agentId,
+    outcome: "waiting",
+  });
 }
 
 /** Commit shows the user row in the transcript immediately. */

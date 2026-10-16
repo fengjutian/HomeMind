@@ -29,7 +29,11 @@ import SessionWorkStatusIcon from "./SessionWorkStatusIcon";
 import SharedExpertHint from "./SharedExpertHint";
 import RemoteExpertHint from "./RemoteExpertHint";
 import TeamChatBadge from "./TeamChatBadge";
-import { useSessionWorkIds } from "../hooks/useSessionWorkIds";
+import {
+  useExpertWorkStatuses,
+  useSessionWorkIds,
+  type ExpertWorkStatus,
+} from "../hooks/useSessionWorkIds";
 import {
   resolveSessionWorkStatus,
   type SessionWorkStatus,
@@ -52,6 +56,30 @@ function AgentUnreadBadge({ count }: { count: number }) {
     >
       {count > 99 ? "99+" : count}
     </span>
+  );
+}
+
+function ExpertTaskIndicator({ status }: { status?: ExpertWorkStatus }) {
+  const { t } = useTranslation();
+  if (!status) return null;
+  const label =
+    status === "waiting"
+      ? t("chat.expertTaskWaiting", "任务需要确认")
+      : status === "interrupted"
+      ? t("chat.expertTaskInterrupted", "任务已中断")
+      : t("chat.expertTaskWorking", "任务正常运行");
+  return (
+    <span
+      className={`${styles.agentTaskPulse} ${
+        status === "waiting"
+          ? styles.agentTaskPulseWaiting
+          : status === "interrupted"
+          ? styles.agentTaskPulseInterrupted
+          : ""
+      }`}
+      aria-label={label}
+      title={label}
+    />
   );
 }
 
@@ -250,6 +278,7 @@ interface AgentCardProps {
   onHide?: () => void;
   liveWorkingIds: ReadonlySet<string>;
   dragHandle?: ReactNode;
+  workStatus?: ExpertWorkStatus;
 }
 
 function ActiveAgentCard({
@@ -272,6 +301,7 @@ function ActiveAgentCard({
   onHide,
   liveWorkingIds,
   dragHandle,
+  workStatus,
 }: AgentCardProps) {
   const { t } = useTranslation();
   const accent = agent.color || "#6366f1";
@@ -296,9 +326,6 @@ function ActiveAgentCard({
 
   const showExpandMore = hasMore && !searchQuery.trim();
   const sessionsEnabled = isAgentChatReady(agent.state);
-  const hasTask = sessions.some(
-    (session) => resolveSessionWorkStatus(session, liveWorkingIds) !== "idle",
-  );
 
   return (
     <div
@@ -328,13 +355,7 @@ function ActiveAgentCard({
             {dragHandle}
             <div className={styles.agentNameCluster}>
               <div className={styles.agentCardName}>{agent.name}</div>
-              {hasTask ? (
-                <span
-                  className={styles.agentTaskPulse}
-                  aria-label={t("chat.expertHasActiveTask", "有进行中的任务")}
-                  title={t("chat.expertHasActiveTask", "有进行中的任务")}
-                />
-              ) : null}
+              <ExpertTaskIndicator status={workStatus} />
               <TeamChatBadge agent={agent} />
               <SharedExpertHint agent={agent} />
               <RemoteExpertHint agent={agent} />
@@ -437,6 +458,7 @@ interface AgentRowProps {
   onHide?: () => void;
   onUnhide?: () => void;
   dragHandle?: ReactNode;
+  workStatus?: ExpertWorkStatus;
 }
 
 function InactiveAgentRow({
@@ -446,6 +468,7 @@ function InactiveAgentRow({
   onHide,
   onUnhide,
   dragHandle,
+  workStatus,
 }: AgentRowProps) {
   const { t } = useTranslation();
   const accent = agent.color || "#6366f1";
@@ -479,6 +502,7 @@ function InactiveAgentRow({
             {dragHandle}
             <div className={styles.agentNameCluster}>
               <div className={styles.agentRowName}>{agent.name}</div>
+              <ExpertTaskIndicator status={workStatus} />
               <TeamChatBadge agent={agent} />
               <SharedExpertHint agent={agent} />
               <RemoteExpertHint agent={agent} />
@@ -570,6 +594,7 @@ export default function SessionList({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const liveWorkingIds = useSessionWorkIds();
+  const expertWorkStatuses = useExpertWorkStatuses(activeAgentId, sessions);
   const [searchQuery, setSearchQuery] = useState("");
   const [showingHidden, setShowingHidden] = useState(false);
   const [expertOrder, setExpertOrder] = useState<string[]>(() =>
@@ -713,6 +738,7 @@ export default function SessionList({
                     onAgentSelect(agent.agent_id);
                   }}
                   onUnhide={() => unhide(agent.agent_id)}
+                  workStatus={expertWorkStatuses.get(agent.agent_id)}
                 />
               ))
             : agentsToRender.map((agent) => {
@@ -740,6 +766,7 @@ export default function SessionList({
                     }
                     liveWorkingIds={liveWorkingIds}
                     dragHandle={dragHandle(agent.agent_id)}
+                    workStatus={expertWorkStatuses.get(agent.agent_id)}
                   />
                 ) : (
                   <InactiveAgentRow
@@ -750,6 +777,7 @@ export default function SessionList({
                       canHide(agent) ? () => hide(agent.agent_id) : undefined
                     }
                     dragHandle={dragHandle(agent.agent_id)}
+                    workStatus={expertWorkStatuses.get(agent.agent_id)}
                   />
                 );
                 return (

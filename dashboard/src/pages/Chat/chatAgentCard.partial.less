@@ -104,15 +104,24 @@
 }
 
 .agentTaskPulse {
+  --agent-task-color: var(--fn-color-success, #22c55e);
   position: relative;
   width: 7px;
   height: 7px;
   flex: 0 0 7px;
   border-radius: 50%;
-  background: var(--fn-color-success, #22c55e);
+  background: var(--agent-task-color);
   box-shadow: 0 0 0 0
-    color-mix(in srgb, var(--fn-color-success, #22c55e) 45%, transparent);
+    color-mix(in srgb, var(--agent-task-color) 45%, transparent);
   animation: agent-task-breathe 1.8s ease-in-out infinite;
+}
+
+.agentTaskPulseWaiting {
+  --agent-task-color: #f59e0b;
+}
+
+.agentTaskPulseInterrupted {
+  --agent-task-color: #ef4444;
 }
 
 @keyframes agent-task-breathe {
@@ -120,13 +129,13 @@
   100% {
     opacity: 0.72;
     box-shadow: 0 0 0 0
-      color-mix(in srgb, var(--fn-color-success, #22c55e) 42%, transparent);
+      color-mix(in srgb, var(--agent-task-color) 42%, transparent);
   }
 
   50% {
     opacity: 1;
     box-shadow: 0 0 0 5px
-      color-mix(in srgb, var(--fn-color-success, #22c55e) 0%, transparent);
+      color-mix(in srgb, var(--agent-task-color) 0%, transparent);
   }
 }
 

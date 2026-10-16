@@ -41,4 +41,12 @@ describe("DesktopWindowControls", () => {
     await user.click(buttons[0]);
     expect(emitDesktopWindowAction).toHaveBeenCalledWith("minimise");
   });
+
+  it("renders the controls inside a full-width draggable title bar", () => {
+    const { container } = render(<DesktopWindowControls chrome="windows" />);
+    const titleBar = container.firstElementChild;
+
+    expect(titleBar?.className).toContain("windows");
+    expect(titleBar).not.toHaveAttribute("data-octop-no-drag");
+  });
 });

@@ -20,7 +20,6 @@ export default function DesktopWindowControls({
     return (
       <div
         className={styles.mac}
-        data-octop-no-drag="true"
         aria-label={t("desktopChrome.group", "Window controls")}
       >
         <button
@@ -60,7 +59,6 @@ export default function DesktopWindowControls({
   return (
     <div
       className={styles.windows}
-      data-octop-no-drag="true"
       aria-label={t("desktopChrome.group", "Window controls")}
     >
       <button

@@ -21,6 +21,7 @@ body {
 
 html {
   --window-controls-inset-end: 0px;
+  --desktop-titlebar-height: 32px;
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
@@ -74,6 +75,12 @@ html[data-octop-desktop-chrome] .ant-drawer-right .ant-drawer-close {
   width: auto;
   overflow: hidden;
   overscroll-behavior: none;
+}
+
+/* Reserve a real row for the frameless desktop title bar so page content does
+   not sit underneath the window controls. */
+html[data-octop-desktop-chrome] #root {
+  padding-top: var(--desktop-titlebar-height);
 }
 
 /* ConfigProvider prefixCls="octop" → antd <App> is .octop-app.
