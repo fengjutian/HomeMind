@@ -52,6 +52,7 @@ import { frameBelongsToThread } from "./frameThread";
 import {
   MAX_STREAM_RESUME_ATTEMPTS,
   STREAM_STALE_WITHOUT_SOCKET_MS,
+  isSocketSilent,
   shouldEmitStreamResumeNotice,
   shouldForceSealStream,
   shouldResumeStreamAfterClose,
@@ -568,6 +569,8 @@ type LiveSocket = {
   userCancelled: boolean;
   /** Subscribe-only socket — replacing it must not send `cancel` to the host. */
   listenOnly?: boolean;
+  /** Last inbound frame (pong / chunk / status). Liveness for half-open sockets. */
+  lastFrameAt: number;
   pingTimer?: ReturnType<typeof setInterval>;
 };
 
@@ -575,6 +578,18 @@ function startSocketPing(live: LiveSocket): void {
   if (live.pingTimer != null) return;
   live.pingTimer = setInterval(() => {
     if (live.ws.readyState !== WebSocket.OPEN) return;
+    if (isSocketSilent({ now: Date.now(), lastFrameAt: live.lastFrameAt })) {
+      // No pong for a full ping interval: the TCP connection is half-open.
+      // Close it (unexpected close) so the resume gate re-subscribes and the
+      // server's `turn_status` can seal a turn that already ended.
+      stopSocketPing(live);
+      try {
+        live.ws.close();
+      } catch {
+        // ignore
+      }
+      return;
+    }
     try {
       live.ws.send(JSON.stringify({ type: "ping" }));
     } catch {
@@ -2421,6 +2436,7 @@ export async function attachThread(
     intentionalClose: false,
     userCancelled: false,
     listenOnly: true,
+    lastFrameAt: Date.now(),
   };
   liveSockets.set(sessionId, live);
 
@@ -2476,6 +2492,7 @@ export async function attachThread(
 
     ws.onopen = () => {
       touchStreamActivity(sessionId);
+      live.lastFrameAt = Date.now();
       startSocketPing(live);
       try {
         ws.send(JSON.stringify({ type: "subscribe", thread_id: threadId }));
@@ -2486,6 +2503,7 @@ export async function attachThread(
     };
 
     ws.onmessage = (event) => {
+      live.lastFrameAt = Date.now();
       try {
         const data = JSON.parse(String(event.data)) as Record<string, unknown>;
         if (!data || typeof data !== "object") return;
@@ -2712,6 +2730,7 @@ async function sendTurnWebSocket(
       intentionalClose: false,
       userCancelled: false,
       listenOnly: false,
+      lastFrameAt: Date.now(),
     };
     liveSockets.set(sessionId, live);
 
@@ -2739,6 +2758,7 @@ async function sendTurnWebSocket(
 
     ws.onopen = () => {
       openedForTurn = true;
+      live.lastFrameAt = Date.now();
       startSocketPing(live);
       const payload: Record<string, unknown> = {
         type: "user_turn",
@@ -2774,6 +2794,7 @@ async function sendTurnWebSocket(
     };
 
     ws.onmessage = (event) => {
+      live.lastFrameAt = Date.now();
       try {
         const data = JSON.parse(String(event.data)) as HarnessChunk;
         if (!data || typeof data !== "object") return;

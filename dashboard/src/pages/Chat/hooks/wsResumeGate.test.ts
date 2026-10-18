@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_STREAM_RESUME_ATTEMPTS,
+  SOCKET_SILENCE_MS,
   STREAM_STALE_WITHOUT_SOCKET_MS,
+  isSocketSilent,
   shouldBlockHistoryRefresh,
   shouldEmitStreamResumeNotice,
   shouldForceSealStream,
@@ -199,5 +201,28 @@ describe("shouldEmitStreamResumeNotice", () => {
     expect(
       shouldEmitStreamResumeNotice({ resumeAttempt: 2, turnActive: false }),
     ).toBe(false);
+  });
+});
+
+describe("isSocketSilent", () => {
+  it("keeps a socket that answered within the window", () => {
+    expect(
+      isSocketSilent({ now: 30_000, lastFrameAt: 10_000, silenceMs: 50_000 }),
+    ).toBe(false);
+  });
+
+  it("flags a half-open socket after two missed pings", () => {
+    expect(
+      isSocketSilent({ now: 60_000, lastFrameAt: 10_000, silenceMs: 50_000 }),
+    ).toBe(true);
+  });
+
+  it("uses SOCKET_SILENCE_MS by default", () => {
+    expect(isSocketSilent({ now: SOCKET_SILENCE_MS, lastFrameAt: 0 })).toBe(
+      true,
+    );
+    expect(isSocketSilent({ now: SOCKET_SILENCE_MS - 1, lastFrameAt: 0 })).toBe(
+      false,
+    );
   });
 });

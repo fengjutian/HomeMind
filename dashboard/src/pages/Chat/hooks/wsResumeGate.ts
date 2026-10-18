@@ -13,6 +13,26 @@ export const MAX_STREAM_RESUME_ATTEMPTS = 8;
 export const STREAM_STALE_WITHOUT_SOCKET_MS = 20_000;
 
 /**
+ * Silence window after which an OPEN socket is treated as half-open. The client
+ * pings every 25s and the server answers `pong`, so two missed intervals mean
+ * the connection is dead even though `readyState` still says OPEN.
+ */
+export const SOCKET_SILENCE_MS = 50_000;
+
+/**
+ * Whether an open socket has been silent long enough to be half-open (laptop
+ * sleep / NAT timeout / killed peer). Callers close such a socket so the normal
+ * unexpected-close resume path runs instead of leaving “生成中” stuck forever.
+ */
+export function isSocketSilent(opts: {
+  now: number;
+  lastFrameAt: number;
+  silenceMs?: number;
+}): boolean {
+  return opts.now - opts.lastFrameAt >= (opts.silenceMs ?? SOCKET_SILENCE_MS);
+}
+
+/**
  * Whether an unexpected WS close should keep the local stream open and
  * re-subscribe, instead of sealing the turn as finished.
  */
