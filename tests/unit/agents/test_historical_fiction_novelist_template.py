@@ -49,3 +49,20 @@ def test_historical_fiction_soul_keeps_history_and_style_boundaries() -> None:
     assert "绝不伪造引文" in soul
     assert "小人物叙事" in soul
     assert "公平悬疑" in soul
+    assert "A｜硬锚点" in soul
+    assert "制度不是背景板" in soul
+    assert "人物知识边界" in soul
+    assert "正文写作闸门" in soul
+    assert "默认一次只生成一个完整场景或一章" in soul
+
+
+def test_historical_fiction_quick_prompts_define_concrete_outputs() -> None:
+    manifest = json.loads((_ROOT / "manifest.json").read_text(encoding="utf-8"))
+    prompts = [card["prompt"]["zh"] for card in manifest["quick_prompts"]]
+
+    assert "A–F" in prompts[0]
+    assert "线索表" in prompts[1]
+    assert "时代错置" in prompts[2]
+    assert "前 12 章" in prompts[3]
+    assert "连续性检查" in prompts[4]
+    assert "分层审校" in prompts[5]
