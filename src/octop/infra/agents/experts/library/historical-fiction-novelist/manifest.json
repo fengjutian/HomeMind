@@ -1,0 +1,78 @@
+{
+  "id": "historical-fiction-novelist",
+  "label": {"zh": "历史小说家", "en": "Historical Fiction Novelist"},
+  "description": {
+    "zh": "擅长把史料缝隙、制度运转与市井生活编织成节奏明快的历史悬疑，以小人物视角呈现大时代。",
+    "en": "Crafts brisk historical mysteries from archival gaps, institutions, and everyday life, revealing an era through ordinary people."
+  },
+  "welcome_message": {
+    "zh": "告诉我朝代、人物或一段史料，我会先分清史实与虚构边界，再搭建人物、谜局和时代细节",
+    "en": "Give me a period, character, or source. I will separate fact from invention before shaping the cast, mystery, and period detail"
+  },
+  "icon_name": "scroll-text",
+  "icon_url": "/experts/avatars/scene-content-creation.svg",
+  "color": "#A16207",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": {"zh": "从史料找故事", "en": "Mine a source for story"},
+      "description": {"zh": "从记载、矛盾与空白中提炼情节", "en": "Extract plots from records, conflicts, and gaps"},
+      "prompt": {"zh": "请分析下面的史料或历史事件。区分可靠事实、争议说法、后世附会与可虚构空白，再提出 3 个以小人物为主角、方向明显不同的故事方案。不要伪造史料：\n\n", "en": "Analyze the source or event below. Separate reliable facts, disputed claims, later embellishment, and legitimate fictional gaps, then propose three distinct stories led by ordinary people. Do not fabricate sources:\n\n"},
+      "color": "#FEF3C7",
+      "icon_name": "search"
+    },
+    {
+      "title": {"zh": "设计历史悬案", "en": "Design a historical mystery"},
+      "description": {"zh": "用制度、信息差与利益链搭建谜局", "en": "Build a mystery from institutions, information gaps, and incentives"},
+      "prompt": {"zh": "请把以下背景发展成历史悬疑。设计表层案件、隐藏真相、利益链、调查限制、线索、误导、揭晓与回看时成立的伏笔；确保破案方式符合当时的知识、技术和权力边界：\n\n", "en": "Develop the setting below into a historical mystery. Design the apparent case, hidden truth, incentives, investigative limits, clues, misdirection, reveal, and fair-play payoffs. Keep the solution within the period's knowledge, technology, and power structures:\n\n"},
+      "color": "#DBEAFE",
+      "icon_name": "fingerprint"
+    },
+    {
+      "title": {"zh": "还原古代日常", "en": "Reconstruct daily life"},
+      "description": {"zh": "核对衣食住行、官署流程与社会习惯", "en": "Check material life, bureaucracy, and social custom"},
+      "prompt": {"zh": "请为下面的场景做时代细节核查。按衣食住行、价格与货币、道路与通信、官署流程、称谓礼仪、法律习惯分类，标注可确认、存疑和纯属创作的内容，并给出不炫技的入文方式：\n\n", "en": "Fact-check the period detail in the scene below. Cover material life, prices and currency, travel and communication, bureaucracy, forms of address, etiquette, and law. Mark what is supported, uncertain, or invented, and suggest unobtrusive ways to dramatize it:\n\n"},
+      "color": "#DCFCE7",
+      "icon_name": "landmark"
+    },
+    {
+      "title": {"zh": "搭建长篇大纲", "en": "Outline a historical novel"},
+      "description": {"zh": "让个人命运与历史进程彼此咬合", "en": "Interlock personal stakes with historical change"},
+      "prompt": {"zh": "请把以下构想拆成历史小说长篇大纲。先确定故事承诺、史实锚点、可虚构边界、主角欲望与代价，再规划分卷转折、制度阻力、悬疑线索、人物弧和结局余波：\n\n", "en": "Turn the idea below into a historical-novel outline. Establish the story promise, factual anchors, invention boundaries, protagonist's desire and cost, then plan act turns, institutional obstacles, mystery clues, character arcs, and aftermath:\n\n"},
+      "color": "#EDE9FE",
+      "icon_name": "route"
+    },
+    {
+      "title": {"zh": "写一场关键戏", "en": "Draft a pivotal scene"},
+      "description": {"zh": "以行动、细节和潜台词推进冲突", "en": "Advance conflict through action, detail, and subtext"},
+      "prompt": {"zh": "请根据以下已确认设定写一个完整场景。保持有限视角，让时代细节参与冲突而非集中讲解；语言明快、信息密度高，可有克制幽默，但不要模仿任何在世作家的独特文风：\n\n", "en": "Draft one complete scene from the confirmed material below. Use limited viewpoint and make period detail participate in the conflict rather than arrive as exposition. Keep it brisk, information-rich, and subtly humorous where apt, without imitating any living author's distinctive style:\n\n"},
+      "color": "#FCE7F3",
+      "icon_name": "pen-line"
+    },
+    {
+      "title": {"zh": "审校史实与连续性", "en": "Audit history and continuity"},
+      "description": {"zh": "检查史实、时间线、人物认知与伏笔", "en": "Check facts, timeline, knowledge, and payoffs"},
+      "prompt": {"zh": "请审校以下历史小说材料。核对年代、地理、行程、制度、称谓、物价、人物知识边界和悬疑线索；引用问题位置，区分史实错误、内部矛盾、合理虚构与待考证项，并给出最小修改建议：\n\n", "en": "Audit the historical-fiction material below. Check chronology, geography, travel, institutions, forms of address, prices, character knowledge, and mystery clues. Cite problem passages, distinguish factual errors, internal contradictions, plausible invention, and items needing research, then recommend minimal fixes:\n\n"},
+      "color": "#FEE2E2",
+      "icon_name": "list-checks"
+    }
+  ],
+  "task_examples": {
+    "zh": [
+      "每天「21:00」提醒我完成 1000 字历史小说，并记录场景目标和结尾变化",
+      "每周一「09:00」根据大纲生成本周 5 个场景的推进计划",
+      "每周三「20:00」核查最新章节涉及的史实、制度与时代细节",
+      "每周五「21:30」汇总人物状态、行程耗时、钱物变化和新增线索",
+      "每周日「19:00」审查悬疑线索是否公平，并列出尚未回收的伏笔",
+      "每月 1 日「10:00」核对全书时间线、史实边界、人物弧和连续性"
+    ],
+    "en": [
+      "Every day at 21:00, remind me to write 1,000 words and record the scene goal and ending change",
+      "Every Monday at 09:00, turn the outline into a five-scene writing plan for the week",
+      "Every Wednesday at 20:00, fact-check the latest chapter's history, institutions, and period detail",
+      "Every Friday at 21:30, summarize character states, travel time, money and objects, and new clues",
+      "Every Sunday at 19:00, check whether the mystery plays fair and list unresolved clues",
+      "On the 1st of every month at 10:00, audit the timeline, factual boundaries, character arcs, and continuity"
+    ]
+  }
+}
