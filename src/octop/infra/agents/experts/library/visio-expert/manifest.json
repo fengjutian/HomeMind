@@ -1,0 +1,137 @@
+{
+  "id": "visio-expert",
+  "label": {
+    "zh": "Visio 制图专家",
+    "en": "Visio Diagram Expert"
+  },
+  "description": {
+    "zh": "面向 Microsoft Visio 的专业制图助手，可规划、创建、编辑和质检流程图、泳道图、组织结构图、网络拓扑与系统架构图，并交付可编辑的 .vsdx 文件。",
+    "en": "A Microsoft Visio specialist for planning, creating, editing, and reviewing flowcharts, swimlanes, organization charts, network topologies, and system architecture diagrams, with editable .vsdx delivery."
+  },
+  "welcome_message": {
+    "zh": "告诉我图的用途、读者和内容，或提供现有 Visio 文件；我会从结构梳理到 .vsdx 交付全程处理",
+    "en": "Tell me the diagram's purpose, audience, and content, or share an existing Visio file; I can take it from structure to an editable .vsdx deliverable"
+  },
+  "icon_name": "workflow",
+  "icon_url": "/experts/avatars/scene-office.svg",
+  "color": "#2563EB",
+  "prompt_files": [
+    "SOUL.md"
+  ],
+  "quick_prompts": [
+    {
+      "title": {
+        "zh": "绘制流程图",
+        "en": "Create a flowchart"
+      },
+      "description": {
+        "zh": "把步骤、判断与异常路径画清楚",
+        "en": "Clarify steps, decisions, and exception paths"
+      },
+      "prompt": {
+        "zh": "请根据以下内容制作一份专业流程图，并交付可编辑的 .vsdx 文件。先识别起止点、活动、判断、角色和异常路径，再在 Visio 中完成绘制与质检：\n\n",
+        "en": "Create a professional flowchart from the following content and deliver an editable .vsdx file. Identify start/end points, activities, decisions, roles, and exception paths before drawing and reviewing it in Visio:\n\n"
+      },
+      "color": "#DBEAFE",
+      "icon_name": "workflow"
+    },
+    {
+      "title": {
+        "zh": "绘制泳道图",
+        "en": "Create a swimlane diagram"
+      },
+      "description": {
+        "zh": "梳理跨角色流程、交接与责任边界",
+        "en": "Map cross-role flow, handoffs, and ownership"
+      },
+      "prompt": {
+        "zh": "请把以下跨部门或跨角色流程制作成 Visio 泳道图。明确泳道、触发条件、活动、判断、交接、输入输出和结束状态，并交付可编辑的 .vsdx 文件：\n\n",
+        "en": "Turn the following cross-team or cross-role process into a Visio swimlane diagram. Clarify lanes, triggers, activities, decisions, handoffs, inputs, outputs, and end states, and deliver an editable .vsdx file:\n\n"
+      },
+      "color": "#E0E7FF",
+      "icon_name": "columns-3"
+    },
+    {
+      "title": {
+        "zh": "绘制系统架构图",
+        "en": "Create an architecture diagram"
+      },
+      "description": {
+        "zh": "表达边界、组件、接口与数据流",
+        "en": "Show boundaries, components, interfaces, and data flow"
+      },
+      "prompt": {
+        "zh": "请根据以下系统说明制作 Visio 架构图。先确定抽象层级和系统边界，再表达组件、接口、协议、数据流、信任边界与图例；不要虚构未提供的技术细节：\n\n",
+        "en": "Create a Visio architecture diagram from the following system description. Establish the abstraction level and system boundaries, then show components, interfaces, protocols, data flow, trust boundaries, and a legend. Do not invent missing technical details:\n\n"
+      },
+      "color": "#EDE9FE",
+      "icon_name": "network"
+    },
+    {
+      "title": {
+        "zh": "绘制网络拓扑",
+        "en": "Create a network topology"
+      },
+      "description": {
+        "zh": "整理设备、网段、链路与安全区域",
+        "en": "Organize devices, subnets, links, and security zones"
+      },
+      "prompt": {
+        "zh": "请把以下网络信息绘制为 Visio 拓扑图。标明设备、区域、网段、链路方向、协议或端口及高可用关系；敏感地址按我的要求脱敏，并交付可编辑的 .vsdx 文件：\n\n",
+        "en": "Turn the following network information into a Visio topology. Label devices, zones, subnets, link direction, protocols or ports, and high-availability relationships; redact sensitive addresses as requested and deliver an editable .vsdx file:\n\n"
+      },
+      "color": "#CFFAFE",
+      "icon_name": "router"
+    },
+    {
+      "title": {
+        "zh": "制作组织结构图",
+        "en": "Create an organization chart"
+      },
+      "description": {
+        "zh": "从名单或表格生成清晰的汇报关系",
+        "en": "Turn a roster or table into clear reporting lines"
+      },
+      "prompt": {
+        "zh": "请根据以下名单或表格制作 Visio 组织结构图。核对姓名、职位、部门和汇报关系，处理虚线汇报与空缺岗位，并交付可编辑的 .vsdx 文件：\n\n",
+        "en": "Create a Visio organization chart from the following roster or table. Verify names, titles, departments, and reporting lines; handle dotted-line reporting and vacancies; and deliver an editable .vsdx file:\n\n"
+      },
+      "color": "#DCFCE7",
+      "icon_name": "network"
+    },
+    {
+      "title": {
+        "zh": "优化现有 Visio",
+        "en": "Improve an existing diagram"
+      },
+      "description": {
+        "zh": "修复结构、连线、布局和可读性问题",
+        "en": "Fix structure, connectors, layout, and readability"
+      },
+      "prompt": {
+        "zh": "请审阅并优化这份现有 Visio 图。先诊断语义、层级、连线、交叉、对齐、间距、文字、颜色和页面设置问题，再另存为新的 .vsdx 文件，并提供修改摘要。文件路径：\n",
+        "en": "Review and improve this existing Visio diagram. Diagnose semantics, hierarchy, connectors, crossings, alignment, spacing, text, color, and page setup; then save a new .vsdx file and provide a change summary. File path:\n"
+      },
+      "color": "#FEF3C7",
+      "icon_name": "wand-sparkles"
+    }
+  ],
+  "task_examples": {
+    "zh": [
+      "每周一「09:00」根据项目流程清单检查缺失的责任人和异常路径",
+      "每周三「16:00」审阅共享目录中的架构图并列出过期组件与连线",
+      "每周五「17:00」把本周确认的流程变更整理成 Visio 更新清单",
+      "每月 1 日「10:00」根据设备清单生成网络拓扑更新草稿",
+      "每月最后一个工作日「16:00」检查组织结构图中的人员和汇报关系变化",
+      "每季度首日「09:30」审计关键流程图的版本、图例和责任边界"
+    ],
+    "en": [
+      "Every Monday at 09:00, check the project process list for missing owners and exception paths",
+      "Every Wednesday at 16:00, review architecture diagrams in the shared folder for stale components and connectors",
+      "Every Friday at 17:00, turn confirmed process changes from the week into a Visio update checklist",
+      "On the 1st of every month at 10:00, draft network-topology updates from the device inventory",
+      "At 16:00 on the last working day of every month, check the organization chart for staffing and reporting-line changes",
+      "At 09:30 on the first day of every quarter, audit key process diagrams for versions, legends, and ownership boundaries"
+    ]
+  }
+}
