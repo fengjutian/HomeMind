@@ -47,6 +47,29 @@ async def test_upload_pdf_workspace_path(env_with_agent: Any) -> None:
     assert r2.content == b"%PDF-1.4"
 
 
+async def test_upload_visio_workspace_path(env_with_agent: Any) -> None:
+    client, _srv, auth, aid = env_with_agent
+    data = b"PK\x03\x04fake-vsdx"
+    files = {
+        "file": (
+            "architecture.vsdx",
+            data,
+            "application/vnd.ms-visio.drawing",
+        )
+    }
+    r = await client.post(f"/api/agents/{aid}/upload", files=files, headers=auth)
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["filename"] == "architecture.vsdx"
+    assert body["media_type"] == "application/vnd.ms-visio.drawing"
+    assert body["workspace_path"].endswith(".vsdx")
+
+    downloaded = await client.get(body["access_url"], headers=auth)
+    assert downloaded.status_code == 200, downloaded.text
+    assert downloaded.content == data
+
+
 async def test_upload_requires_auth(env: Any) -> None:
     client, _srv, _auth = env
     files = {"file": ("note.txt", b"x", "text/plain")}

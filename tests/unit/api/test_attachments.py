@@ -86,6 +86,24 @@ def test_office_image_and_archive_extensions_are_accepted() -> None:
     assert validate_inbound_media_type("foo/bar", "bundle.tgz") == "application/gzip"
 
 
+@pytest.mark.parametrize(
+    ("filename", "media_type"),
+    [
+        ("diagram.vsd", "application/vnd.visio"),
+        ("diagram.vdx", "application/vnd.ms-visio.viewer"),
+        ("diagram.vsdx", "application/vnd.ms-visio.drawing"),
+        ("diagram.vsdm", "application/vnd.ms-visio.drawing.macroenabled.12"),
+        ("shapes.vssx", "application/vnd.ms-visio.stencil"),
+        ("shapes.vssm", "application/vnd.ms-visio.stencil.macroenabled.12"),
+        ("template.vstx", "application/vnd.ms-visio.template"),
+        ("template.vstm", "application/vnd.ms-visio.template.macroenabled.12"),
+    ],
+)
+def test_visio_extensions_and_mime_types_are_accepted(filename: str, media_type: str) -> None:
+    assert validate_inbound_media_type("foo/bar", filename) == media_type
+    assert validate_inbound_media_type(media_type, "blob") == media_type
+
+
 def test_video_audio_and_executable_extensions_are_accepted() -> None:
     assert validate_inbound_media_type("foo/bar", "clip.mp4") == "video/mp4"
     assert validate_inbound_media_type("foo/bar", "clip.webm") == "video/webm"
@@ -215,6 +233,25 @@ async def test_save_attachment_pdf_uses_extension() -> None:
 
         on_disk = await workspace.adownload_bytes(stored.data_path)
         assert on_disk == b"%PDF-1.4"
+
+
+@pytest.mark.asyncio
+async def test_save_attachment_visio_keeps_editable_file() -> None:
+    with tempfile.TemporaryDirectory() as ws_dir:
+        workspace = _workspace(ws_dir)
+        data = b"PK\x03\x04fake-vsdx"
+        stored = await save_attachment(
+            workspace,
+            owner_id=1,
+            filename="architecture.vsdx",
+            media_type="application/vnd.ms-visio.drawing",
+            data=data,
+        )
+
+        assert stored.media_type == "application/vnd.ms-visio.drawing"
+        assert stored.filename == "architecture.vsdx"
+        assert stored.data_path.endswith(".vsdx")
+        assert await workspace.adownload_bytes(stored.data_path) == data
 
 
 @pytest.mark.asyncio
