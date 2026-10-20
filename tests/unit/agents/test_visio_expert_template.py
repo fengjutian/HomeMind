@@ -36,5 +36,8 @@ def test_visio_expert_requires_editable_output_and_quality_assurance() -> None:
 
     assert "可编辑的 `.vsdx`" in soul
     assert "动态连接线" in soul
+    assert "图型选择决策" in soul
+    assert "交付前质检清单" in soul
+    assert "文件含宏时保留原格式与宏" in soul
     assert "不得虚构" in soul
     assert "不覆盖用户原文件" in soul
