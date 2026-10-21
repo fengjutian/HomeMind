@@ -105,7 +105,6 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
   const [page, setPage] = useState<ThreadAuditPage>();
   const [items, setItems] = useState<ThreadAuditItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
   const [kinds, setKinds] = useState<AuditKind[]>(ALL_KINDS);
   const [turnId, setTurnId] = useState("");
@@ -116,6 +115,10 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
   const [filterResetKey, setFilterResetKey] = useState(0);
   const [pendingNew, setPendingNew] = useState<ThreadAuditPage>();
   const [selected, setSelected] = useState<ThreadAuditItem>();
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageCursors, setPageCursors] = useState<(number | undefined)[]>([
+    undefined,
+  ]);
   const newestIdRef = useRef<string>();
   const loadRequestRef = useRef(0);
 
@@ -141,24 +144,34 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
     setLoading(true);
     setError(false);
     try {
-      const next = await auditApi.getThreadAudit(threadId, filters);
+      const next = await auditApi.getThreadAudit(threadId, {
+        ...filters,
+        beforeTs: pageCursors[pageIndex],
+      });
       if (requestId !== loadRequestRef.current) return;
       setPage(next);
       setItems(next.timeline);
-      newestIdRef.current = next.timeline.at(-1)?.id;
+      if (pageIndex === 0) newestIdRef.current = next.timeline.at(-1)?.id;
       setPendingNew(undefined);
     } catch {
       if (requestId === loadRequestRef.current) setError(true);
     } finally {
       if (requestId === loadRequestRef.current) setLoading(false);
     }
-  }, [filters, threadId]);
+  }, [filters, pageCursors, pageIndex, threadId]);
 
   useEffect(() => {
     setSelected(undefined);
     setPendingNew(undefined);
     newestIdRef.current = undefined;
+    setPageIndex(0);
+    setPageCursors([undefined]);
   }, [threadId]);
+
+  useEffect(() => {
+    setPageIndex(0);
+    setPageCursors([undefined]);
+  }, [kinds, sinceTs, status, toolCallId, turnId]);
 
   useEffect(() => {
     void load();
@@ -183,37 +196,23 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
     };
   }, [autoRefresh, filters, threadId]);
 
-  const loadMore = async () => {
-    if (!threadId || !page?.next_before_ts) return;
-    setLoadingMore(true);
-    try {
-      const older = await auditApi.getThreadAudit(threadId, {
-        ...filters,
-        beforeTs: page.next_before_ts,
-      });
-      setItems((current) => [...older.timeline, ...current]);
-      setPage((current) =>
-        current
-          ? {
-              ...current,
-              has_more: older.has_more,
-              next_before_ts: older.next_before_ts,
-            }
-          : older,
-      );
-    } finally {
-      setLoadingMore(false);
-    }
+  const showNextPage = () => {
+    if (!page?.next_before_ts) return;
+    const nextIndex = pageIndex + 1;
+    setPageCursors((current) => {
+      const next = current.slice(0, nextIndex);
+      next[nextIndex] = page.next_before_ts ?? undefined;
+      return next;
+    });
+    setPageIndex(nextIndex);
   };
 
   const acceptNew = () => {
     if (!pendingNew) return;
-    setItems((current) => mergeAuditItems(current, pendingNew.timeline));
-    setPage((current) => ({
-      ...pendingNew,
-      has_more: Boolean(current?.has_more || pendingNew.has_more),
-      next_before_ts: current?.next_before_ts ?? pendingNew.next_before_ts,
-    }));
+    setItems(pendingNew.timeline);
+    setPage(pendingNew);
+    setPageIndex(0);
+    setPageCursors([undefined]);
     newestIdRef.current = pendingNew.timeline.at(-1)?.id;
     setPendingNew(undefined);
   };
@@ -328,7 +327,12 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
             <Button icon={<RotateCcw size={14} />} onClick={resetFilters}>
               {t("chat.audit.resetFilters")}
             </Button>
-            <Tag>{t("chat.audit.resultCount", { count: items.length })}</Tag>
+            <Tag>
+              {t("chat.audit.pageResultCount", {
+                page: pageIndex + 1,
+                count: items.length,
+              })}
+            </Tag>
           </Space>
           {pendingNew && (
             <Alert
@@ -432,10 +436,22 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
               }}
             />
           )}
-          {page?.has_more && (
-            <Button block loading={loadingMore} onClick={() => void loadMore()}>
-              {t("chat.audit.loadMore")}
-            </Button>
+          {(pageIndex > 0 || page?.has_more) && (
+            <Space style={{ width: "100%", justifyContent: "center" }}>
+              <Button
+                disabled={loading || pageIndex === 0}
+                onClick={() => setPageIndex((current) => current - 1)}
+              >
+                {t("chat.audit.previousPage")}
+              </Button>
+              <span>{t("chat.audit.pageNumber", { page: pageIndex + 1 })}</span>
+              <Button
+                disabled={loading || !page?.has_more}
+                onClick={showNextPage}
+              >
+                {t("chat.audit.nextPage")}
+              </Button>
+            </Space>
           )}
         </Space>
       )}

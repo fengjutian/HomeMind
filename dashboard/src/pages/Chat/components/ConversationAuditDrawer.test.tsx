@@ -86,7 +86,7 @@ describe("ConversationAuditDrawer", () => {
     expect(screen.getByText("call-1")).toBeInTheDocument();
     expect(screen.getByText("chat.audit.notice.binary")).toBeInTheDocument();
     expect(screen.getByText("chat.audit.kind.trajectory")).toBeInTheDocument();
-    expect(screen.getByText("chat.audit.loadMore")).toBeInTheDocument();
+    expect(screen.getByText("chat.audit.nextPage")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("notes.txt"));
     expect(screen.getByText("chat.audit.detail")).toBeInTheDocument();
@@ -147,5 +147,26 @@ describe("ConversationAuditDrawer", () => {
     expect(
       mergeAuditItems([oldItem, currentItem], [updatedItem, newItem]),
     ).toEqual([oldItem, updatedItem, newItem]);
+  });
+
+  it("pages backward through the audit cursor and returns to the first page", async () => {
+    render(<ConversationAuditDrawer threadId="T1" />);
+
+    await screen.findByText("notes.txt");
+    fireEvent.click(screen.getByText("chat.audit.nextPage"));
+
+    await waitFor(() =>
+      expect(getThreadAudit).toHaveBeenCalledWith(
+        "T1",
+        expect.objectContaining({ beforeTs: 1_700_000_000, limit: 50 }),
+      ),
+    );
+    expect(screen.getByText("chat.audit.pageNumber")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("chat.audit.previousPage"));
+    await waitFor(() => {
+      const lastCall = getThreadAudit.mock.calls.at(-1);
+      expect(lastCall?.[1]?.beforeTs).toBeUndefined();
+    });
   });
 });
