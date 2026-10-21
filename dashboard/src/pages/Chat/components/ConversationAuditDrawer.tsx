@@ -333,6 +333,22 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
                 count: items.length,
               })}
             </Tag>
+            <Space.Compact>
+              <Button
+                size="small"
+                disabled={loading || pageIndex === 0}
+                onClick={() => setPageIndex((current) => current - 1)}
+              >
+                {t("chat.audit.previousPage")}
+              </Button>
+              <Button
+                size="small"
+                disabled={loading || !page?.has_more}
+                onClick={showNextPage}
+              >
+                {t("chat.audit.nextPage")}
+              </Button>
+            </Space.Compact>
           </Space>
           {pendingNew && (
             <Alert
@@ -435,23 +451,6 @@ export default function ConversationAuditDrawer({ threadId }: Props) {
                 );
               }}
             />
-          )}
-          {(pageIndex > 0 || page?.has_more) && (
-            <Space style={{ width: "100%", justifyContent: "center" }}>
-              <Button
-                disabled={loading || pageIndex === 0}
-                onClick={() => setPageIndex((current) => current - 1)}
-              >
-                {t("chat.audit.previousPage")}
-              </Button>
-              <span>{t("chat.audit.pageNumber", { page: pageIndex + 1 })}</span>
-              <Button
-                disabled={loading || !page?.has_more}
-                onClick={showNextPage}
-              >
-                {t("chat.audit.nextPage")}
-              </Button>
-            </Space>
           )}
         </Space>
       )}

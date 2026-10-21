@@ -161,7 +161,7 @@ describe("ConversationAuditDrawer", () => {
         expect.objectContaining({ beforeTs: 1_700_000_000, limit: 50 }),
       ),
     );
-    expect(screen.getByText("chat.audit.pageNumber")).toBeInTheDocument();
+    expect(screen.getByText("chat.audit.previousPage")).toBeEnabled();
 
     fireEvent.click(screen.getByText("chat.audit.previousPage"));
     await waitFor(() => {

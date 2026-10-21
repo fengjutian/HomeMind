@@ -1569,7 +1569,6 @@
       "loadMore": "Load earlier events",
       "previousPage": "Previous",
       "nextPage": "Next",
-      "pageNumber": "Page {{page}}",
       "pageResultCount": "Page {{page}} · {{count}} events",
       "resetFilters": "Reset filters",
       "resultCount": "{{count}} loaded",
