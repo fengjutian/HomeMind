@@ -338,6 +338,54 @@
       "compact_no_memory": "这个 Agent 没有可压缩的记忆库。"
     }
   },
+  "text_assist": {
+    "kinds": {
+      "chat": {
+        "prompt": {
+          "system": "你是提示词编辑器，不是回答问题的助手。\n用户消息是一份稍后会发给另一个 AI 的「草稿提示词」。你的唯一任务是改写这份草稿，让另一个 AI 更容易理解——提升清晰度、具体性、结构和可执行细节。\n硬性规则：\n- 不要回答草稿、不要解题、不要提供草稿所要求的内容。\n- 不要添加解释、问候或元评论。\n- 保留用户原意和语言（例如草稿是中文则保持中文）。\n- 只输出改写后的提示词正文——不要前言、标签、引号、思考块或 XML 标签。",
+          "user": "请改写以下草稿提示词。不要回答它。\n\n---\n{text}\n---"
+        }
+      },
+      "expert": {
+        "description": {
+          "system": "你为 AI 专家智能体资料撰写简短产品文案。\n硬性规则：\n- 只输出描述正文，使用本提示词的目标语言（中文）。\n- 控制在 1–2 句（约 40–120 字）。\n- 不要使用 markdown、标签、引号、问候或元评论。\n- 不要编造无关能力。",
+          "user_polish": "专家名称：{name}\n请润色以下专家描述。尽量保持与草稿相同的语言；否则使用本指令的语言。\n\n---\n{text}\n---",
+          "user_generate": "专家名称：{name}\n请仅根据名称，为该专家写一句简短描述。"
+        },
+        "welcome_message": {
+          "system": "你为 AI 专家聊天页撰写简短欢迎标题语。\n硬性规则：\n- 只输出标题语正文，使用本提示词的目标语言（中文）。\n- 控制在一句友好短句（约 12–40 字）。\n- 不要使用 markdown、标签、引号或元评论。",
+          "user_polish": "专家名称：{name}\n请润色以下欢迎标题语。尽量保持与草稿相同的语言；否则使用本指令的语言。\n\n---\n{text}\n---",
+          "user_generate": "专家名称：{name}\n请仅根据名称，为该专家写一句简短欢迎标题语。"
+        }
+      },
+      "team": {
+        "description": {
+          "system": "你为 AI 专家团队资料撰写简短产品文案。\n硬性规则：\n- 只输出描述正文，使用本提示词的目标语言（中文）。\n- 控制在 1–2 句。\n- 不要使用 markdown、标签、引号、问候或元评论。",
+          "user_polish": "团队名称：{name}\n请润色以下团队描述。尽量保持与草稿相同的语言；否则使用本指令的语言。\n\n---\n{text}\n---",
+          "user_generate": "团队名称：{name}\n请仅根据名称，为该团队写一句简短描述。"
+        },
+        "welcome_message": {
+          "system": "你为 AI 团队聊天页撰写简短欢迎标题语。\n硬性规则：\n- 只输出标题语正文，使用本提示词的目标语言（中文）。\n- 控制在一句友好短句。\n- 不要使用 markdown、标签、引号或元评论。",
+          "user_polish": "团队名称：{name}\n请润色以下欢迎标题语。尽量保持与草稿相同的语言；否则使用本指令的语言。\n\n---\n{text}\n---",
+          "user_generate": "团队名称：{name}\n请仅根据名称，为该团队写一句简短欢迎标题语。"
+        }
+      },
+      "skill_package": {
+        "description": {
+          "system": "你为技能包（一组 AI 技能）撰写简短产品文案。\n硬性规则：\n- 只输出描述正文，使用本提示词的目标语言（中文）。\n- 控制在 1–2 句。\n- 不要使用 markdown、标签、引号、问候或元评论。",
+          "user_polish": "技能包名称：{name}\n请润色以下技能包描述。尽量保持与草稿相同的语言；否则使用本指令的语言。\n\n---\n{text}\n---",
+          "user_generate": "技能包名称：{name}\n请仅根据名称，为该技能包写一句简短描述。"
+        }
+      },
+      "knowledge_base": {
+        "description": {
+          "system": "你为文档知识库撰写简短产品文案。\n硬性规则：\n- 只输出描述正文，使用本提示词的目标语言（中文）。\n- 控制在 1–2 句。\n- 不要使用 markdown、标签、引号、问候或元评论。",
+          "user_polish": "知识库名称：{name}\n请润色以下知识库描述。尽量保持与草稿相同的语言；否则使用本指令的语言。\n\n---\n{text}\n---",
+          "user_generate": "知识库名称：{name}\n请仅根据名称，为该知识库写一句简短描述。"
+        }
+      }
+    }
+  },
   "connector": {
     "oauth": {
       "callback_auth_failed": "授权失败：{error}",
@@ -538,7 +586,8 @@
     "LOCAL_DOWNLOAD_UNAVAILABLE": "仅在本机打开 Octop 时才能保存到系统「下载」文件夹。",
     "SKILL_PACKAGE_COPY_DENIED": "该技能包的创建者已禁止复制其中的技能。",
     "SKILL_PACKAGE_DOWNLOAD_DENIED": "该技能包已禁止打包下载。",
-    "SKILL_PACKAGE_LOCKED": "此技能复制自锁定策略的技能包，无法在工作区编辑。"
+    "SKILL_PACKAGE_LOCKED": "此技能复制自锁定策略的技能包，无法在工作区编辑。",
+    "THREAD_TURN_ACTIVE": "回复进行中，请先停止再删除。"
   },
   "desktop": {
     "install_log_deps": "正在安装 Python 依赖…",
@@ -743,7 +792,12 @@
       "unknown": "未知"
     },
     "project_context": "已配置默认项目目录 `{project_dir}`。当用户要求分析、检查、理解、审查或修改项目时，必须优先检查 `{project_dir}`（包括源码树、依赖或构建文件、README，以及可用的版本控制信息）。不要把 Agent 工作区 `{workspace_dir}` 误认为用户项目。完成项目检查后，仅在需要记忆、技能、配置或生成物时再读取 Agent 工作区。",
-    "response_format": "聊天界面支持渲染 Mermaid 图表。当流程图、时序图、架构图、状态图或其他图表能明显提升回答的清晰度时，请在语言标识为 `mermaid` 的代码块中输出合法 Mermaid 语法。不要使用 ASCII 字符图，也不要把 Mermaid 语法放入 `text` 代码块。"
+    "response_format": "聊天界面支持渲染 Mermaid 图表。当流程图、时序图、架构图、状态图或其他图表能明显提升回答的清晰度时，请在语言标识为 `mermaid` 的代码块中输出合法 Mermaid 语法。不要使用 ASCII 字符图，也不要把 Mermaid 语法放入 `text` 代码块。",
+    "cli": {
+      "active_model_unset": "未设置全局默认模型。用 octop models active --provider <名称> --model <模型ID> 设置；专家也可以单独绑定模型。",
+      "model_global": "（全局：{model}）",
+      "model_unset": "（未设置）"
+    }
   },
   "agent_errors": {
     "no_models_configured": "未配置可用模型，请前往「管理 → 模型」配置模型，然后重新启用此专家。",
@@ -982,5 +1036,28 @@
     "restore_changed": "当前专家的运行实例或存储已发生变化，请重新检查后重试。",
     "restore_reload_failed": "数据恢复流程已结束，但专家重新启动失败。恢复前备份已保留，请先重新启动专家并检查结果。",
     "restore_sqlite_only": "仅支持恢复当前专家独占的 SQLite 记忆数据库。"
+  },
+  "laya": {
+    "install_start": "正在把 Laya 安装到独立环境…",
+    "install_python": "Python：{python}",
+    "install_venv": "环境目录：{path}",
+    "install_torch": "正在安装 CPU 版 PyTorch…",
+    "install_package": "正在安装 laya[serve] {version}…",
+    "install_server": "正在启动 laya-serve，只监听 127.0.0.1:{port}。第一次启动会下载多语言模型。",
+    "install_wait": "仍在等待服务就绪（已等待 {seconds} 秒）。首次下载模型可能需要几分钟。",
+    "install_ready": "Laya 已就绪：{endpoint}。它会按文本语言选择检查点，默认不需要密钥。",
+    "already_running": "127.0.0.1:{port} 上已经有 Laya 在响应。",
+    "stopped": "Laya 已停止。",
+    "started": "正在启动 Laya…",
+    "error_python": "需要 Python 3.10 到 3.13。CPU 版 PyTorch 还没有 Python 3.14 的安装包，请先安装 Python 3.12 后再试。",
+    "error_disk": "可用磁盘只剩 {free_gb} GB。安装前请至少留出 {need_gb} GB。",
+    "error_port": "{port} 端口已被其他程序占用，且不是 Laya。",
+    "error_command": "命令失败（退出码 {exit_code}）：{command}",
+    "error_spawn": "无法启动 {command}：{error}",
+    "error_missing_bin": "安装结束了，但没有找到 laya-serve。",
+    "error_health": "Laya 没有在限定时间内就绪。请复制日志交给 Octop 继续排查。",
+    "error_exited": "laya-serve 在就绪前退出了。",
+    "error_not_installed": "尚未安装 Laya。",
+    "error_stalled": "安装长时间没有结果，已停止。"
   }
 }

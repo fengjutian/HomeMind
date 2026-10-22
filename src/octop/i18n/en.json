@@ -338,6 +338,54 @@
       "compact_no_memory": "This agent has no memory store to compact."
     }
   },
+  "text_assist": {
+    "kinds": {
+      "chat": {
+        "prompt": {
+          "system": "You are a prompt editor, not an assistant that answers questions.\nThe user message is a DRAFT PROMPT they will later send to another AI. Your only job is to rewrite that draft so another AI can understand it more clearly — improve clarity, specificity, structure, and actionable detail.\nHard rules:\n- Do NOT answer the draft, solve the task, or provide the requested content.\n- Do NOT add explanations, greetings, or meta commentary.\n- Preserve the user's original intent and language (e.g. keep Chinese if the draft is Chinese).\n- Output ONLY the rewritten prompt text — no preamble, labels, quotes, thinking blocks, or XML tags.",
+          "user": "Rewrite the following draft prompt. Do not answer it.\n\n---\n{text}\n---"
+        }
+      },
+      "expert": {
+        "description": {
+          "system": "You write short product copy for an AI expert agent profile.\nHard rules:\n- Output ONLY the description text in the target language of this prompt.\n- Keep it to 1–2 concise sentences (about 40–120 characters for Chinese, or 12–40 words for English).\n- No markdown, labels, quotes, greetings, or meta commentary.\n- Do not invent unrelated capabilities.",
+          "user_polish": "Expert name: {name}\nPolish the following expert description. Keep the same language as the draft when possible; otherwise use the language of this instruction.\n\n---\n{text}\n---",
+          "user_generate": "Expert name: {name}\nWrite one short description for this expert based only on the name."
+        },
+        "welcome_message": {
+          "system": "You write a short welcome title line shown on an AI expert chat page.\nHard rules:\n- Output ONLY the welcome title text in the target language of this prompt.\n- Keep it to one short friendly sentence (about 12–40 Chinese characters, or 6–18 English words).\n- No markdown, labels, quotes, or meta commentary.",
+          "user_polish": "Expert name: {name}\nPolish the following welcome title. Keep the same language as the draft when possible; otherwise use the language of this instruction.\n\n---\n{text}\n---",
+          "user_generate": "Expert name: {name}\nWrite one short welcome title for this expert based only on the name."
+        }
+      },
+      "team": {
+        "description": {
+          "system": "You write short product copy for an AI expert team profile.\nHard rules:\n- Output ONLY the description text in the target language of this prompt.\n- Keep it to 1–2 concise sentences.\n- No markdown, labels, quotes, greetings, or meta commentary.",
+          "user_polish": "Team name: {name}\nPolish the following team description. Keep the same language as the draft when possible; otherwise use the language of this instruction.\n\n---\n{text}\n---",
+          "user_generate": "Team name: {name}\nWrite one short description for this team based only on the name."
+        },
+        "welcome_message": {
+          "system": "You write a short welcome title line shown on an AI team chat page.\nHard rules:\n- Output ONLY the welcome title text in the target language of this prompt.\n- Keep it to one short friendly sentence.\n- No markdown, labels, quotes, or meta commentary.",
+          "user_polish": "Team name: {name}\nPolish the following welcome title. Keep the same language as the draft when possible; otherwise use the language of this instruction.\n\n---\n{text}\n---",
+          "user_generate": "Team name: {name}\nWrite one short welcome title for this team based only on the name."
+        }
+      },
+      "skill_package": {
+        "description": {
+          "system": "You write short product copy for a skill package that groups AI skills.\nHard rules:\n- Output ONLY the description text in the target language of this prompt.\n- Keep it to 1–2 concise sentences.\n- No markdown, labels, quotes, greetings, or meta commentary.",
+          "user_polish": "Skill package name: {name}\nPolish the following skill package description. Keep the same language as the draft when possible; otherwise use the language of this instruction.\n\n---\n{text}\n---",
+          "user_generate": "Skill package name: {name}\nWrite one short description for this skill package based only on the name."
+        }
+      },
+      "knowledge_base": {
+        "description": {
+          "system": "You write short product copy for a knowledge base of documents.\nHard rules:\n- Output ONLY the description text in the target language of this prompt.\n- Keep it to 1–2 concise sentences.\n- No markdown, labels, quotes, greetings, or meta commentary.",
+          "user_polish": "Knowledge base name: {name}\nPolish the following knowledge base description. Keep the same language as the draft when possible; otherwise use the language of this instruction.\n\n---\n{text}\n---",
+          "user_generate": "Knowledge base name: {name}\nWrite one short description for this knowledge base based only on the name."
+        }
+      }
+    }
+  },
   "connector": {
     "oauth": {
       "callback_auth_failed": "Authorization failed: {error}",
@@ -538,7 +586,8 @@
     "LOCAL_DOWNLOAD_UNAVAILABLE": "Saving to the host Downloads folder is only available when Octop is opened on this computer.",
     "SKILL_PACKAGE_COPY_DENIED": "The creator of this skill package has disabled copying its skills.",
     "SKILL_PACKAGE_DOWNLOAD_DENIED": "Downloading this skill package is disabled.",
-    "SKILL_PACKAGE_LOCKED": "This skill was copied from a locked skill package and cannot be edited in the workspace."
+    "SKILL_PACKAGE_LOCKED": "This skill was copied from a locked skill package and cannot be edited in the workspace.",
+    "THREAD_TURN_ACTIVE": "A reply is still in progress. Stop it, then delete this conversation."
   },
   "desktop": {
     "install_log_deps": "Installing Python dependencies…",
@@ -743,7 +792,12 @@
       "unknown": "Unknown"
     },
     "project_context": "A default project directory is configured at `{project_dir}`. For requests to analyze, inspect, understand, review, or modify the project, inspect `{project_dir}` first (including its source tree, dependency/build files, README, and version-control metadata when available). Do not mistake the agent workspace `{workspace_dir}` for the user project. After inspecting the project, read the agent workspace only when its memory, skills, configuration, or generated artifacts are relevant.",
-    "response_format": "The chat interface renders Mermaid diagrams. When a flowchart, sequence diagram, architecture diagram, state diagram, or other diagram would make the answer materially clearer, emit valid Mermaid in a fenced code block whose language is `mermaid`. Do not use ASCII-art diagrams, and do not put Mermaid syntax in a `text` code block."
+    "response_format": "The chat interface renders Mermaid diagrams. When a flowchart, sequence diagram, architecture diagram, state diagram, or other diagram would make the answer materially clearer, emit valid Mermaid in a fenced code block whose language is `mermaid`. Do not use ASCII-art diagrams, and do not put Mermaid syntax in a `text` code block.",
+    "cli": {
+      "active_model_unset": "No global default model is set. Set one with: octop models active --provider <name> --model <model-id> (agents can also bind their own model).",
+      "model_global": "(global: {model})",
+      "model_unset": "(not set)"
+    }
   },
   "agent_errors": {
     "no_models_configured": "No models are configured. Go to Admin → Model Management to add a provider, then enable this expert again.",
@@ -982,5 +1036,28 @@
     "restore_changed": "The expert runtime or store changed. Inspect again before retrying.",
     "restore_reload_failed": "The data restore stage ended, but restarting the expert failed. The safety backup is retained. Restart the expert and inspect the result.",
     "restore_sqlite_only": "Restore requires a dedicated SQLite memory store for this expert."
+  },
+  "laya": {
+    "install_start": "Installing Laya into an isolated environment…",
+    "install_python": "Python: {python}",
+    "install_venv": "Environment: {path}",
+    "install_torch": "Installing the CPU build of PyTorch…",
+    "install_package": "Installing laya[serve] {version}…",
+    "install_server": "Starting laya-serve on 127.0.0.1:{port}. The first launch downloads the multilingual checkpoint.",
+    "install_wait": "Waiting for the service ({seconds}s). The first model download can take several minutes.",
+    "install_ready": "Laya is ready at {endpoint}. It chooses a checkpoint from the text and does not require a key.",
+    "already_running": "A Laya service is already responding on 127.0.0.1:{port}.",
+    "stopped": "Laya has stopped.",
+    "started": "Starting Laya…",
+    "error_python": "Python 3.10 through 3.13 is required. The CPU PyTorch build does not publish a Python 3.14 wheel yet. Install Python 3.12 and retry.",
+    "error_disk": "Only {free_gb} GB is free. Leave at least {need_gb} GB before installing.",
+    "error_port": "Port {port} is already in use by something that is not Laya.",
+    "error_command": "Command failed (exit {exit_code}): {command}",
+    "error_spawn": "Could not start {command}: {error}",
+    "error_missing_bin": "The install finished, but laya-serve was not found.",
+    "error_health": "Laya did not become ready in time. Copy the log and send it to Octop.",
+    "error_exited": "laya-serve exited before it was ready.",
+    "error_not_installed": "Laya is not installed yet.",
+    "error_stalled": "The install produced no result for too long and was stopped."
   }
 }

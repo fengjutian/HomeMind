@@ -339,7 +339,8 @@
     "tokenCountPreview": "About {{label}} tokens ({{exact}})",
     "back": "Back",
     "comingSoon": "Coming soon",
-    "notImplemented": "This page is under construction."
+    "notImplemented": "This page is under construction.",
+    "savedToDownloads": "Saved to the Downloads folder"
   },
   "apiErrors": {
     "AUTH_FAILED": "Authentication failed.",
@@ -514,7 +515,9 @@
     "UPLOAD_SESSION_EXPIRED": "The upload session has expired.",
     "UPLOAD_SESSION_NOT_FOUND": "The upload session was not found.",
     "UPLOAD_SESSION_NOT_OPEN": "The upload session is no longer open.",
-    "UPLOAD_TOO_MANY_SESSIONS": "Too many uploads are currently in progress. Try again later."
+    "UPLOAD_TOO_MANY_SESSIONS": "Too many uploads are currently in progress. Try again later.",
+    "THREAD_TURN_ACTIVE": "A reply is still in progress. Stop it, then delete this conversation.",
+    "SKILL_PACKAGE_DOWNLOAD_DENIED": "Downloading this skill package is disabled."
   },
   "nav": {
     "chat": "Conversation",
@@ -877,7 +880,8 @@
     "enable": "Enable",
     "featureEnabled": "Knowledge bases enabled",
     "featureDisabled": "Knowledge bases disabled",
-    "featureSaveFailed": "Failed to update knowledge base feature"
+    "featureSaveFailed": "Failed to update knowledge base feature",
+    "ocrLocalHint": "RapidOCR components and default Chinese/English models are installed when saved."
   },
   "setupWizard": {
     "title": "Setup Wizard",
@@ -4114,7 +4118,15 @@
       "viewTable": "Table",
       "totalConnections": "{{count}} connection(s)",
       "colStatus": "Status",
-      "colAgents": "Experts"
+      "colAgents": "Experts",
+      "emptyGuideStepWhat": "What is cloud collab?",
+      "emptyGuideStepWhatDetail": "A connection links this Octop to another instance. You can browse that side's experts and teams and start chats here. History stays on the side where the expert lives.",
+      "emptyGuideStepHow": "How to add one",
+      "emptyGuideStepHowDetail": "Click Add connection and enter the peer address, username, and password. Probe first to confirm the account, then save and connect. Start the link from the side that can reach the other.",
+      "emptyGuideStepChat": "How to chat",
+      "emptyGuideStepChatDetail": "After it connects, remote experts and teams show up under Cloud in the chat sidebar. The Experts tab also lists remote experts, and the Teams tab lists remote teams.",
+      "peerAccount": "Peer account",
+      "peerAccountHint": "Local account on the peer Octop that opened this link, not the account used to sign in here"
     },
     "captcha": {
       "title": "Login captcha",
@@ -5164,6 +5176,30 @@
       "phase_backing_up_current": "Backing up this expert’s current state",
       "phase_restoring": "Restoring this expert’s data",
       "phase_restarting": "Reloading this expert"
+    },
+    "userFile": {
+      "contextNotice": "USER.md is loaded once when a session starts and stays in that session’s context.",
+      "description": "Maintain USER.md manually for personal details, names and communication preferences. Agents have read-only access, including during onboarding. Edits apply to new sessions. Manual documents take priority over ordinary memory; conflicts become review candidates. Remember requests go to ordinary memory and leave this document unchanged.",
+      "contentLabel": "User profile content (USER.md)",
+      "placeholder": "Enter personal details and preferences. Markdown is supported.",
+      "saved": "User profile saved. It will apply to new sessions.",
+      "loadFailed": "Could not load the user profile. Please retry.",
+      "saveFailed": "Could not save. Your changes have been kept; please retry."
+    },
+    "manualReview": {
+      "check": "Check duplicates and conflicts",
+      "conflicts": "{{count}} conflicts moved to candidates for review.",
+      "complete": "The current review is complete.",
+      "partial": "{{count}} ordinary memories remain. Continue the review.",
+      "unavailable": "Semantic review is unavailable and incomplete. Configure a memory auxiliary model and retry.",
+      "failed": "Review is incomplete. Please retry later.",
+      "stale": "The manual documents changed. Run the review again.",
+      "disabled": "Ordinary memory is disabled. The document is saved; review is skipped.",
+      "too_large": "The documents are too long for semantic review. Shorten them and retry.",
+      "not_checked": "These manual documents have not been reviewed.",
+      "details": "Manual documents take priority. {{count}} duplicate memories are omitted from recall when the session snapshot matches. Confirmed conflicts become review candidates; old facts are retired and source evidence is preserved. Review uses the saved USER.md and MEMORY.md.",
+      "openCandidates": "Review candidates",
+      "uncertain": "Some comparisons are uncertain. Original memories are unchanged. Clarify the manual documents and retry."
     }
   },
   "personalization": {
@@ -7599,5 +7635,12 @@
     "startedAt": "Started",
     "completedAt": "Finished",
     "transaction": "Transaction"
+  },
+  "textAssist": {
+    "hint": "Generate from the name with AI, or polish the current text",
+    "action": "AI polish",
+    "nameRequired": "Enter a name first",
+    "failed": "Polish failed. Please try again later.",
+    "emptyResult": "The model returned an empty result"
   }
 }

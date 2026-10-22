@@ -137,9 +137,9 @@ class BridgeConnectionRepo:
             conn.execute(
                 "INSERT INTO bridge_connections("
                 "connection_id, owner_user_id, peer_base_url, peer_username, display_name, "
-                "notes, icon_name, credential_blob, access_token_blob, token_expires_at, status, "
+                "notes, icon_name, icon_url, credential_blob, access_token_blob, token_expires_at, status, "
                 "auto_reconnect, peer_client_host, created_at, updated_at"
-                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     connection_id,
                     owner_user_id,
