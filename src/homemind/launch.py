@@ -6,11 +6,16 @@ import asyncio
 from typing import Any
 
 from homemind.api.app import build_app
+from homemind.compat import prepare_environment
 from homemind.infra.server import HomeMindServer
 from octop.launch import run_foreground as run_octop_foreground
 
 
 async def run_foreground(**kwargs: Any) -> None:
+    # Applied here, not at import time: the server needs the Octop runtime to
+    # see the HomeMind data root, but importing this module must not rewrite
+    # the caller's environment.
+    prepare_environment()
     await run_octop_foreground(
         app_factory=build_app,
         server_factory=HomeMindServer,

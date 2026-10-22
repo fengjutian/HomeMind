@@ -12,8 +12,6 @@ from homemind.version import HOMEMIND_VERSION
 from octop.cli.main import _ensure_utf8_stdio, _LazyCLI
 from octop.cli.registry import COMMANDS
 
-prepare_environment()
-
 
 def _version() -> str:
     return HOMEMIND_VERSION
@@ -58,6 +56,9 @@ def cli(
 ) -> None:
     """HomeMind command-line interface."""
     _ensure_utf8_stdio()
+    # The HomeMind -> Octop environment bridge is applied here, not at import
+    # time: importing this module must not rewrite the caller's environment.
+    prepare_environment()
     ctx.ensure_object(dict)
     ctx.obj["as_user"] = as_user
     ctx.obj["agent_id"] = agent_id

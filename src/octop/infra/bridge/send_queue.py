@@ -123,8 +123,14 @@ class PrioritySendQueue:
     def pending_frames(self) -> int:
         return sum(len(q) for q in self._queues.values())
 
-    async def send(self, payload: dict[str, Any]) -> None:
-        """Enqueue one frame, waiting for lane budget before it is buffered."""
+    async def send(self, payload: dict[str, Any]) -> asyncio.Event | None:
+        """Enqueue one frame, waiting for lane budget before it is buffered.
+
+        Returns an event that is set once the frame has been written, for
+        control frames only. A caller that must know the frame reached the
+        wire — a pong answering a ping, a close — awaits it; bulk traffic
+        returns ``None`` because nothing waits on it.
+        """
         text = self._dumps(payload)
         size = _frame_size(text)
         lane = lane_for_frame(str(payload.get("type") or ""))
@@ -150,12 +156,7 @@ class PrioritySendQueue:
         if written is not None:
             self._control_waiters.add(written)
         self._ensure_pump()
-        if written is None:
-            return
-        try:
-            await written.wait()
-        finally:
-            self._control_waiters.discard(written)
+        return written
 
     def close(self) -> None:
         """Release everyone waiting for a control frame that will never be written."""
@@ -207,6 +208,7 @@ class PrioritySendQueue:
                 await self._sink(text)
                 if written is not None:
                     written.set()
+                    self._control_waiters.discard(written)
         except asyncio.CancelledError:
             raise
         except Exception:

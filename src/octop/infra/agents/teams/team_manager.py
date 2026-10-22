@@ -626,6 +626,7 @@ class TeamManager:
                     speaker_id=speaker_id,
                 )
             finally:
+                await self._clear_live_member(room_thread_id, speaker_id)
                 self._finish_member_activity(room_thread_id, speaker_id, activity)
         stream_text = "".join(text_parts).strip()
         return {
@@ -1176,7 +1177,10 @@ class TeamManager:
         piece = str(chunk.get("content") or "") if str(chunk.get("type") or "") == "token" else ""
         try:
             if include_room and room_thread_id:
-                await hub.push_to_thread(room_thread_id, stamped)
+                async with self._member_wall_lock:
+                    await hub.push_to_thread(room_thread_id, stamped)
+                    if piece:
+                        self._append_live_member(room_thread_id, speaker_id, piece)
             if member_thread_id and member_thread_id != room_thread_id:
                 await hub.push_to_thread(member_thread_id, chunk)
         except Exception:
@@ -1198,8 +1202,12 @@ class TeamManager:
         if hub is None or not room_thread_id:
             return
         stamped = stamp_stream_speaker(chunk, speaker_id, include_done=True)
+        piece = str(chunk.get("content") or "") if str(chunk.get("type") or "") == "token" else ""
         try:
-            await hub.push_to_thread(room_thread_id, stamped)
+            async with self._member_wall_lock:
+                await hub.push_to_thread(room_thread_id, stamped)
+                if piece:
+                    self._append_live_member(room_thread_id, speaker_id, piece)
         except Exception:
             logger.warning(
                 "failed to flush team room frame speaker=%s room=%s",

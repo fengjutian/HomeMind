@@ -17,10 +17,35 @@ from octop.infra.users.password import _COMMON_PASSWORDS, validate_password_poli
 posix_only = pytest.mark.skipif(os.name != "posix", reason="bash entrypoint helpers")
 # Same tests, but runnable anywhere a bash is on PATH (e.g. Git Bash on Windows).
 bash_exe = shutil.which("bash")
-bash_only = pytest.mark.skipif(bash_exe is None, reason="requires a bash shell")
 
 REPO = Path(__file__).resolve().parents[2]
 ENTRYPOINT = REPO / "docker" / "docker-entrypoint.sh"
+
+
+def _bash_can_source_entrypoint() -> bool:
+    """True when the bash on PATH can actually read the entrypoint script.
+
+    ``bash`` being on PATH is not enough: Windows also ships a WSL launcher
+    (``WindowsApps\\bash.exe``) that cannot see ``D:\\...`` paths, so the script
+    would be "missing" even though a bash exists. Probe once instead of
+    failing four tests with a confusing "No such file" error.
+    """
+    if bash_exe is None:
+        return False
+    probe = subprocess.run(
+        ["bash", "-c", f'OCTOP_ENTRYPOINT_LIB=1; source "{ENTRYPOINT}"'],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    return probe.returncode == 0
+
+
+bash_only = pytest.mark.skipif(
+    bash_exe is None or not _bash_can_source_entrypoint(),
+    reason="requires a bash shell that can read the entrypoint script",
+)
 
 
 def _source_helpers() -> str:

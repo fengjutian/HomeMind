@@ -205,11 +205,20 @@ class BridgeSession:
             with suppress(Exception):
                 await closer()
 
-    async def send_json(self, payload: dict[str, Any]) -> None:
+    async def send_json(self, payload: dict[str, Any], *, wait: bool = False) -> None:
+        """Queue one frame for the peer.
+
+        ``wait`` blocks until the frame is actually on the wire. It is used for
+        the frames whose delivery is the answer to something the peer asked
+        for — a pong, a hello_ack — where returning before the write would
+        leave the peer waiting.
+        """
         if self.closed:
             raise ConnectionError("bridge session closed")
         try:
-            await self._send_queue.send(payload)
+            written = await self._send_queue.send(payload)
+            if wait and written is not None:
+                await written.wait()
         except Exception:
             await self.close(reason="send failed")
             raise
@@ -225,7 +234,7 @@ class BridgeSession:
         self._note_recv()
         msg_type = str(payload.get("type") or "")
         if msg_type == "ping":
-            await self.send_json({"type": "pong"})
+            await self.send_json({"type": "pong"}, wait=True)
             return
         if msg_type == "pong":
             self._seen_pong = True
