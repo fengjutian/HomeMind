@@ -39,6 +39,7 @@ from octop.infra.agents.providers.resolved import list_resolved_models as _list_
 from octop.infra.agents.providers.store import (
     clear_stale_pins_for_provider,
     merge_stream_usage_extra,
+    resolve_provider_stream_usage,
 )
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.groups import RESOURCE_MODEL, GroupAccess, model_resource_key
@@ -171,6 +172,58 @@ async def _maybe_refresh_codex_row(server: Any, row: Any) -> Any:
         refreshed = server.services.provider_repo.get(row.id)
         return refreshed if refreshed is not None else row
     return row
+
+
+def _annotate_provider_models(server: Any, payload: dict[str, Any]) -> dict[str, Any]:
+    access = GroupAccess(server.services.repos)
+    provider_name = str(payload.get("name") or "")
+    for model in payload.get("models") or []:
+        if not isinstance(model, dict):
+            continue
+        model_id = str(model.get("id") or "")
+        model.update(
+            access.visibility(
+                RESOURCE_MODEL,
+                model_resource_key(provider_name, model_id),
+                shared=None,
+            )
+        )
+    return payload
+
+
+def _sync_model_visibility(
+    server: Any,
+    provider_name: str,
+    models: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    access = GroupAccess(server.services.repos)
+    existing = server.services.provider_repo.get_by_name(provider_name)
+    previous = (
+        {str(model.get("id") or "") for model in existing.get_models()}
+        if existing is not None
+        else set()
+    )
+    cleaned: list[dict[str, Any]] = []
+    kept: set[str] = set()
+    for model in models:
+        item = dict(model)
+        model_id = str(item.get("id") or "").strip()
+        visibility = item.pop("visibility", None)
+        group_ids = item.pop("group_ids", None)
+        if model_id:
+            kept.add(model_id)
+        if visibility is not None and model_id:
+            access.set_visibility(
+                RESOURCE_MODEL,
+                model_resource_key(provider_name, model_id),
+                str(visibility),
+                group_ids if isinstance(group_ids, list) else [],
+            )
+        cleaned.append(item)
+    for model_id in previous - kept:
+        if model_id:
+            access.clear(RESOURCE_MODEL, model_resource_key(provider_name, model_id))
+    return cleaned
 
 
 def _row_to_dict(r: Any) -> dict[str, Any]:

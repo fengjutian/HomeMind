@@ -711,6 +711,46 @@ class OctopServer:
 
         self._upload_sweep_task = asyncio.create_task(_sweep_uploads(), name="upload-sweeper")
 
+    async def refresh_plugin_channels(self) -> None:
+        """Reconcile only changed kinds and report registration failures to callers."""
+        from octop.infra.errors import ErrorCode, OctopError
+        from octop.infra.gateway.plugin_channels import (
+            changed_plugin_channel_kinds,
+            current_registration_errors,
+        )
+
+        changed = changed_plugin_channel_kinds(PluginRegistry())
+        if self.app_runtime is not None:
+            await self.app_runtime.gateway.reload_plugin_channels(
+                self._apply_plugin_channels, kinds=changed
+            )
+        else:
+            self._apply_plugin_channels()
+        errors = current_registration_errors()
+        if errors:
+            raise OctopError(
+                ErrorCode.PLUGIN_INSTALL_FAILED,
+                "plugin channel registration failed",
+                details={"registration_errors": errors},
+            )
+
+    def _apply_plugin_channels(self) -> None:
+        """Register plugin-contributed channel kinds with the gateway.
+
+        Called after every plugin load/reload so channel kinds are always in
+        sync with the plugin registry. Best-effort: a failure in one plugin's
+        registration never blocks boot (already handled inside
+        ``apply_plugin_channels``).
+        """
+        if self.plugin_manager is None:
+            return
+        try:
+            from octop.infra.gateway.plugin_channels import apply_plugin_channels  # noqa: PLC0415
+
+            apply_plugin_channels(registry=PluginRegistry())
+        except Exception:
+            logger.exception("applying plugin channel kinds failed")
+
     def _emit_wizard_password(self, *, user_count: int) -> None:
         config = self.config
         if config is None:

@@ -167,6 +167,7 @@ class WebSocketChannel(BaseChannel):
         )
         self._hub.mark_turn_active(thread_id)
         failed = False
+        stream: Any = None
         try:
             await self._hub.push_to_thread(
                 thread_id,
@@ -182,7 +183,8 @@ class WebSocketChannel(BaseChannel):
             while True:
                 saw_tool_result = False
                 preempted = False
-                async for chunk in processor.iter_turn_chunks(current):
+                stream = processor.iter_turn_chunks(current)
+                async for chunk in stream:
                     chunk_type = str(chunk.get("type") or "") if isinstance(chunk, dict) else ""
                     if preempted and chunk_type not in ("done", "error"):
                         # Cancel already landed at the tool boundary. Later
@@ -339,39 +341,6 @@ class WebSocketChannel(BaseChannel):
             self._hub.mark_turn_idle(thread_id)
             if stream is not None:
                 await close_event_stream(stream)
-            if discarded is not None:
-                try:
-                    await self._hub.push_to_thread(
-                        thread_id,
-                        {
-                            "type": "steer.discarded",
-                            "seq": discarded.seq,
-                            "client_pending_ids": discarded.client_pending_ids,
-                            "pending_ids": discarded.pending_ids,
-                            "turn_id": discarded.turn_id,
-                            "reason": discarded.reason,
-                            "thread_id": thread_id,
-                        },
-                    )
-                except Exception:
-                    logger.exception("websocket failed to deliver steer.discarded")
-            try:
-                # hitl_paused means the steer queue is parked server-side and
-                # survives the approval pause (drains after SSE resume) — the
-                # dashboard keeps its chips instead of clearing them.
-                hitl_parked = self._steer.is_hitl_paused(thread_id)
-                await self._hub.push_to_thread(
-                    thread_id,
-                    {
-                        "type": "turn.ended",
-                        "turn_id": turn_id,
-                        "thread_id": thread_id,
-                        "failed": failed or None,
-                        **({"hitl_paused": True} if hitl_parked else {}),
-                    },
-                )
-            except Exception:
-                logger.exception("websocket failed to deliver turn.ended thread=%s", thread_id)
 
     async def _send_text(self, subject: ChannelSubject, text: str) -> None:
         if not text:

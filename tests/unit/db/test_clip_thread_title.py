@@ -56,7 +56,7 @@ def test_migration_003_repairs_stored_hard_cuts(tmp_path: Path) -> None:
             (
                 Path(__file__).resolve().parents[3]
                 / "src/octop/infra/db/migrations/001_initial.sql"
-            ).read_text()
+            ).read_text(encoding="utf-8")
         )
         # Partial v2 columns so full migrate can finish.
         conn.execute("ALTER TABLE cron_jobs ADD COLUMN mcp_servers TEXT NOT NULL DEFAULT '[]'")
@@ -82,7 +82,7 @@ def test_migration_003_repairs_stored_hard_cuts(tmp_path: Path) -> None:
     with pool.connect() as conn:
         v = conn.execute("SELECT version FROM _schema_version").fetchone()[0]
         title = conn.execute("SELECT title FROM threads WHERE thread_id = ?", ("t1",)).fetchone()[0]
-    assert v == 24
+    assert v == 28
     assert title == "x" * 39 + "…"
     # Idempotent repair
     assert repair_all_legacy_thread_titles(pool) == 0

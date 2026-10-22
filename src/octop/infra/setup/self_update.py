@@ -600,12 +600,29 @@ def get_installed_version(python_exe: str) -> str | None:
     return None
 
 
-def get_version_in_dir(python_exe: str, target: str) -> str | None:
-    """Return the HomeMind version installed in *target* (a ``pip --target`` dir)."""
+def get_version_in_dir(python_exe: str, target: str, *, check_cli: bool = False) -> str | None:
+    """Return the HomeMind version installed in *target* (a ``pip --target`` dir).
+
+    ``check_cli`` additionally exercises the installed console entry point so a
+    half-written target is rejected before it is swapped in.
+    """
     try:
         code = (
-            "import sys; sys.path.insert(0, sys.argv[1]); "
-            f"from importlib.metadata import version; print(version({_PACKAGE_NAME!r}))"
+            "import json, site, sys; from pathlib import Path; "
+            "target = Path(sys.argv[1]).resolve(); "
+            "sys.path.insert(0, str(target)); site.addsitedir(str(target)); "
+            f"import {_PACKAGE_NAME} as pkg; "
+            "actual = getattr(pkg, '__version__', None) if "
+            "Path(pkg.__file__).resolve().is_relative_to(target) else None\n"
+            "if actual is not None and sys.argv[2] == '1':\n"
+            " import contextlib, io, runpy\n"
+            f" sys.argv = [{_CONSOLE_SCRIPT_NAMES[0]!r}, '--version']\n"
+            " with contextlib.redirect_stdout(io.StringIO()):\n"
+            "  try:\n"
+            f"   runpy.run_module({_PACKAGE_NAME!r}, run_name='__main__', alter_sys=True)\n"
+            "  except SystemExit as exc:\n"
+            "   if exc.code not in (None, 0): raise\n"
+            f"print('\\n{_PROBE_PREFIX}' + json.dumps(actual))"
         )
         result = subprocess.run(
             [python_exe, "-B", "-c", code, target, "1" if check_cli else "0"],

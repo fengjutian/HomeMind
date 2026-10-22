@@ -13,7 +13,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from starlette.websockets import WebSocketState
 
-from octop.api.deps import get_server, require_permission, resolve_user_from_token
+from octop.api.deps import current_user, get_server, require_permission, resolve_user_from_token
 from octop.infra.errors import ErrorCode, OctopError
 from octop.infra.users.permissions import user_has_permission
 from octop.infra.users.profile_avatar import (

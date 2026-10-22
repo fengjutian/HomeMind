@@ -1134,7 +1134,7 @@ def test_restore_repairs_old_physical_schema_with_current_watermark(tmp_path: Pa
             (
                 Path(__file__).resolve().parents[3]
                 / "src/octop/infra/db/migrations/001_initial.sql"
-            ).read_text()
+            ).read_text(encoding="utf-8")
         )
         conn.execute("UPDATE _schema_version SET version = 13")
         conn.execute(
@@ -1178,7 +1178,7 @@ def test_restore_repairs_old_physical_schema_with_current_watermark(tmp_path: Pa
             "SELECT instance_id, shared FROM connectors WHERE instance_id = 'instance-1'"
         ).fetchone()
 
-    assert result["schema_version"] == 24
+    assert result["schema_version"] == 28
     assert "shared" in columns
     assert connector is not None
     assert connector["shared"] == 0
@@ -1232,7 +1232,7 @@ def test_refuse_newer_schema_backup_before_database_replace(
     assert excinfo.value.code == ErrorCode.BACKUP_SCHEMA_INCOMPATIBLE
     assert excinfo.value.details == {
         "archive_schema_version": 999,
-        "runtime_schema_version": 24,
+        "runtime_schema_version": 28,
     }
     with pool.connect() as conn:
         assert (

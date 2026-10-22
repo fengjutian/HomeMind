@@ -1617,6 +1617,78 @@ def _ensure_bridge_token_version_schema(db: DatabasePool) -> None:
     _ensure_column(db, "bridge_connections", "credentials_updated_at", "INTEGER")
 
 
+def _ensure_skill_package_download_schema(db: DatabasePool) -> None:
+    """Migration 25: skill packages can disable ZIP download for non-owners."""
+    if not _table_exists(db, "skill_packages"):
+        return
+    _ensure_column(db, "skill_packages", "allow_download", "INTEGER NOT NULL DEFAULT 1")
+
+
+def _ensure_skill_package_shared_schema(db: DatabasePool) -> None:
+    """Migration 26: skill packages can be private or shared with other users."""
+    if not _table_exists(db, "skill_packages"):
+        return
+    _ensure_column(db, "skill_packages", "shared", "INTEGER NOT NULL DEFAULT 0")
+
+
+def _ensure_user_group_schema(db: DatabasePool) -> None:
+    """Migration 27: user groups and per-resource visibility grants."""
+    if not _table_exists(db, "users"):
+        return
+    with db.connect() as conn:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS user_group (
+              id             INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_group_id  TEXT NOT NULL UNIQUE,
+              name           TEXT NOT NULL UNIQUE,
+              description    TEXT,
+              created_at     INTEGER NOT NULL,
+              updated_at     INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS user_group_member (
+              user_group_id  TEXT NOT NULL REFERENCES user_group(user_group_id) ON DELETE CASCADE,
+              user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              created_at     INTEGER NOT NULL,
+              PRIMARY KEY (user_group_id, user_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_group_member_user ON user_group_member(user_id);
+
+            CREATE TABLE IF NOT EXISTS resource_group_grant (
+              resource_type  TEXT NOT NULL,
+              resource_key   TEXT NOT NULL,
+              user_group_id  TEXT NOT NULL REFERENCES user_group(user_group_id) ON DELETE CASCADE,
+              PRIMARY KEY (resource_type, resource_key, user_group_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_resource_group_grant_group
+              ON resource_group_grant(user_group_id);
+            """
+        )
+
+
+def _ensure_user_group_profile_schema(db: DatabasePool) -> None:
+    """Migration 28: enable flag and preset avatar on user groups."""
+    if not _table_exists(db, "user_group"):
+        return
+    _ensure_column(db, "user_group", "enabled", "INTEGER NOT NULL DEFAULT 1")
+    _ensure_column(db, "user_group", "avatar_icon", "TEXT")
+
+
+def _ensure_knowledge_base_icon_url_schema(db: DatabasePool) -> None:
+    """Optional portrait URL on knowledge bases. Idempotent."""
+    if not _table_exists(db, "knowledge_bases"):
+        return
+    _ensure_column(db, "knowledge_bases", "icon_url", "TEXT NOT NULL DEFAULT ''")
+
+
+def _ensure_bridge_icon_url_schema(db: DatabasePool) -> None:
+    """Optional portrait URL on bridge connections. Idempotent."""
+    if not _table_exists(db, "bridge_connections"):
+        return
+    _ensure_column(db, "bridge_connections", "icon_url", "TEXT NOT NULL DEFAULT ''")
+
+
 def _ensure_bridge_state_schema(db: DatabasePool) -> None:
     """Plan phase 13: the eight-state connection machine on bridge_connections.
 
@@ -2052,6 +2124,30 @@ def _apply_sqlite_migration(db: DatabasePool, version: int, path: Path) -> None:
         with db.connect() as conn:
             conn.execute("UPDATE _schema_version SET version = ?", (version,))
         return
+    if version == 25:
+        # Idempotent helper, not the raw file: a clamped watermark or a
+        # restored pre-v25 database would otherwise run the ALTER twice.
+        _ensure_skill_package_download_schema(db)
+        with db.connect() as conn:
+            conn.execute("UPDATE _schema_version SET version = ?", (version,))
+        return
+    if version == 26:
+        _ensure_skill_package_shared_schema(db)
+        with db.connect() as conn:
+            conn.execute("UPDATE _schema_version SET version = ?", (version,))
+        return
+    if version == 27:
+        _ensure_user_group_schema(db)
+        with db.connect() as conn:
+            conn.execute("UPDATE _schema_version SET version = ?", (version,))
+        return
+    if version == 28:
+        _ensure_user_group_profile_schema(db)
+        _ensure_knowledge_base_icon_url_schema(db)
+        _ensure_bridge_icon_url_schema(db)
+        with db.connect() as conn:
+            conn.execute("UPDATE _schema_version SET version = ?", (version,))
+        return
     sql = path.read_text(encoding="utf-8")
     with db.connect() as conn:
         conn.executescript(sql)
@@ -2227,4 +2323,10 @@ def run_migrations(db: DatabasePool) -> None:
     _ensure_bridge_connections_schema(db)
     _ensure_bridge_state_schema(db)
     _ensure_bridge_token_version_schema(db)
+    _ensure_skill_package_download_schema(db)
+    _ensure_skill_package_shared_schema(db)
+    _ensure_user_group_schema(db)
+    _ensure_user_group_profile_schema(db)
+    _ensure_knowledge_base_icon_url_schema(db)
+    _ensure_bridge_icon_url_schema(db)
     _ensure_workspace_change_log_schema(db)
