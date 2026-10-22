@@ -77,7 +77,6 @@ import {
   type ZipImportSummary,
 } from "../Agent/Skills/components/SkillImportModal";
 import SkillHubTab from "../Agent/Skills/components/SkillHubTab";
-import SkillsShTab from "../Agent/Skills/components/SkillsShTab";
 import skillStyles from "../Agent/Skills/index.module.less";
 import type { ParsedZipSkill } from "../Agent/Skills/components/parseSkillZip";
 import { showConfirmModal } from "../../utils/confirmModal";
@@ -152,8 +151,6 @@ export default function SkillPackagesPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
-  const [skillsShOpen, setSkillsShOpen] = useState(false);
-  const [qoderCommunityOpen, setQoderCommunityOpen] = useState(false);
   const [skillsetHubOpen, setSkillsetHubOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
@@ -968,55 +965,24 @@ export default function SkillPackagesPage() {
                             <Store size={14} />
                             {t("skills.tencentSkillHub")}
                           </button>
-                        </Tooltip>
-                        {canMutate ? (
-                          <>
-                            <button
-                              type="button"
-                              className={skillStyles.toolbarBtn}
-                              onClick={() => setHubOpen(true)}
-                            >
-                              <Store size={14} />
-                              {t("skills.tencentSkillHub")}
-                            </button>
-                            <button
-                              type="button"
-                              className={skillStyles.toolbarBtn}
-                              onClick={() => setSkillsShOpen(true)}
-                            >
-                              <Store size={14} />
-                              {t("skills.skillsSh")}
-                            </button>
-                            <button
-                              type="button"
-                              className={skillStyles.toolbarBtn}
-                              onClick={() => setQoderCommunityOpen(true)}
-                            >
-                              <Store size={14} />
-                              {t("skills.qoderCommunity")}
-                            </button>
-                            <button
-                              type="button"
-                              className={skillStyles.toolbarBtn}
-                              onClick={() => setImportModalOpen(true)}
-                            >
-                              <Download size={14} />
-                              {t("skills.importSkills")}
-                            </button>
-                            <button
-                              type="button"
-                              className={skillStyles.toolbarBtnPrimary}
-                              onClick={openCreateSkill}
-                            >
-                              <Plus size={14} />
-                              {t("skillPackages.createSkill")}
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className={skillStyles.skillsListArea}>
-                      {skillsContent}
+                          <button
+                            type="button"
+                            className={skillStyles.toolbarBtn}
+                            onClick={() => setImportModalOpen(true)}
+                          >
+                            <Download size={14} />
+                            {t("skills.importSkills")}
+                          </button>
+                          <button
+                            type="button"
+                            className={skillStyles.toolbarBtnPrimary}
+                            onClick={openCreateSkill}
+                          >
+                            <Plus size={14} />
+                            {t("skillPackages.createSkill")}
+                          </button>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                   <div className={skillStyles.skillsListArea}>
@@ -1313,35 +1279,6 @@ export default function SkillPackagesPage() {
         {selected ? (
           <SkillHubTab
             target={{ type: "package", packageId: selected.id }}
-            onInstalled={() => void refreshSelected()}
-          />
-        ) : null}
-      </Drawer>
-      <Drawer
-        title={t("skills.skillsSh")}
-        open={skillsShOpen}
-        onClose={() => setSkillsShOpen(false)}
-        width={860}
-        destroyOnHidden
-      >
-        {selected ? (
-          <SkillsShTab
-            target={{ type: "package", packageId: selected.id }}
-            onInstalled={() => void refreshSelected()}
-          />
-        ) : null}
-      </Drawer>
-      <Drawer
-        title={t("skills.qoderCommunity")}
-        open={qoderCommunityOpen}
-        onClose={() => setQoderCommunityOpen(false)}
-        width={860}
-        destroyOnHidden
-      >
-        {selected ? (
-          <SkillsShTab
-            target={{ type: "package", packageId: selected.id }}
-            source="qoder-community"
             onInstalled={() => void refreshSelected()}
           />
         ) : null}
