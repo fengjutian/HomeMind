@@ -2307,25 +2307,67 @@ export default function KnowledgeBasesPage() {
                   <div
                     className={`${skillStyles.gridToolbar} ${styles.docsToolbar}`}
                   >
-                    {dragActive && canDropUpload ? (
-                      <div className={styles.dropOverlay} aria-hidden>
-                        <FileUp size={36} strokeWidth={1.75} />
-                        <span>{t("knowledgeBases.dropToUpload")}</span>
-                      </div>
-                    ) : null}
-                    <div
-                      className={`${skillStyles.gridToolbar} ${styles.docsToolbar}`}
-                    >
-                      <span className={skillStyles.gridCount}>
-                        {documentCap === null
-                          ? t("knowledgeBases.documentCount", {
-                              count: fileCount,
-                            })
-                          : t("knowledgeBases.documentLimit", {
-                              count: fileCount,
-                              max: documentCap,
-                            })}
-                      </span>
+                    <div className={styles.toolbarStart}>
+                      {isMobile ? (
+                        <button
+                          type="button"
+                          className={styles.mobileBack}
+                          onClick={() => setMobilePane("list")}
+                          aria-label={t("knowledgeBases.backToList")}
+                        >
+                          <ChevronLeft size={18} />
+                        </button>
+                      ) : null}
+                      <nav
+                        className={styles.pathBreadcrumb}
+                        aria-label={t("knowledgeBases.pathBreadcrumb")}
+                      >
+                        <Signpost
+                          size={14}
+                          className={styles.pathBreadcrumbIcon}
+                          aria-hidden
+                        />
+                        {folderCrumbs.map((seg, index) => {
+                          const isLast = index === folderCrumbs.length - 1;
+                          return (
+                            <span
+                              key={`${seg.path}:${index}`}
+                              className={styles.pathBreadcrumbSegment}
+                            >
+                              {index > 0 ? (
+                                <span
+                                  className={styles.pathBreadcrumbSep}
+                                  aria-hidden
+                                >
+                                  /
+                                </span>
+                              ) : null}
+                              {isLast ? (
+                                <span
+                                  className={styles.pathBreadcrumbCurrent}
+                                  title={seg.label}
+                                >
+                                  <span className={styles.pathBreadcrumbLabel}>
+                                    {seg.label}
+                                  </span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className={styles.pathBreadcrumbLink}
+                                  onClick={() => setCurrentFolder(seg.path)}
+                                  title={seg.label}
+                                >
+                                  <span className={styles.pathBreadcrumbLabel}>
+                                    {seg.label}
+                                  </span>
+                                </button>
+                              )}
+                            </span>
+                          );
+                        })}
+                      </nav>
+                    </div>
                       <div className={skillStyles.gridToolbarRight}>
                         <Segmented
                           size="small"
@@ -2478,6 +2520,7 @@ export default function KnowledgeBasesPage() {
                           count: documentCap ?? limits.max_docs_per_kb,
                         })}
                       />
+                    ) : null}
                       <input
                         ref={uploadRef}
                         className={styles.fileInput}
