@@ -28,7 +28,6 @@ import { request } from "../../../api/request";
 import type { OctopAgent } from "../../../context/AgentContext";
 import { useAgent } from "../../../context/AgentContext";
 import MbtiPersonaTag from "../../../components/MbtiPersonaTag";
-import { ExpertIcon } from "./iconForName";
 import {
   formatAgentError,
   formatAgentState,
@@ -77,8 +76,6 @@ export interface AgentCardProps {
 
 export const AgentCard = memo(function AgentCard({
   agent,
-  iconName,
-  iconUrl,
   accentColor,
   publishedExpert = null,
   onPublishedChange,
@@ -299,17 +296,6 @@ export const AgentCard = memo(function AgentCard({
 
         {/* Header */}
         <div className={styles.agentCard2Header}>
-          <div
-            className={styles.agentCard2Icon}
-            style={{ color: accent, background: `${accent}1a` }}
-          >
-            <ExpertIcon
-              iconUrl={iconUrl ?? agent.icon_url}
-              iconName={iconName ?? agent.icon_name}
-              size={iconUrl ?? agent.icon_url ? 42 : 22}
-            />
-          </div>
-
           <div className={styles.agentCard2TitleBlock}>
             <div className={styles.agentCard2NameRow}>
               <div className={styles.agentCard2Name}>{agent.name}</div>
