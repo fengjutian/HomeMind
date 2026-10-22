@@ -1,0 +1,82 @@
+{
+  "id": "technology-research",
+  "label": {
+    "zh": "技术调研专家",
+    "en": "Technology Research Expert"
+  },
+  "description": {
+    "zh": "依据业务目标与工程约束联网检索权威资料，交叉验证候选方案，并给出可落地、可验证的技术栈建议。",
+    "en": "Researches authoritative current sources against business and engineering constraints, cross-validates alternatives, and recommends a practical, testable technology stack."
+  },
+  "welcome_message": {
+    "zh": "请描述项目目标、核心场景和已知约束；我会先补齐关键问题，再联网调研并给出有来源的技术选型建议。",
+    "en": "Describe the project goals, key scenarios, and known constraints. I will clarify material unknowns, research current sources, and deliver evidence-backed stack recommendations."
+  },
+  "icon_name": "layers",
+  "color": "#2563EB",
+  "prompt_files": [
+    "SOUL.md"
+  ],
+  "quick_prompts": [
+    {
+      "title": {"zh": "新项目技术选型", "en": "Select a stack for a new project"},
+      "description": {"zh": "从需求和约束出发比较完整技术栈", "en": "Compare end-to-end stacks from requirements and constraints"},
+      "prompt": {"zh": "请为下面的项目调研并推荐技术栈。先识别会改变结论的缺失信息，再联网核实候选方案的当前版本、维护状态和官方能力边界；用统一标准比较前端、后端、数据、基础设施与可观测性方案，最后给出推荐、备选、风险和 PoC 计划：\n\n", "en": "Research and recommend a technology stack for the project below. First identify missing information that could change the decision, then verify current versions, maintenance status, and official capability boundaries online. Compare frontend, backend, data, infrastructure, and observability options using consistent criteria, and finish with a recommendation, fallback, risks, and a PoC plan:\n\n"},
+      "color": "#DBEAFE",
+      "icon_name": "layers"
+    },
+    {
+      "title": {"zh": "框架对比", "en": "Compare frameworks"},
+      "description": {"zh": "基于证据比较候选框架而非罗列优缺点", "en": "Compare candidates with evidence instead of generic pros and cons"},
+      "prompt": {"zh": "请对比下面的候选框架。先确认使用场景、负载、团队经验和部署约束；联网查阅官方文档、发布说明和源码仓库，核实稳定版本、支持周期、关键限制与许可证。输出带来源的对比矩阵、适用边界、推荐结论和验证步骤：\n\n", "en": "Compare the frameworks below. Establish the use case, load profile, team experience, and deployment constraints first. Research official documentation, release notes, and source repositories to verify stable versions, support windows, material limitations, and licenses. Return a sourced decision matrix, applicability boundaries, recommendation, and validation steps:\n\n"},
+      "color": "#EDE9FE",
+      "icon_name": "scale"
+    },
+    {
+      "title": {"zh": "评审现有架构", "en": "Review an existing architecture"},
+      "description": {"zh": "识别瓶颈、复杂度和演进优先级", "en": "Find bottlenecks, complexity, and evolution priorities"},
+      "prompt": {"zh": "请评审下面的现有技术栈与架构。区分已知事实、待验证假设和真实风险；联网核实关键组件的维护状态、安全公告与兼容性，判断哪些部分应保留、升级、替换或暂缓，并给出按收益/风险排序的演进路线：\n\n", "en": "Review the existing stack and architecture below. Separate known facts, unverified assumptions, and actual risks. Research maintenance status, security advisories, and compatibility for critical components, decide what to retain, upgrade, replace, or defer, and provide an evolution roadmap ordered by benefit and risk:\n\n"},
+      "color": "#FEF3C7",
+      "icon_name": "scan-search"
+    },
+    {
+      "title": {"zh": "云服务选型", "en": "Choose cloud services"},
+      "description": {"zh": "比较托管能力、成本、锁定与运维负担", "en": "Compare managed capabilities, cost, lock-in, and operations"},
+      "prompt": {"zh": "请为下面的工作负载调研云平台或托管服务。明确区域、合规、可用性、容量、延迟、数据驻留和预算约束；基于官方定价与服务文档比较候选方案，列出成本模型、供应商锁定、退出路径、运维责任和故障边界：\n\n", "en": "Research cloud platforms or managed services for the workload below. Establish region, compliance, availability, capacity, latency, data residency, and budget constraints. Compare candidates using official pricing and service documentation, covering the cost model, vendor lock-in, exit path, operational ownership, and failure boundaries:\n\n"},
+      "color": "#DCFCE7",
+      "icon_name": "cloud"
+    },
+    {
+      "title": {"zh": "数据库选型", "en": "Select a database"},
+      "description": {"zh": "用数据模型和访问模式驱动决策", "en": "Drive the decision from data and access patterns"},
+      "prompt": {"zh": "请为下面的系统调研数据库与数据基础设施。先明确数据模型、读写路径、一致性、事务、查询、增长、备份恢复和合规要求；联网核实候选产品的当前能力与限制，输出容量假设、对比矩阵、推荐拓扑、迁移风险和基准测试方案：\n\n", "en": "Research databases and data infrastructure for the system below. Establish the data model, read/write paths, consistency, transactions, queries, growth, backup and recovery, and compliance requirements. Verify current candidate capabilities and limits online, then provide capacity assumptions, a comparison matrix, recommended topology, migration risks, and a benchmark plan:\n\n"},
+      "color": "#FFEDD5",
+      "icon_name": "database"
+    },
+    {
+      "title": {"zh": "验证技术可行性", "en": "Validate technical feasibility"},
+      "description": {"zh": "把不确定结论转成最小 PoC", "en": "Turn uncertain claims into a minimal PoC"},
+      "prompt": {"zh": "请把下面的技术选型争议转化为一个最小可行的 PoC。列出要验证的假设、成功阈值、代表性数据与流量、环境控制、观测指标、测试步骤、停止条件和结果记录模板；只测试真正会改变决策的未知项：\n\n", "en": "Turn the technology decision below into a minimal viable PoC. Define the hypotheses, success thresholds, representative data and traffic, environment controls, observed metrics, test steps, stop conditions, and result template. Test only unknowns that can materially change the decision:\n\n"},
+      "color": "#FEE2E2",
+      "icon_name": "flask-conical"
+    }
+  ],
+  "task_examples": {
+    "zh": [
+      "每周一「09:00」检查核心技术依赖的新版本、支持周期与重要安全公告",
+      "每周三「15:00」跟踪当前选型中仍未验证的关键假设，并更新证据清单",
+      "每周五「17:00」汇总本周技术生态变化，只报告可能改变现有决策的事项",
+      "每月 1 日「10:00」复核云服务定价、配额和区域可用性对成本模型的影响",
+      "每月 15 日「10:00」审查核心开源依赖的维护活跃度、许可证和替代方案",
+      "每季度首个工作日「14:00」复盘技术栈风险登记表并提出下一季度 PoC 优先级"
+    ],
+    "en": [
+      "Every Monday at 09:00, check core dependencies for new releases, support-window changes, and material security advisories",
+      "Every Wednesday at 15:00, track unresolved assumptions in the current decision and update the evidence register",
+      "Every Friday at 17:00, summarize ecosystem changes that could materially alter existing technology decisions",
+      "On the 1st of every month at 10:00, review cloud pricing, quotas, and regional availability against the cost model",
+      "On the 15th of every month at 10:00, audit maintenance activity, licenses, and alternatives for core open-source dependencies",
+      "On the first business day of every quarter at 14:00, review the stack risk register and prioritize the next PoCs"
+    ]
+  }
+}
