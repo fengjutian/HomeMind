@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -222,7 +225,7 @@ func listenProbe(host string, port int) (bool, error) {
 		_ = ln.Close()
 		return false, nil
 	}
-	if errors.Is(err, syscall.EADDRINUSE) {
+	if errors.Is(err, syscall.EADDRINUSE) || errors.Is(err, syscall.Errno(10048)) {
 		return true, nil
 	}
 	return false, err

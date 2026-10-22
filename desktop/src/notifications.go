@@ -121,6 +121,7 @@ func (a *App) activateNotification(id string) {
 	if route == "" || a.window == nil {
 		return
 	}
-	a.window.SetURL(dashboardURL(a.store.get().Port) + strings.TrimPrefix(route, "/"))
+	host, _ := resolveListen()
+	a.window.SetURL(dashboardURL(host, a.store.get().Port) + strings.TrimPrefix(route, "/"))
 	a.showWindow()
 }

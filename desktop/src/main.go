@@ -249,7 +249,7 @@ func (a *App) boot() {
 		a.mu.Unlock()
 	}
 	a.showDashboard(base)
-	a.startBackendMonitor(root, base, s.Port, locale)
+	a.startBackendMonitor(root, base, port, locale)
 }
 
 func (a *App) startBackendMonitor(root, base string, port int, locale Locale) {
