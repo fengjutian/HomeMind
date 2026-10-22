@@ -162,7 +162,7 @@ function App() {
   return (
     // Keep the current module visible while the next lazy route chunk loads.
     // MainLayout renders an immediate progress cue during the transition.
-    <BrowserRouter useTransitions>
+    <BrowserRouter basename={routerBasename()} useTransitions>
       <GlobalErrorBoundary>
         <GlobalStyle />
         <ThemeProvider>

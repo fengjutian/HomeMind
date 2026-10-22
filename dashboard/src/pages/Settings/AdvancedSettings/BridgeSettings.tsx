@@ -14,7 +14,6 @@ import {
   Input,
   Popconfirm,
   Segmented,
-  Space,
   Spin,
   Switch,
   Table,
@@ -63,9 +62,12 @@ import {
   type BridgeProbeResult,
   type BridgeRemoteAgent,
 } from "../../../api/modules/bridge";
-import { inboundPeerAddress, inboundSourceIp } from "./bridgePeerLabel";
+import {
+  inboundPeerAddress,
+  inboundSourceIp,
+  peerHostLabel,
+} from "./bridgePeerLabel";
 import { TabPanelHeader } from "./TabPanelHeader";
-import BridgeDiagnostics from "./BridgeDiagnostics";
 import styles from "./BridgeSettings.module.less";
 
 const BRIDGE_ACCENT = "var(--fn-color-brand)";
@@ -95,26 +97,17 @@ function BridgeConnectionAvatar({
   );
 }
 
-/**
- * Phase 13 states only a human can clear are shown as errors; everything else
- * is a warning the operator could simply retry.
- */
-function stateTagColor(state: string): string {
-  if (state === "REAUTH_REQUIRED" || state === "INCOMPATIBLE") return "error";
+function bridgePhotoUrl(url?: string | null): string | null {
+  const text = url?.trim() || "";
+  if (!text) return null;
   if (
-    state === "DEGRADED" ||
-    state === "CONNECTING" ||
-    state === "AUTHENTICATING"
+    isUploadedAvatarUrl(text) ||
+    text.startsWith("blob:") ||
+    /^https?:\/\//i.test(text)
   ) {
-    return "warning";
+    return text;
   }
-  return "default";
-}
-
-function stateText(state: string, t: (key: string) => string): string {
-  const key = `advancedSettings.bridge.state.${state}`;
-  const label = t(key);
-  return label === key ? state : label;
+  return null;
 }
 
 function statusColor(status: string): string {
@@ -147,8 +140,8 @@ function InboundPeerFacts({ row }: { row: BridgeConnection }) {
         <span className={styles.infoLabel}>
           {t("advancedSettings.bridge.peerUrl")}:
         </span>
-        <span className={styles.infoValue} title={address}>
-          {address || "—"}
+        <span className={styles.infoValue} title={address || undefined}>
+          {address ? peerHostLabel(address) : "—"}
         </span>
       </div>
       {sourceIp ? (
@@ -161,9 +154,14 @@ function InboundPeerFacts({ row }: { row: BridgeConnection }) {
       ) : null}
       <div className={styles.infoRow}>
         <span className={styles.infoLabel}>
-          {t("advancedSettings.bridge.username")}:
+          {t("advancedSettings.bridge.peerAccount")}:
         </span>
-        <span className={styles.infoValue}>{row.peer_username}</span>
+        <span
+          className={styles.infoValue}
+          title={t("advancedSettings.bridge.peerAccountHint")}
+        >
+          {row.peer_username}
+        </span>
       </div>
     </>
   );
@@ -628,11 +626,6 @@ function BridgeConnectionCard({
         {isInboundConnection(row) ? (
           <>
             <InboundPeerFacts row={row} />
-            <p className={styles.meta}>
-              {connected
-                ? t("advancedSettings.bridge.inboundHint")
-                : t("advancedSettings.bridge.inboundOfflineHint")}
-            </p>
           </>
         ) : (
           <>
@@ -1167,18 +1160,11 @@ export default function BridgeSettingsPanel({
         title: t("advancedSettings.bridge.colStatus"),
         dataIndex: "status",
         key: "status",
-        width: 160,
+        width: 110,
         render: (_status: string, row) => (
-          <Space direction="vertical" size={2}>
-            <Tag color={statusColor(row.status)}>
-              {connectionStatusText(row, t)}
-            </Tag>
-            {row.state && row.state !== "ONLINE" ? (
-              <Tag color={stateTagColor(row.state)} className={styles.stateTag}>
-                {stateText(row.state, t)}
-              </Tag>
-            ) : null}
-          </Space>
+          <Tag color={statusColor(row.status)}>
+            {connectionStatusText(row, t)}
+          </Tag>
         ),
       },
       {
@@ -1319,10 +1305,6 @@ export default function BridgeSettingsPanel({
           actions={headerActions}
         />
       )}
-
-      <div className={styles.diagnostics}>
-        <BridgeDiagnostics />
-      </div>
 
       {loading ? (
         <div className={styles.loading}>

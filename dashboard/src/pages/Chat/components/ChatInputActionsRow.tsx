@@ -267,6 +267,7 @@ export default function ChatInputActionsRow({
   const [reasoningModelRef, setReasoningModelRef] = useState<string | null>(
     null,
   );
+
   // Press-and-hold dictation: start on pointerdown, finish on release or when
   // the pointer slides off the button (also covers touch cancel).
   const handleVoicePressStart = () => {
@@ -403,11 +404,6 @@ export default function ChatInputActionsRow({
   const closePlusMenu = () => {
     setOverflowPopoverOpen(false);
     closeCompactPicker();
-  };
-
-  const closeModelMenus = () => {
-    setModelPopoverOpen(false);
-    closePlusMenu();
   };
 
   const openCompactPicker = (key: CompactPickerKey) => {
@@ -598,7 +594,7 @@ export default function ChatInputActionsRow({
                 }`}
                 onClick={() => {
                   onModelChange?.(null);
-                  closeModelMenus();
+                  closePlusMenu();
                 }}
               >
                 <span className={styles.modelMenuTitle}>
@@ -625,7 +621,7 @@ export default function ChatInputActionsRow({
                     className={styles.modelMenuSelect}
                     onClick={() => {
                       onModelChange?.(active ? null : value);
-                      closeModelMenus();
+                      closePlusMenu();
                     }}
                   >
                     <img
@@ -680,7 +676,7 @@ export default function ChatInputActionsRow({
                 message.info(t("chat.remoteExpert.manageToast"));
                 return;
               }
-              closeModelMenus();
+              closePlusMenu();
               navigate("/admin/models");
             }}
           >

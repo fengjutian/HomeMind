@@ -65,6 +65,7 @@ import WelcomeScreen from "./components/WelcomeScreen";
 import AgentNotReadyScreen from "./components/AgentNotReadyScreen";
 import ModelConfigEmpty from "./components/ModelConfigEmpty";
 import AgentProfileDrawer from "../../components/AgentProfileDrawer";
+import TrajectoryDrawer from "./components/TrajectoryDrawer";
 import { useExpertChatWelcome } from "./hooks/useExpertQuickCards";
 import { useSkills } from "../Agent/Skills/useSkills";
 import { useChatSubagents } from "./hooks/useChatSubagents";
@@ -208,6 +209,8 @@ function ChatPageInner() {
     [agents, resolvedAgentId],
   );
   const agentChatReady = isAgentChatReady(activeAgent?.state, activeAgent);
+  const trajectoryEnabled =
+    activeAgent !== null && activeAgent.config?.enable_trajectory !== false;
   const sharedExpertViewer = isSharedExpertViewer(activeAgent ?? {});
   const isTeamChat = isTeamAgent(activeAgent);
   const [agentProfileOpen, setAgentProfileOpen] = useState(false);
@@ -267,6 +270,7 @@ function ChatPageInner() {
   const chatSubagents = useChatSubagents(
     chatSkillCatalogAgentId(resolvedAgentId, agentChatReady, agentsLoading),
   );
+  const [trajectoryDrawerOpen, setTrajectoryDrawerOpen] = useState(false);
   const [turnRailVisible, setTurnRailVisible] = useState(false);
   const {
     sessions,
@@ -307,6 +311,7 @@ function ChatPageInner() {
     }
     setAgentProfileOpen(false);
     setProfileAgentId(null);
+    setTrajectoryDrawerOpen(false);
   }, [resolvedAgentId]);
 
   // Weak stream resume may skip intermediate tokens — hint once after rebind.
@@ -354,7 +359,6 @@ function ChatPageInner() {
     contextUsage,
     pendingPlanPath,
     liveSpeakers,
-    teamActivity,
     activeTurnId,
     sendMessage,
     editAndResend,
@@ -1106,16 +1110,40 @@ function ChatPageInner() {
     [messages, wrappedHandleSend, hasPendingHitlPause, t],
   );
 
-  const handleRegenerateMermaid = useCallback(
-    (code: string) => {
-      if (hasPendingHitlPause) {
-        antMessage.warning(t("chat.hitl.finishPendingFirst"));
-        return;
+  const handleDisableStreamUsage = useCallback(async () => {
+    let lastUserModel: string | null = null;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role === "user") {
+        lastUserModel = messages[i].composerContext?.model ?? null;
+        break;
       }
-      wrappedHandleSend(t("chat.mermaidRegeneratePrompt", { code }));
-    },
-    [wrappedHandleSend, hasPendingHitlPause, t],
-  );
+    }
+    const providerId = providerIdForTurn(availableModels, [
+      lastUserModel,
+      selectedModel,
+      activeAgent?.default_model,
+      activeModelRef,
+    ]);
+    if (providerId == null) {
+      antMessage.error(t("chat.disableStreamUsageFailed"));
+      return false;
+    }
+    try {
+      await disableProviderStreamUsage(providerId);
+      antMessage.success(t("chat.disableStreamUsageSuccess"));
+      return true;
+    } catch {
+      antMessage.error(t("chat.disableStreamUsageFailed"));
+      return false;
+    }
+  }, [
+    availableModels,
+    selectedModel,
+    activeAgent?.default_model,
+    activeModelRef,
+    messages,
+    t,
+  ]);
 
   // Edit user message: truncate history from that message onwards, replace
   // its content, and re-send — mirrors Claude / ChatGPT "edit message" behaviour.
@@ -1530,11 +1558,10 @@ function ChatPageInner() {
                     onRefreshHistory={refreshHistory}
                     isStreaming={isStreaming}
                     liveSpeakers={liveSpeakers}
-                    teamActivity={teamActivity}
                     thinkingStartedAt={thinkingStartedAt}
                     sessionKey={activeThreadId ?? undefined}
                     onRegenerate={handleRegenerate}
-                    onRegenerateMermaid={handleRegenerateMermaid}
+                    onDisableStreamUsage={handleDisableStreamUsage}
                     onEditUserMessage={handleEditUserMessage}
                     onWithdrawSteer={handleWithdrawSteer}
                     onForkAssistantMessage={handleForkAssistantMessage}
@@ -1554,33 +1581,114 @@ function ChatPageInner() {
               )}
             </div>
 
-            {!isMobile && !dockOpen && !agentProfileOpen && (
-              <div className={styles.chatFloatActions}>
-                {/* PWA install first when available — same column as browser / experts. */}
-                <PwaInstallPrompt appearance="chatFloat" />
-                {resolvedAgentId && !sharedExpertViewer && (
-                  <>
+            {!isMobile &&
+              !dockOpen &&
+              !agentProfileOpen &&
+              !trajectoryDrawerOpen && (
+                <div className={styles.chatFloatActions}>
+                  {/* PWA install first when available — same column as browser / experts. */}
+                  <PwaInstallPrompt appearance="chatFloat" />
+                  {resolvedAgentId && !sharedExpertViewer && (
+                    <>
+                      <Tooltip
+                        title={profileOpenLabel}
+                        mouseEnterDelay={0.35}
+                        placement="left"
+                      >
+                        <span className={styles.chatFloatBtnWrap}>
+                          <button
+                            type="button"
+                            className={styles.agentProfileBtn}
+                            onClick={() => setAgentProfileOpen(true)}
+                            aria-label={profileOpenLabel}
+                          >
+                            <ProfileIcon size={20} strokeWidth={2.1} />
+                          </button>
+                        </span>
+                      </Tooltip>
+                      <Tooltip
+                        title={
+                          agentChatReady
+                            ? t("chat.openWorkspace", "工作区")
+                            : t("workspace.requiresRunning")
+                        }
+                        mouseEnterDelay={0.35}
+                        placement="left"
+                      >
+                        <span className={styles.chatFloatBtnWrap}>
+                          <button
+                            type="button"
+                            className={styles.chatFloatBtn}
+                            disabled={!agentChatReady}
+                            onClick={toggleWorkspacePanel}
+                            aria-label={t("chat.openWorkspace", "工作区")}
+                          >
+                            <FolderOpen size={20} strokeWidth={2.1} />
+                          </button>
+                        </span>
+                      </Tooltip>
+                    </>
+                  )}
+                  {!sharedExpertViewer && panelFilePaths.length > 0 && (
                     <Tooltip
-                      title={profileOpenLabel}
+                      title={t("chat.modifiedFiles", {
+                        count: panelFilePaths.length,
+                        defaultValue: "已修改文件（{{count}}）",
+                      })}
                       mouseEnterDelay={0.35}
                       placement="left"
                     >
                       <span className={styles.chatFloatBtnWrap}>
                         <button
                           type="button"
-                          className={styles.agentProfileBtn}
-                          onClick={() => setAgentProfileOpen(true)}
-                          aria-label={profileOpenLabel}
+                          className={styles.chatFloatBtn}
+                          onClick={() => openFileList()}
+                          aria-label={t("chat.modifiedFiles", {
+                            count: panelFilePaths.length,
+                            defaultValue: "已修改文件（{{count}}）",
+                          })}
                         >
-                          <ProfileIcon size={20} strokeWidth={2.1} />
+                          <FilePen size={20} strokeWidth={2.1} />
+                        </button>
+                        {panelFilePaths.length > 1 && (
+                          <span className={styles.chatFloatBadge}>
+                            {panelFilePaths.length > 99
+                              ? "99+"
+                              : panelFilePaths.length}
+                          </span>
+                        )}
+                      </span>
+                    </Tooltip>
+                  )}
+                  {canTerminal && (
+                    <Tooltip
+                      title={t("chat.openTerminal", "打开终端")}
+                      mouseEnterDelay={0.35}
+                      placement="left"
+                    >
+                      <span className={styles.chatFloatBtnWrap}>
+                        <button
+                          type="button"
+                          className={styles.terminalFloatBtn}
+                          onClick={toggleTerminalPanel}
+                          aria-label={t("chat.openTerminal", "打开终端")}
+                        >
+                          <Terminal size={20} strokeWidth={2.1} />
                         </button>
                       </span>
                     </Tooltip>
+                  )}
+                  {trajectoryEnabled && (
                     <Tooltip
                       title={
-                        agentChatReady
-                          ? t("chat.openWorkspace", "工作区")
-                          : t("workspace.requiresRunning")
+                        !agentChatReady
+                          ? t("workspace.requiresRunning")
+                          : !activeThreadId
+                          ? t(
+                              "chat.trajectorySelectSession",
+                              "Select a session to view trajectory",
+                            )
+                          : t("chat.openTrajectory", "运行轨迹")
                       }
                       mouseEnterDelay={0.35}
                       placement="left"
@@ -1589,76 +1697,25 @@ function ChatPageInner() {
                         <button
                           type="button"
                           className={styles.chatFloatBtn}
-                          disabled={!agentChatReady}
-                          onClick={toggleWorkspacePanel}
-                          aria-label={t("chat.openWorkspace", "工作区")}
+                          disabled={!activeThreadId || !agentChatReady}
+                          onClick={() => setTrajectoryDrawerOpen(true)}
+                          aria-label={t("chat.openTrajectory", "运行轨迹")}
                         >
-                          <FolderOpen size={20} strokeWidth={2.1} />
+                          <Activity size={20} strokeWidth={2.1} />
                         </button>
                       </span>
                     </Tooltip>
-                  </>
-                )}
-                {!sharedExpertViewer && panelFilePaths.length > 0 && (
-                  <Tooltip
-                    title={t("chat.modifiedFiles", {
-                      count: panelFilePaths.length,
-                      defaultValue: "已修改文件（{{count}}）",
-                    })}
-                    mouseEnterDelay={0.35}
-                    placement="left"
-                  >
-                    <span className={styles.chatFloatBtnWrap}>
-                      <button
-                        type="button"
-                        className={styles.chatFloatBtn}
-                        onClick={() => openFileList()}
-                        aria-label={t("chat.modifiedFiles", {
-                          count: panelFilePaths.length,
-                          defaultValue: "已修改文件（{{count}}）",
-                        })}
-                      >
-                        <FilePen size={20} strokeWidth={2.1} />
-                      </button>
-                      {panelFilePaths.length > 1 && (
-                        <span className={styles.chatFloatBadge}>
-                          {panelFilePaths.length > 99
-                            ? "99+"
-                            : panelFilePaths.length}
-                        </span>
-                      )}
-                    </span>
-                  </Tooltip>
-                )}
-                {canTerminal && (
-                  <Tooltip
-                    title={t("chat.openTerminal", "打开终端")}
-                    mouseEnterDelay={0.35}
-                    placement="left"
-                  >
-                    <span className={styles.chatFloatBtnWrap}>
-                      <button
-                        type="button"
-                        className={styles.terminalFloatBtn}
-                        onClick={toggleTerminalPanel}
-                        aria-label={t("chat.openTerminal", "打开终端")}
-                      >
-                        <Terminal size={20} strokeWidth={2.1} />
-                      </button>
-                    </span>
-                  </Tooltip>
-                )}
-                {activeAgent && (
+                  )}
                   <Tooltip
                     title={
-                      !agentChatReady
-                        ? t("workspace.requiresRunning")
-                        : !activeThreadId
-                        ? t(
-                            "chat.audit.selectThread",
-                            "Select a session to view trajectory",
-                          )
-                        : t("chat.audit.open")
+                      browserSessionId
+                        ? t("browserWorkspace.browserStatusActive", {
+                            owner:
+                              browserControlOwner === "agent"
+                                ? t("browserWorkspace.agentControl")
+                                : t("browserWorkspace.userTakeover"),
+                          })
+                        : t("browserWorkspace.browserStatusIdle")
                     }
                     mouseEnterDelay={0.35}
                     placement="left"
@@ -1666,67 +1723,36 @@ function ChatPageInner() {
                     <span className={styles.chatFloatBtnWrap}>
                       <button
                         type="button"
-                        className={styles.chatFloatBtn}
-                        disabled={!activeThreadId || !agentChatReady}
-                        onClick={() =>
-                          navigate(
-                            `/chat/${resolvedAgentId}/${activeThreadId}/audit`,
-                          )
-                        }
-                        aria-label={t("chat.audit.open")}
+                        className={[
+                          styles.browserStatusBtn,
+                          browserSessionId ? styles.browserStatusActive : "",
+                          browserSessionId &&
+                          (browserSessionState === "awaiting_user_auth" ||
+                            browserSessionState === "authenticating")
+                            ? styles.browserStatusAuth
+                            : "",
+                          browserSessionId && browserControlOwner === "user"
+                            ? styles.browserStatusTakeover
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        onClick={() => void handleToggleBrowserPanel()}
+                        aria-label={t("chat.openBrowser")}
                       >
-                        <Activity size={20} strokeWidth={2.1} />
+                        <Globe size={20} strokeWidth={2.1} />
+                        {browserSessionId && (
+                          <span
+                            className={`${styles.browserStatusDot} ${
+                              styles[`browserStatus_${browserControlOwner}`]
+                            }`}
+                          />
+                        )}
                       </button>
                     </span>
                   </Tooltip>
-                )}
-                <Tooltip
-                  title={
-                    browserSessionId
-                      ? t("browserWorkspace.browserStatusActive", {
-                          owner:
-                            browserControlOwner === "agent"
-                              ? t("browserWorkspace.agentControl")
-                              : t("browserWorkspace.userTakeover"),
-                        })
-                      : t("browserWorkspace.browserStatusIdle")
-                  }
-                  mouseEnterDelay={0.35}
-                  placement="left"
-                >
-                  <span className={styles.chatFloatBtnWrap}>
-                    <button
-                      type="button"
-                      className={[
-                        styles.browserStatusBtn,
-                        browserSessionId ? styles.browserStatusActive : "",
-                        browserSessionId &&
-                        (browserSessionState === "awaiting_user_auth" ||
-                          browserSessionState === "authenticating")
-                          ? styles.browserStatusAuth
-                          : "",
-                        browserSessionId && browserControlOwner === "user"
-                          ? styles.browserStatusTakeover
-                          : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      onClick={() => void handleToggleBrowserPanel()}
-                      aria-label={t("chat.openBrowser")}
-                    >
-                      <Globe size={20} strokeWidth={2.1} />
-                      {browserSessionId && (
-                        <span
-                          className={`${styles.browserStatusDot} ${
-                            styles[`browserStatus_${browserControlOwner}`]
-                          }`}
-                        />
-                      )}
-                    </button>
-                  </span>
-                </Tooltip>
-              </div>
-            )}
+                </div>
+              )}
 
             <ChatComposerChrome sessionUsageLabel={sessionUsageLabel} />
             {pendingAsk ? (
@@ -1890,6 +1916,14 @@ function ChatPageInner() {
                 setAgentProfileOpen(false);
                 setProfileAgentId(null);
               }}
+            />
+          )}
+          {trajectoryEnabled && (
+            <TrajectoryDrawer
+              agentId={resolvedAgentId ?? ""}
+              threadId={activeThreadId}
+              open={trajectoryDrawerOpen}
+              onClose={() => setTrajectoryDrawerOpen(false)}
             />
           )}
         </div>

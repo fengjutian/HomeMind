@@ -1322,8 +1322,10 @@ function handleHarnessChunk(
   switch (chunk.type) {
     case "token": {
       const snapshot = Boolean(chunk.team_snapshot);
-      // Snapshots are complete wall copies — never leave the speaker "live".
-      if (!snapshot) markSpeakerLive(state, speaker);
+      const liveCatchup = snapshot && Boolean(chunk.team_live);
+      // A finished snapshot is a complete wall copy. A live catchup is the
+      // text already spoken when the page refreshes; the member is still talking.
+      if (!snapshot || liveCatchup) markSpeakerLive(state, speaker);
       touchTeamActivity(state, speaker, "model_generating");
       appendStreamingToken(
         state,

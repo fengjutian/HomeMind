@@ -11,7 +11,6 @@ import { preferencesApi } from "../../api/modules/preferences";
 import BootOfflinePanel from "../../components/BootOfflinePanel";
 import BrandLogo from "../../components/BrandLogo";
 import { isNetworkFetchError } from "../../utils/networkError";
-import { publicUrl } from "../../utils/publicUrl";
 import DatabaseStep from "./steps/DatabaseStep";
 import PasswordStep from "./steps/PasswordStep";
 import AdminStep from "./steps/AdminStep";

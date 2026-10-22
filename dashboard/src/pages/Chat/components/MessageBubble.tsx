@@ -13,7 +13,6 @@ import {
   Settings,
   GitFork,
   PanelRight,
-  FileText,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +22,6 @@ import UserMessageComposerTags, {
   type ComposerTagLookups,
 } from "./UserMessageComposerTags";
 import { deriveMessageContent } from "../utils/messageContent";
-import { isLongComposerText } from "../utils/longText";
 import { inferKindFromNameAndMime } from "../utils/chatAttachments";
 import { ChatMediaPlayer } from "./ChatMediaPlayer";
 import { useAuthImageSrc } from "../../../hooks/useAuthImageSrc";
@@ -89,7 +87,8 @@ interface MessageBubbleProps {
   agentId?: string | null;
   composerLookups?: ComposerTagLookups;
   onRegenerate?: (messageId: string) => void;
-  onRegenerateMermaid?: (code: string) => void;
+  /** Turn off streamed token usage then retry (invalid_request / MindIE). */
+  onDisableStreamUsage?: () => Promise<boolean>;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onWithdrawSteer?: (messageId: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
@@ -561,7 +560,7 @@ function MessageBubble({
   agentId = null,
   composerLookups,
   onRegenerate,
-  onRegenerateMermaid,
+  onDisableStreamUsage,
   onEditUserMessage,
   onWithdrawSteer,
   onForkAssistantMessage,
@@ -699,7 +698,6 @@ function MessageBubble({
   }
 
   const isUser = message.role === "user";
-  const isLongUserMessage = isUser && isLongComposerText(message.content);
   const showUserComposerTags =
     isUser && !isEditing && hasUserComposerTags(message.composerContext);
   const isStreaming = message.status === "streaming";
@@ -901,27 +899,7 @@ function MessageBubble({
                       agentId={agentId}
                     />
                   )}
-                  {message.content &&
-                    (isLongUserMessage ? (
-                      <div
-                        className={styles.userLongTextCard}
-                        data-testid="user-long-text-card"
-                      >
-                        <FileText size={18} />
-                        <span className={styles.userLongTextMeta}>
-                          <span className={styles.userLongTextTitle}>
-                            {message.content.replace(/\s+/g, " ").trim()}
-                          </span>
-                          <span className={styles.userLongTextCount}>
-                            {t("chat.longText.characterCount", {
-                              count: message.content.length,
-                            })}
-                          </span>
-                        </span>
-                      </div>
-                    ) : (
-                      <div>{message.content}</div>
-                    ))}
+                  {message.content && <div>{message.content}</div>}
                 </div>
               )}
             </div>
@@ -1032,7 +1010,6 @@ function MessageBubble({
                   <Markdown
                     content={textContent}
                     isStreaming={isStreaming}
-                    onRegenerateMermaid={onRegenerateMermaid}
                     onRunShellCommand={onRunShellCommand}
                     shellCommandDisabled={shellCommandDisabled}
                     shellCommandDisabledTitle={shellCommandDisabledTitle}

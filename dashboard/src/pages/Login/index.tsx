@@ -16,7 +16,6 @@ import {
   type OauthProviderStatus,
 } from "../../api/modules/auth";
 import { apiErrorMessage } from "../../utils/apiError";
-import { publicUrl } from "../../utils/publicUrl";
 import { refreshServerLabels } from "../../i18n";
 import { applyUserLocale, applyGuestLocale } from "../../utils/locale";
 import BrandLogo from "../../components/BrandLogo";

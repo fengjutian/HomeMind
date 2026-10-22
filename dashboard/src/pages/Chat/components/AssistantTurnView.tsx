@@ -43,7 +43,6 @@ interface AssistantTurnViewProps {
    */
   liveSpeakers?: ReadonlyArray<string>;
   onRegenerate?: (messageId: string) => void;
-  onRegenerateMermaid?: (code: string) => void;
   onDisableStreamUsage?: () => Promise<boolean>;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
@@ -70,7 +69,6 @@ function TurnErrorBubbles({
   agentId,
   showAvatar,
   onRegenerate,
-  onRegenerateMermaid,
   onDisableStreamUsage,
   onEditUserMessage,
   onForkAssistantMessage,
@@ -84,7 +82,6 @@ function TurnErrorBubbles({
   agentId?: string | null;
   showAvatar: boolean;
   onRegenerate?: (messageId: string) => void;
-  onRegenerateMermaid?: (code: string) => void;
   onDisableStreamUsage?: () => Promise<boolean>;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
@@ -105,7 +102,6 @@ function TurnErrorBubbles({
             showAvatar={showAvatar && index === 0}
             groupPosition="only"
             onRegenerate={onRegenerate}
-            onRegenerateMermaid={onRegenerateMermaid}
             onDisableStreamUsage={onDisableStreamUsage}
             onEditUserMessage={onEditUserMessage}
             onForkAssistantMessage={onForkAssistantMessage}
@@ -140,7 +136,6 @@ export default function AssistantTurnView({
   isTurnInProgress = false,
   liveSpeakers = [],
   onRegenerate,
-  onRegenerateMermaid,
   onDisableStreamUsage,
   onEditUserMessage,
   onForkAssistantMessage,
@@ -304,7 +299,6 @@ export default function AssistantTurnView({
             agentId={agentId}
             showAvatar={firstSummaryIdx < 0 && !trailingHasSummary}
             onRegenerate={onRegenerate}
-            onRegenerateMermaid={onRegenerateMermaid}
             onDisableStreamUsage={onDisableStreamUsage}
             onEditUserMessage={onEditUserMessage}
             onForkAssistantMessage={onForkAssistantMessage}
@@ -326,7 +320,6 @@ export default function AssistantTurnView({
           !trailingSplit.answerMessage
         }
         onRegenerate={onRegenerate}
-        onRegenerateMermaid={onRegenerateMermaid}
         onDisableStreamUsage={onDisableStreamUsage}
         onEditUserMessage={onEditUserMessage}
         onForkAssistantMessage={onForkAssistantMessage}
@@ -438,7 +431,6 @@ export default function AssistantTurnView({
                   showAvatar={!showProcess}
                   groupPosition="only"
                   onRegenerate={onRegenerate}
-                  onRegenerateMermaid={onRegenerateMermaid}
                   onDisableStreamUsage={onDisableStreamUsage}
                   onEditUserMessage={onEditUserMessage}
                   onForkAssistantMessage={onForkAssistantMessage}
@@ -455,7 +447,6 @@ export default function AssistantTurnView({
               agentId={agentId}
               showAvatar={!showProcess && !split.answerMessage}
               onRegenerate={onRegenerate}
-              onRegenerateMermaid={onRegenerateMermaid}
               onDisableStreamUsage={onDisableStreamUsage}
               onEditUserMessage={onEditUserMessage}
               onForkAssistantMessage={onForkAssistantMessage}

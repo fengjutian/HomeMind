@@ -2,11 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ClipboardEvent, DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { uploadFile } from "../../../api/modules/upload";
-import {
-  RESUMABLE_THRESHOLD_BYTES,
-  ResumableUpload,
-  type UploadProgress,
-} from "../../../api/resumableUploader";
 import { agentAttachmentAccessUrl } from "../../../utils/toolMediaBlocks";
 import type { ChatAttachment } from "./useChat";
 import { message as antMessage } from "@/utils/antdMessage";
@@ -27,49 +22,12 @@ import {
 } from "../utils/droppedFiles";
 import { useServerUploadLimit } from "../../../hooks/useServerUploadLimit";
 
-interface ChatUploadResult {
-  path: string;
-  workspace_path: string;
-  filename: string;
-  media_type: string;
-  url: string;
-  access_url: string;
-}
-
-/** Resumable path for files above the threshold; small files keep XHR. */
-async function uploadViaSession(
-  file: File,
-  agentId: string,
-  onProgress: (p: UploadProgress) => void,
-  register: (upload: ResumableUpload) => void,
-): Promise<ChatUploadResult> {
-  const upload = new ResumableUpload(file, {
-    purpose: "CHAT_ATTACHMENT",
-    agentId,
-  });
-  upload.onProgress(onProgress);
-  register(upload);
-  const completed = await upload.start();
-  return {
-    path: completed.path,
-    workspace_path: completed.workspace_path,
-    filename: completed.filename,
-    media_type: completed.media_type,
-    url: completed.url,
-    access_url: completed.access_url,
-  };
-}
-
 export function useChatAttachments(agentId: string | null | undefined) {
   const { t } = useTranslation();
   const { maxUploadBytes, maxUploadMb } = useServerUploadLimit();
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(
-    null,
-  );
-  const activeUploadRef = useRef<ResumableUpload | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
@@ -113,25 +71,7 @@ export function useChatAttachments(agentId: string | null | undefined) {
       try {
         const results = await Promise.all(
           fileArr.map(async (file) => {
-            // Small files keep the single-request XHR experience; anything
-            // above the threshold goes through the resumable session API so a
-            // dropped connection does not restart the whole upload.
-            const res =
-              file.size > RESUMABLE_THRESHOLD_BYTES
-                ? await uploadViaSession(
-                    file,
-                    agentId,
-                    (p) =>
-                      setUploadProgress(
-                        p.status === "done" || p.status === "cancelled"
-                          ? null
-                          : p,
-                      ),
-                    (u) => {
-                      activeUploadRef.current = u;
-                    },
-                  )
-                : await uploadFile(agentId, file);
+            const res = await uploadFile(agentId, file);
             const workspacePath = res.path || res.workspace_path;
             const previewUrl =
               res.access_url ||
@@ -159,8 +99,6 @@ export function useChatAttachments(agentId: string | null | undefined) {
         );
       } finally {
         setUploading(false);
-        activeUploadRef.current = null;
-        setUploadProgress(null);
       }
     },
     [agentId, maxUploadBytes, maxUploadMb, t],
@@ -276,15 +214,40 @@ export function useChatAttachments(agentId: string | null | undefined) {
     [processFiles, t],
   );
 
-  const cancelUpload = useCallback(() => {
-    void activeUploadRef.current?.cancel();
-  }, []);
+  useEffect(() => {
+    const onDesktopDrop = (event: Event) => {
+      const detail = (event as CustomEvent<DesktopFileDropDetail>).detail;
+      setDragOver(false);
+      void (async () => {
+        if (detail?.truncated) {
+          antMessage.warning(
+            t(
+              "upload.tooMany",
+              "Only the first {{max}} files can be uploaded at once",
+              { max: detail.max ?? 500 },
+            ),
+          );
+        }
+        try {
+          const files = await filesFromDesktopDrop(detail);
+          if (files.length === 0) {
+            antMessage.warning(t("upload.emptyDrop", "No files to upload"));
+            return;
+          }
+          await processFiles(files);
+        } catch {
+          antMessage.error(t("upload.failed", "Upload failed"));
+        }
+      })();
+    };
+    window.addEventListener(DESKTOP_FILE_DROP_EVENT, onDesktopDrop);
+    return () =>
+      window.removeEventListener(DESKTOP_FILE_DROP_EVENT, onDesktopDrop);
+  }, [processFiles, t]);
 
   return {
     attachments,
     uploading,
-    uploadProgress,
-    cancelUpload,
     dragOver,
     fileInputRef,
     folderInputRef,

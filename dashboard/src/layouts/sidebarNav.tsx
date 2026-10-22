@@ -19,9 +19,6 @@ import {
   GraduationCap,
   Shield,
   PanelsTopLeft,
-  HouseHeart,
-  Wifi,
-  ScrollText,
 } from "lucide-react";
 import type { OctopUser } from "../api/modules/auth";
 import { navAllowed, userCan } from "../utils/permissions";
@@ -69,12 +66,9 @@ export interface NavSection {
 /** Every nav item key the sidebar can show. Keep in sync with `SIDEBAR_NAV_KEYS` in `octop.infra.users.preferences`. */
 export const SIDEBAR_NAV_KEYS = [
   "chat",
-  "family",
-  "hardware",
   "experts",
   "tasks",
   "token-usage",
-  "conversation-audit",
   "personalization",
   "channels",
   "connectors",
@@ -159,50 +153,10 @@ export function buildNavSections(
 ): NavSection[] {
   const topItems: NavItem[] = [
     {
-      items: [
-        {
-          key: "chat",
-          path: "/chat",
-          icon: <MessageSquareText size={iconSize} strokeWidth={iconStroke} />,
-          labelKey: "nav.chat",
-        },
-        {
-          key: "family",
-          path: "/family",
-          icon: <HouseHeart size={iconSize} strokeWidth={iconStroke} />,
-          labelKey: "nav.family",
-        },
-        {
-          key: "hardware",
-          path: "/smart-home",
-          icon: <Wifi size={iconSize} strokeWidth={iconStroke} />,
-          labelKey: "nav.hardware",
-        },
-        {
-          key: "experts",
-          path: "/experts",
-          icon: <GraduationCap size={iconSize} strokeWidth={iconStroke} />,
-          labelKey: "nav.experts",
-        },
-        {
-          key: "tasks",
-          path: "/tasks",
-          icon: <Timer size={iconSize} strokeWidth={iconStroke} />,
-          labelKey: "nav.tasks",
-        },
-        {
-          key: "token-usage",
-          path: "/token-usage",
-          icon: <Activity size={iconSize} strokeWidth={iconStroke} />,
-          labelKey: "nav.tokenUsage",
-        },
-        {
-          key: "conversation-audit",
-          path: "/conversation-audit",
-          icon: <ScrollText size={iconSize} strokeWidth={iconStroke} />,
-          labelKey: "nav.conversationAudit",
-        },
-      ],
+      key: "chat",
+      path: "/chat",
+      icon: <MessageSquareText size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.chat",
     },
   ];
   if (navAllowed(user, "experts")) {
@@ -272,14 +226,14 @@ export function buildNavSections(
       labelKey: "nav.knowledgeBases",
     });
   }
-  // User-scoped remote HomeMind links — always available (like personalization).
-  settingsItems.push({
-    key: "bridge",
-    path: "/bridge",
-    icon: <Cloudy size={iconSize} strokeWidth={iconStroke} />,
-    labelKey: "nav.bridge",
-    badge: "Beta",
-  });
+  if (navAllowed(user, "bridge")) {
+    settingsItems.push({
+      key: "bridge",
+      path: "/bridge",
+      icon: <Cloudy size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.bridge",
+    });
+  }
   if (settingsItems.length > 0) {
     sections.push({
       id: "settings",

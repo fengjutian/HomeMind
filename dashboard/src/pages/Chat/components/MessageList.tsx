@@ -19,8 +19,6 @@ import MessageBubble from "./MessageBubble";
 import AssistantTurnView from "./AssistantTurnView";
 import ScrollToBottomButton from "./ScrollToBottomButton";
 import GeneratingIndicator from "./GeneratingIndicator";
-import { cancelTeamMember } from "../hooks/chatStore";
-import type { TeamMemberActivity } from "../hooks/sseHelpers";
 import TurnTimelineRail from "./TurnTimelineRail";
 import { isLiveAssistantTurn } from "./liveAssistantTurn";
 import {
@@ -103,11 +101,10 @@ interface MessageListProps {
   isStreaming?: boolean;
   /** Speakers still generating (tool gaps after composer unlock). */
   liveSpeakers?: ReadonlyArray<string>;
-  teamActivity?: ReadonlyArray<TeamMemberActivity>;
   thinkingStartedAt?: number | null;
   sessionKey?: string;
   onRegenerate?: (messageId: string) => void;
-  onRegenerateMermaid?: (code: string) => void;
+  onDisableStreamUsage?: () => Promise<boolean>;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onWithdrawSteer?: (messageId: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
@@ -134,7 +131,7 @@ interface GroupRenderContext {
   lastAssistantGroupIndex: number;
   lastUserGroupIndex: number;
   onRegenerate?: (messageId: string) => void;
-  onRegenerateMermaid?: (code: string) => void;
+  onDisableStreamUsage?: () => Promise<boolean>;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onWithdrawSteer?: (messageId: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
@@ -184,7 +181,7 @@ function renderMessageGroup(
             isTurnInProgress={isTurnInProgress}
             liveSpeakers={ctx.liveSpeakers}
             onRegenerate={ctx.onRegenerate}
-            onRegenerateMermaid={ctx.onRegenerateMermaid}
+            onDisableStreamUsage={ctx.onDisableStreamUsage}
             onEditUserMessage={ctx.onEditUserMessage}
             onForkAssistantMessage={ctx.onForkAssistantMessage}
             forkDisabled={ctx.forkDisabled}
@@ -240,7 +237,7 @@ function renderMessageGroup(
         isTurnInProgress={isTurnInProgress}
         liveSpeakers={ctx.liveSpeakers}
         onRegenerate={ctx.onRegenerate}
-        onRegenerateMermaid={ctx.onRegenerateMermaid}
+        onDisableStreamUsage={ctx.onDisableStreamUsage}
         onEditUserMessage={ctx.onEditUserMessage}
         onForkAssistantMessage={ctx.onForkAssistantMessage}
         forkDisabled={ctx.forkDisabled}
@@ -260,7 +257,7 @@ function renderMessageGroup(
 
 export default function MessageList(props: MessageListProps) {
   const {
-    messages: incomingMessages,
+    messages,
     agentId,
     composerLookups,
     loading,
@@ -271,11 +268,10 @@ export default function MessageList(props: MessageListProps) {
     onRefreshHistory,
     isStreaming,
     liveSpeakers = [],
-    teamActivity = [],
     thinkingStartedAt = null,
     sessionKey,
     onRegenerate,
-    onRegenerateMermaid,
+    onDisableStreamUsage,
     onEditUserMessage,
     onWithdrawSteer,
     onForkAssistantMessage,
@@ -314,23 +310,6 @@ export default function MessageList(props: MessageListProps) {
   /** First group id when an older-page load starts. Appends must not count as prepends. */
   const prependAnchorIdRef = useRef<string | null>(null);
 
-  // Keep the previous conversation painted while an uncached thread hydrates.
-  // Replacing the whole list with a spinner here unmounts the scroll container
-  // and makes long conversations visibly flash before history arrives.
-  const retainedMessagesRef = useRef(incomingMessages);
-  const retainedSessionKeyRef = useRef(sessionKey);
-  const isInitialHistoryLoading = loading && incomingMessages.length === 0;
-  if (!isInitialHistoryLoading) {
-    retainedMessagesRef.current = incomingMessages;
-    retainedSessionKeyRef.current = sessionKey;
-  }
-  const messages = isInitialHistoryLoading
-    ? retainedMessagesRef.current
-    : incomingMessages;
-  const renderedSessionKey = isInitialHistoryLoading
-    ? retainedSessionKeyRef.current
-    : sessionKey;
-
   const messageGroups = useMemo(
     () => groupConsecutiveAssistantMessages(messages, agentId ?? undefined),
     [messages, agentId],
@@ -368,7 +347,7 @@ export default function MessageList(props: MessageListProps) {
     [liveSpeakers, agents, activeAgent?.agent_id, activeAgent?.name],
   );
 
-  const stableSessionKey = renderedSessionKey || "__default__";
+  const stableSessionKey = sessionKey || "__default__";
 
   // Keep this callback identity stable. An inline parent `onLoadMoreHistory`
   // (or flag churn) used to recreate it every render → useAutoScroll re-bound
@@ -770,7 +749,7 @@ export default function MessageList(props: MessageListProps) {
       lastAssistantGroupIndex,
       lastUserGroupIndex,
       onRegenerate,
-      onRegenerateMermaid,
+      onDisableStreamUsage,
       onEditUserMessage,
       onWithdrawSteer,
       onForkAssistantMessage,
@@ -795,7 +774,7 @@ export default function MessageList(props: MessageListProps) {
       lastAssistantGroupIndex,
       lastUserGroupIndex,
       onRegenerate,
-      onRegenerateMermaid,
+      onDisableStreamUsage,
       onEditUserMessage,
       onWithdrawSteer,
       onForkAssistantMessage,
@@ -823,16 +802,8 @@ export default function MessageList(props: MessageListProps) {
               showElapsed={isAwaitingAssistantReply}
               membersOnly={generatingMembersOnly}
               speakerNames={liveSpeakerNames}
-              activity={teamActivity[0]}
-              onCancelMember={
-                generatingMembersOnly && sessionKey && teamActivity[0]
-                  ? () =>
-                      cancelTeamMember(
-                        sessionKey,
-                        teamActivity[0].speaker_agent_id,
-                      )
-                  : undefined
-              }
+              showAvatar={isAwaitingAssistantReply}
+              agentId={agentId}
             />
           </div>
         )}
@@ -845,8 +816,7 @@ export default function MessageList(props: MessageListProps) {
       isAwaitingAssistantReply,
       generatingMembersOnly,
       liveSpeakerNames,
-      teamActivity,
-      sessionKey,
+      agentId,
       refreshFooter,
     ],
   );
@@ -861,12 +831,23 @@ export default function MessageList(props: MessageListProps) {
     [historyHeader, hasFooter, footer],
   );
 
+  // History first paint uses a loading spinner with no scroll node. When messages
+  // arrive the list mounts; bump scrollerMountKey so useAutoScroll re-binds
+  // wheel/scroll listeners (deps would otherwise stay stale after a null bind).
   const bindNonVirtualScroller = useCallback((el: HTMLDivElement | null) => {
     containerRef.current = el;
     if (el) {
       setScrollerMountKey((k) => k + 1);
     }
   }, []);
+
+  if (loading && messages.length === 0) {
+    return (
+      <div className={styles.messageListLoading}>
+        <Spin />
+      </div>
+    );
+  }
 
   return (
     <div ref={wrapperRef} className={styles.messageListWrapper}>
@@ -939,11 +920,6 @@ export default function MessageList(props: MessageListProps) {
         hasNewActivity={Boolean(isStreaming || hasLiveSpeakers)}
         onClick={() => scrollToBottom()}
       />
-      {isInitialHistoryLoading && (
-        <div className={styles.messageListLoading} aria-busy="true">
-          <Spin />
-        </div>
-      )}
     </div>
   );
 }
