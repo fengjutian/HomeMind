@@ -472,6 +472,8 @@ class TeamManager:
         text_parts: list[str] = []
         reasoning_parts: list[str] = []
         relayed_visible = False
+        saw_tool_call = False
+        emitted_tool_error_ids: set[str] = set()
         decision_payload: dict[str, Any] | None = None
         hold_room = self._defer_member_wall(speaker_id, member_tid, room_thread_id)
         host_id = self._room_agent_id(room_thread_id) if hold_room else ""
@@ -546,8 +548,16 @@ class TeamManager:
                             activity["_first_token_seen"] = True
                             activity["first_token_at"] = time.time()
                     elif kind == "tool_call_chunk":
+                        saw_tool_call = True
                         self._set_member_stage(activity, self._tool_stage(chunk))
                     elif kind == "tool_result":
+                        log_failed_tool_results(
+                            chunk,
+                            agent_id=speaker_id,
+                            thread_id=member_tid or room_thread_id,
+                            seen=emitted_tool_error_ids,
+                            live=saw_tool_call,
+                        )
                         self._set_member_stage(activity, "waiting_model")
                     else:
                         activity["last_activity_at"] = time.time()

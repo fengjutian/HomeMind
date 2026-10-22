@@ -1072,6 +1072,17 @@ class BridgeManager:
                     self._reconnect_failures[connection_id] = 0
                     await asyncio.sleep(_AUTH_RETRY_DELAY_SEC)
                     continue
+                if not retried_auth and _should_refresh_peer_token(exc):
+                    # The peer refused the socket before hello — usually a bad
+                    # token, not a missing route. Refresh once and try again.
+                    retried_auth = True
+                    logger.info(
+                        "bridge handshake rejected connection=%s; refreshing peer token",
+                        connection_id,
+                    )
+                    self._forget_token(connection_id)
+                    self._repo.clear_credentials(connection_id, keep_password=True)
+                    continue
                 raw_detail = str(exc)
                 raw_low = raw_detail.lower()
                 if "incompatible" in raw_low or "matching major version" in raw_low:

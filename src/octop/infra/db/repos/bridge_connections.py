@@ -466,7 +466,6 @@ class BridgeConnectionRepo:
     ) -> BridgeConnectionRow:
         existing = self.get(connection_id)
         ts = now_ts()
-        host = (peer_client_host or "").strip() or None
         if existing is None:
             return self.create(
                 connection_id=connection_id,

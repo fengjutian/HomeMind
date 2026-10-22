@@ -22,8 +22,10 @@ from octop.infra.utils.lan_address import detect_lan_ipv4
 from octop.infra.utils.user_downloads import (
     is_local_dashboard_request,
     reveal_download,
-    sanitize_download_filename as sanitize_user_download_filename,
     save_user_download,
+)
+from octop.infra.utils.user_downloads import (
+    sanitize_download_filename as sanitize_user_download_filename,
 )
 
 router = APIRouter()

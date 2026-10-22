@@ -59,7 +59,9 @@ def test_repair_legacy_schema_ensures_name_unique_index(tmp_path: Path) -> None:
     pool = SqlitePool(db_path)
     with pool.connect() as conn:
         conn.executescript((_MIGRATIONS / "001_initial.sql").read_text(encoding="utf-8"))
-        conn.executescript((_MIGRATIONS / "002_cron_mcp_and_skill_packages.sql").read_text(encoding="utf-8"))
+        conn.executescript(
+            (_MIGRATIONS / "002_cron_mcp_and_skill_packages.sql").read_text(encoding="utf-8")
+        )
         conn.execute("DROP INDEX IF EXISTS idx_skill_packages_name")
     run_migrations(pool)
     with pool.connect() as conn:

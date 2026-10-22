@@ -39,7 +39,6 @@ from octop.infra.agents.security.hitl_session import (
 )
 from octop.infra.agents.settings.acp import ACPSettingsStore
 from octop.infra.agents.settings.decision import DecisionSettings, DecisionSettingsStore
-from octop.infra.utils.turn_failure import turn_model_scope
 from octop.infra.agents.settings.langfuse import LangfuseSettings, LangfuseSettingsStore
 from octop.infra.agents.settings.media_generation import (
     MediaGenerationSettings,
@@ -87,6 +86,7 @@ from octop.infra.skills.workspace_catalog import (
     repair_workspace_skill_manifests,
 )
 from octop.infra.utils.locale import Locale
+from octop.infra.utils.turn_failure import turn_model_scope
 from octop.infra.utils.ulid import new_short_id, new_ulid
 
 if TYPE_CHECKING:

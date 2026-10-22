@@ -162,7 +162,12 @@ def test_write_text_privileged_falls_back_to_sudo_tee(
 @pytest.mark.asyncio
 async def test_probe_tencent_mirror_unreachable() -> None:
     # 127.0.0.1:1 → connection refused → probe returns False quickly.
-    with patch.object(docker_install, "_TENCENT_MIRROR_HOST", "127.0.0.1"):
+    # The port is patched too: a machine that happens to serve something on
+    # localhost:443 would otherwise answer and the probe would say "reachable".
+    with (
+        patch.object(docker_install, "_TENCENT_MIRROR_HOST", "127.0.0.1"),
+        patch.object(docker_install, "_TENCENT_MIRROR_PORT", 1),
+    ):
         assert await _probe_tencent_mirror() is False
 
 
@@ -309,7 +314,7 @@ async def test_auto_install_missing_script_reports_error() -> None:
 
     with patch.object(docker_install, "bundled_install_script", return_value=Path("/nonexistent")):
         lines = await collect()
-    assert any("missing from the Octop package" in line for line in lines)
+    assert any("missing from the HomeMind package" in line for line in lines)
 
 
 @pytest.mark.asyncio

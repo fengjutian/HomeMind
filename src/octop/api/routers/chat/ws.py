@@ -113,7 +113,18 @@ async def dashboard_chat_ws(
                         {"type": "error", "message": f"thread {thread_id!r} not found"},
                     )
                     continue
-                hub.subscribe(thread_id, connection_id)
+
+                def _subscribe(tid: str = thread_id, cid: str = connection_id) -> None:
+                    hub.subscribe(tid, cid)
+
+                # A refresh mid-answer has no history row for the member text
+                # yet; replay what is on the wall so the new subscriber sees it.
+                await subscribe_with_member_catchup(
+                    gateway,
+                    thread_id,
+                    subscribe=_subscribe,
+                    send=send_frame,
+                )
                 activity_value = gateway.processor.teams.active_members(thread_id)
                 await send_frame(
                     {
