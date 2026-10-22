@@ -44,6 +44,7 @@ interface AssistantTurnViewProps {
   liveSpeakers?: ReadonlyArray<string>;
   onRegenerate?: (messageId: string) => void;
   onRegenerateMermaid?: (code: string) => void;
+  onDisableStreamUsage?: () => Promise<boolean>;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
   forkDisabled?: boolean;
@@ -69,6 +70,8 @@ function TurnErrorBubbles({
   agentId,
   showAvatar,
   onRegenerate,
+  onRegenerateMermaid,
+  onDisableStreamUsage,
   onEditUserMessage,
   onForkAssistantMessage,
   forkDisabled,
@@ -81,6 +84,8 @@ function TurnErrorBubbles({
   agentId?: string | null;
   showAvatar: boolean;
   onRegenerate?: (messageId: string) => void;
+  onRegenerateMermaid?: (code: string) => void;
+  onDisableStreamUsage?: () => Promise<boolean>;
   onEditUserMessage?: (messageId: string, newText: string) => void;
   onForkAssistantMessage?: (messageId: string) => void;
   forkDisabled?: boolean;
@@ -100,6 +105,8 @@ function TurnErrorBubbles({
             showAvatar={showAvatar && index === 0}
             groupPosition="only"
             onRegenerate={onRegenerate}
+            onRegenerateMermaid={onRegenerateMermaid}
+            onDisableStreamUsage={onDisableStreamUsage}
             onEditUserMessage={onEditUserMessage}
             onForkAssistantMessage={onForkAssistantMessage}
             forkDisabled={forkDisabled}
@@ -134,6 +141,7 @@ export default function AssistantTurnView({
   liveSpeakers = [],
   onRegenerate,
   onRegenerateMermaid,
+  onDisableStreamUsage,
   onEditUserMessage,
   onForkAssistantMessage,
   forkDisabled,
@@ -262,74 +270,8 @@ export default function AssistantTurnView({
   // would shift the layout before the avatar and the first status settle.
   if (!hasVisibleTurn) return null;
 
-  return (
-    <div className={styles.assistantTurn}>
-      {todoAtTop ? <div className={styles.turnInset}>{todoAtTop}</div> : null}
-      {segmentProcess.map(({ split, hitl }, idx) => {
-        const showProcess = !compactProcess && hasProcessContent(split);
-        // Freeze process spinner while a pending approval card is open.
-        const processStreaming =
-          turnStreaming &&
-          !hasPendingHitl &&
-          idx === segmentProcess.length - 1 &&
-          hitlLayout.trailingMessages.length === 0;
-        return (
-          <div key={hitl.id} className={styles.hitlSegment}>
-            {showProcess ? (
-              <>
-                <TurnProcessBlocks
-                  split={split}
-                  isStreaming={processStreaming}
-                  onAcpPermissionSelect={onAcpPermissionSelect}
-                  hideToolMedia={hasToolMedia}
-                  agentId={speakerAgentId}
-                  showAvatar={idx === firstSummaryIdx}
-                />
-                {todoPanel && idx === firstProcessSegmentIdx ? (
-                  <div className={styles.turnInset}>{todoPanel}</div>
-                ) : null}
-              </>
-            ) : null}
-            {split.answerMessage ? (
-              <div className={styles.assistantTurnAnswer}>
-                <MessageBubble
-                  message={toAnswerOnlyMessage(split.answerMessage)}
-                  agentId={agentId}
-                  showAvatar={!showProcess}
-                  groupPosition="only"
-                  onRegenerate={onRegenerate}
-                  onEditUserMessage={onEditUserMessage}
-                  onForkAssistantMessage={onForkAssistantMessage}
-                  forkDisabled={forkDisabled}
-                  forkDisabledHint={forkDisabledHint}
-                  onRunShellCommand={onRunShellCommand}
-                  shellCommandDisabled={shellCommandDisabled}
-                  shellCommandDisabledTitle={shellCommandDisabledTitle}
-                />
-              </div>
-            ) : null}
-            <TurnErrorBubbles
-              messages={split.errorMessages}
-              agentId={agentId}
-              showAvatar={!showProcess && !split.answerMessage}
-              onRegenerate={onRegenerate}
-              onEditUserMessage={onEditUserMessage}
-              onForkAssistantMessage={onForkAssistantMessage}
-              forkDisabled={forkDisabled}
-              forkDisabledHint={forkDisabledHint}
-              onRunShellCommand={onRunShellCommand}
-              shellCommandDisabled={shellCommandDisabled}
-              shellCommandDisabledTitle={shellCommandDisabledTitle}
-            />
-            <MessageBubble
-              message={hitl}
-              agentId={agentId}
-              onHitlDecision={onHitlDecision}
-              groupPosition="only"
-            />
-          </div>
-        );
-      })}
+  const trailingBody = (
+    <>
       {showTrailingProcess ? (
         <>
           <TurnProcessBlocks
@@ -363,6 +305,7 @@ export default function AssistantTurnView({
             showAvatar={firstSummaryIdx < 0 && !trailingHasSummary}
             onRegenerate={onRegenerate}
             onRegenerateMermaid={onRegenerateMermaid}
+            onDisableStreamUsage={onDisableStreamUsage}
             onEditUserMessage={onEditUserMessage}
             onForkAssistantMessage={onForkAssistantMessage}
             forkDisabled={forkDisabled}
@@ -383,6 +326,8 @@ export default function AssistantTurnView({
           !trailingSplit.answerMessage
         }
         onRegenerate={onRegenerate}
+        onRegenerateMermaid={onRegenerateMermaid}
+        onDisableStreamUsage={onDisableStreamUsage}
         onEditUserMessage={onEditUserMessage}
         onForkAssistantMessage={onForkAssistantMessage}
         forkDisabled={forkDisabled}
@@ -493,6 +438,7 @@ export default function AssistantTurnView({
                   showAvatar={!showProcess}
                   groupPosition="only"
                   onRegenerate={onRegenerate}
+                  onRegenerateMermaid={onRegenerateMermaid}
                   onDisableStreamUsage={onDisableStreamUsage}
                   onEditUserMessage={onEditUserMessage}
                   onForkAssistantMessage={onForkAssistantMessage}
@@ -509,6 +455,7 @@ export default function AssistantTurnView({
               agentId={agentId}
               showAvatar={!showProcess && !split.answerMessage}
               onRegenerate={onRegenerate}
+              onRegenerateMermaid={onRegenerateMermaid}
               onDisableStreamUsage={onDisableStreamUsage}
               onEditUserMessage={onEditUserMessage}
               onForkAssistantMessage={onForkAssistantMessage}

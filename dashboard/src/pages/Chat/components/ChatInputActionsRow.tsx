@@ -262,6 +262,7 @@ export default function ChatInputActionsRow({
   const [modelQuery, setModelQuery] = useState("");
   const [isCompact, setIsCompact] = useState(false);
   const [shortcutOpen, setShortcutOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [modelPopoverOpen, setModelPopoverOpen] = useState(false);
   const [reasoningModelRef, setReasoningModelRef] = useState<string | null>(
     null,
@@ -1096,16 +1097,18 @@ export default function ChatInputActionsRow({
             </div>
           }
         >
-          <button
-            className={styles.secondaryBtn}
-            onClick={onFileSelect}
-            type="button"
-            disabled={uploading}
-            aria-label={t("upload.fileTooltip", "Upload attachment")}
-          >
-            <Paperclip size={16} />
-          </button>
-        </Tooltip>
+          <Tooltip title={t("upload.tooltip", "Upload")} mouseEnterDelay={0.4}>
+            <button
+              className={styles.secondaryBtn}
+              type="button"
+              disabled={uploading}
+              aria-label={t("upload.tooltip", "Upload")}
+              aria-haspopup="menu"
+            >
+              <Paperclip size={16} />
+            </button>
+          </Tooltip>
+        </Popover>
         {showModelPicker ? (
           <Popover
             trigger="click"
