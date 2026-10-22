@@ -1385,6 +1385,8 @@ export default function KnowledgeBasesPage() {
 
   const uploadDocuments = async (files: FileList | File[] | null) => {
     if (!selected || !files || !usable || isAtDocumentLimit) return;
+    if (uploadInFlightRef.current) return;
+    const baseId = selected.id;
     const remaining =
       documentCap === null
         ? Number.POSITIVE_INFINITY
@@ -2368,159 +2370,32 @@ export default function KnowledgeBasesPage() {
                         })}
                       </nav>
                     </div>
-                      <div className={skillStyles.gridToolbarRight}>
-                        <Segmented
-                          size="small"
-                          value={viewMode}
-                          onChange={onDocsViewChange}
-                          options={[
-                            {
-                              value: "card",
-                              label: (
-                                <span className={skillStyles.viewModeLabel}>
-                                  <LayoutGrid size={14} />
-                                  {t("knowledgeBases.viewCard")}
-                                </span>
-                              ),
-                            },
-                            {
-                              value: "table",
-                              label: (
-                                <span className={skillStyles.viewModeLabel}>
-                                  <ListIcon size={14} />
-                                  {t("knowledgeBases.viewTable")}
-                                </span>
-                              ),
-                            },
-                          ]}
-                        />
-                        <input
-                          ref={uploadRef}
-                          className={styles.fileInput}
-                          type="file"
-                          multiple
-                          accept={supportedDocumentTypes}
-                          onChange={(event) =>
-                            void uploadDocuments(event.target.files)
-                          }
-                        />
-                        {canWriteSelected ? (
-                          <Button
-                            icon={<FolderPlus size={14} />}
-                            onClick={() => {
-                              setFolderName("");
-                              setFolderModalOpen(true);
-                            }}
-                          >
-                            {t("knowledgeBases.createFolder")}
-                          </Button>
-                        ) : null}
-                        {canWriteSelected ? (
-                          <Button
-                            icon={<FilePlus size={14} />}
-                            disabled={isAtDocumentLimit}
-                            onClick={openCreateTextDocument}
-                          >
-                            {t("knowledgeBases.createFile")}
-                          </Button>
-                        ) : null}
-                        {canWriteSelected ? (
-                          <Button
-                            type="primary"
-                            icon={<FileUp size={14} />}
-                            loading={Boolean(uploadState)}
-                            disabled={isAtDocumentLimit || Boolean(uploadState)}
-                            onClick={() => uploadRef.current?.click()}
-                          >
-                            {t("knowledgeBases.upload")}
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className={styles.docsPathRow}>
-                      <nav
-                        className={styles.pathBreadcrumb}
-                        aria-label={t("knowledgeBases.pathBreadcrumb")}
-                      >
-                        <Signpost
-                          size={14}
-                          className={styles.pathBreadcrumbIcon}
-                          aria-hidden
-                        />
-                        {folderCrumbs.map((seg, index) => {
-                          const isLast = index === folderCrumbs.length - 1;
-                          return (
-                            <span
-                              key={`${seg.path}:${index}`}
-                              className={styles.pathBreadcrumbSegment}
-                            >
-                              {index > 0 ? (
-                                <span
-                                  className={styles.pathBreadcrumbSep}
-                                  aria-hidden
-                                >
-                                  /
-                                </span>
-                              ) : null}
-                              {isLast ? (
-                                <span
-                                  className={styles.pathBreadcrumbCurrent}
-                                  title={seg.label}
-                                >
-                                  <span className={styles.pathBreadcrumbLabel}>
-                                    {seg.label}
-                                  </span>
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className={styles.pathBreadcrumbLink}
-                                  onClick={() => setCurrentFolder(seg.path)}
-                                  title={seg.label}
-                                >
-                                  <span className={styles.pathBreadcrumbLabel}>
-                                    {seg.label}
-                                  </span>
-                                </button>
-                              )}
-                            </span>
-                          );
-                        })}
-                      </nav>
-                    </div>
-                    {uploadState ? (
-                      <div className={styles.uploadProgress} aria-live="polite">
-                        <Typography.Text
-                          className={styles.uploadProgressLabel}
-                          ellipsis={{ tooltip: uploadState.filename }}
-                        >
-                          {uploadState.total > 1
-                            ? t("knowledgeBases.uploadingMany", {
-                                name: uploadState.filename,
-                                index: uploadState.index,
-                                total: uploadState.total,
-                              })
-                            : t("knowledgeBases.uploading", {
-                                name: uploadState.filename,
-                              })}
-                        </Typography.Text>
-                        <Progress
-                          percent={uploadState.percent}
-                          size="small"
-                          status="active"
-                        />
-                      </div>
-                    ) : null}
-                    {isAtDocumentLimit ? (
-                      <Alert
-                        className={styles.limitAlert}
-                        type="info"
-                        showIcon
-                        message={t("knowledgeBases.documentLimitReached", {
-                          count: documentCap ?? limits.max_docs_per_kb,
-                        })}
+                    <div className={skillStyles.gridToolbarRight}>
+                      <Segmented
+                        size="small"
+                        value={viewMode}
+                        onChange={onDocsViewChange}
+                        options={[
+                          {
+                            value: "card",
+                            label: (
+                              <span className={skillStyles.viewModeLabel}>
+                                <LayoutGrid size={14} />
+                                {t("knowledgeBases.viewCard")}
+                              </span>
+                            ),
+                          },
+                          {
+                            value: "table",
+                            label: (
+                              <span className={skillStyles.viewModeLabel}>
+                                <ListIcon size={14} />
+                                {t("knowledgeBases.viewTable")}
+                              </span>
+                            ),
+                          },
+                        ]}
                       />
-                    ) : null}
                       <input
                         ref={uploadRef}
                         className={styles.fileInput}
@@ -3832,22 +3707,18 @@ export default function KnowledgeBasesPage() {
                       </Radio>
                     </Radio.Group>
                     {ocrBackend === "onnx" ? (
-                      <>
-                        <div
-                          className={`${styles.onnxModelItem} ${styles.onnxModelItemActive}`}
-                        >
-                          <div className={styles.onnxModelInfo}>
-                            <span className={styles.onnxModelName}>
-                              RapidOCR (ONNX)
-                            </span>
-                          </div>
+                      <div
+                        className={`${styles.onnxModelItem} ${styles.onnxModelItemActive}`}
+                      >
+                        <div className={styles.onnxModelInfo}>
+                          <span className={styles.onnxModelName}>
+                            RapidOCR (ONNX)
+                          </span>
+                          <span className={styles.onnxModelMeta}>
+                            {t("knowledgeBases.ocrLocalHint")}
+                          </span>
                         </div>
-                        <Alert
-                          type="info"
-                          showIcon
-                          message={t("knowledgeBases.ocrLocalInstallNotice")}
-                        />
-                      </>
+                      </div>
                     ) : (
                       <>
                         <Alert
