@@ -75,13 +75,10 @@ export default function ProactiveConfig({
       const startStr: string = dayjs(values.active_hours_start).format("HH:mm");
       const endStr: string = dayjs(values.active_hours_end).format("HH:mm");
 
-      // Validate the time range.
-      if (startStr >= endStr) {
+      // An earlier end is a window that crosses midnight. Only an empty window is invalid.
+      if (startStr === endStr) {
         message.error(
-          t(
-            "proactiveConfig.timeRangeError",
-            "关心时段的开始时间必须早于结束时间",
-          ),
+          t("proactiveConfig.timeRangeError", "关心时段的开始和结束不能相同"),
         );
         return;
       }

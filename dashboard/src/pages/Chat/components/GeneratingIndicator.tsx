@@ -23,6 +23,45 @@ interface GeneratingIndicatorProps {
  * Bottom-left live status for the turn. Stop/cancel stays on the composer —
  * this row is status text only so it can remain visible the whole time.
  */
+function GeneratingAvatar({ agentId }: { agentId?: string | null }) {
+  const { t } = useTranslation();
+  const { agents, activeAgent } = useAgent();
+  const isTeamRoom = isTeamAgent(activeAgent);
+  const speakerId =
+    rewritePeerSpeakerId(activeAgent?.agent_id, agentId) ||
+    agentId ||
+    activeAgent?.agent_id;
+  const hostSpeaker = isTeamHostSpeaker(
+    isTeamRoom,
+    speakerId,
+    activeAgent?.agent_id,
+  );
+  const expert =
+    (speakerId && agents.find((item) => item.agent_id === speakerId)) ||
+    (!isTeamRoom || hostSpeaker ? activeAgent : undefined);
+  const avatarProfileId = hostSpeaker
+    ? activeAgent?.agent_id
+    : speakerId || undefined;
+  if (!expert && !avatarProfileId) return null;
+  const avatarTooltip = hostSpeaker
+    ? t("chat.teamHostHover", {
+        name: activeAgent?.name || expert?.name || "",
+      })
+    : expert?.name || undefined;
+  return (
+    <div className={styles.avatarCol}>
+      <ExpertMessageAvatar
+        name={expert?.name || avatarProfileId}
+        color={expert?.color}
+        iconName={expert?.icon_name}
+        iconUrl={expert?.icon_url}
+        tooltip={avatarTooltip}
+        profileAgentId={avatarProfileId}
+      />
+    </div>
+  );
+}
+
 export default function GeneratingIndicator({
   startedAt = null,
   showElapsed = false,

@@ -11,6 +11,20 @@
 
 import { request } from "../request";
 
+export interface StrongMemoryFile {
+  content: string;
+  exists: boolean;
+}
+
+export interface ManualMemoryReview {
+  status: string;
+  conflicts: number;
+  duplicates: number;
+  checked: number;
+  remaining: number;
+  candidate_ids: string[];
+}
+
 // ---------------------------------------------------------------------------
 // Wire types
 // ---------------------------------------------------------------------------

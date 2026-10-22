@@ -49,6 +49,7 @@ class BridgeConnectionRow:
         keys = set(r.keys()) if hasattr(r, "keys") else set()
         raw_notes = r["notes"]
         raw_icon = r["icon_name"] if "icon_name" in keys else None
+        raw_icon_url = r["icon_url"] if "icon_url" in keys else ""
         auto_raw = r["auto_reconnect"] if "auto_reconnect" in keys else 1
         raw_host = r["peer_client_host"] if "peer_client_host" in keys else None
         return cls(
@@ -64,6 +65,7 @@ class BridgeConnectionRow:
                 if isinstance(raw_icon, str) and str(raw_icon).strip()
                 else None
             ),
+            icon_url=str(raw_icon_url or "").strip(),
             credential_blob=bytes(cred) if cred is not None else None,
             access_token_blob=bytes(token) if token is not None else None,
             token_expires_at=r["token_expires_at"],
@@ -120,6 +122,7 @@ class BridgeConnectionRepo:
         display_name: str,
         notes: str | None = None,
         icon_name: str | None = None,
+        icon_url: str = "",
         credential_blob: bytes | None = None,
         access_token_blob: bytes | None = None,
         token_expires_at: int | None = None,
@@ -143,6 +146,7 @@ class BridgeConnectionRepo:
                     display_name,
                     notes,
                     (icon_name or "").strip() or None,
+                    (icon_url or "").strip(),
                     credential_blob,
                     access_token_blob,
                     token_expires_at,
@@ -435,6 +439,17 @@ class BridgeConnectionRepo:
                 )
         return self.get(connection_id)
 
+    def set_icon_url(self, connection_id: str, icon_url: str | None) -> BridgeConnectionRow | None:
+        """Set or clear the uploaded portrait URL only."""
+        ts = now_ts()
+        with self._db.transaction() as conn:
+            conn.execute(
+                "UPDATE bridge_connections SET icon_url = ?, updated_at = ? "
+                "WHERE connection_id = ?",
+                ((icon_url or "").strip(), ts, connection_id),
+            )
+        return self.get(connection_id)
+
     def upsert_reverse(
         self,
         *,
@@ -449,6 +464,7 @@ class BridgeConnectionRepo:
     ) -> BridgeConnectionRow:
         existing = self.get(connection_id)
         ts = now_ts()
+        host = (peer_client_host or "").strip() or None
         if existing is None:
             return self.create(
                 connection_id=connection_id,
@@ -464,6 +480,7 @@ class BridgeConnectionRepo:
         with self._db.transaction() as conn:
             # Keep the owner's chosen display_name / notes on reverse reconnect.
             # Reverse rows cannot dial out — never enable auto-reconnect.
+            # Refresh the observed client address; do not touch the local name.
             conn.execute(
                 "UPDATE bridge_connections SET "
                 "owner_user_id = ?, peer_base_url = ?, peer_username = ?, "

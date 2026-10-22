@@ -43,6 +43,10 @@ import {
   parseHitlSessionPolicy,
 } from "./utils/hitlSessionPolicy";
 import { useChatContextWindow } from "./hooks/useChatContextWindow";
+import {
+  disableProviderStreamUsage,
+  providerIdForTurn,
+} from "../../utils/disableProviderStreamUsage";
 import { useBrowserToolDetection } from "./hooks/useBrowserToolDetection";
 import { useSkillRecordingWorkflow } from "./hooks/useSkillRecordingWorkflow";
 import { listDockFilePathsForTree } from "./utils/dockFilePath";
@@ -88,6 +92,7 @@ import {
 import ChatSidebarPanel from "./components/ChatSidebarPanel";
 import ChatTitleBar from "./components/ChatTitleBar";
 import TeamChatBadge from "./components/TeamChatBadge";
+import RemoteExpertHint from "./components/RemoteExpertHint";
 import ChatComposerChrome from "./components/ChatComposerChrome";
 import AskQuestionCard from "./components/AskQuestionCard";
 import {
@@ -128,7 +133,6 @@ function ChatPageInner() {
     threadId: threadId ?? null,
   });
   const isMobile = useIsMobile();
-  const hitlEnabled = useHitlEnabled();
   const user = useCurrentUser();
   const { layoutMode } = useLayoutMode();
   const isMinimalLayout = layoutMode === "minimal";
@@ -198,6 +202,7 @@ function ChatPageInner() {
     loading: agentsLoading,
   } = useAgent();
   const resolvedAgentId = routeAgentId || activeAgentId;
+  const hitlEnabled = useHitlEnabled(resolvedAgentId);
   const activeAgent = useMemo(
     () => agents.find((a) => a.agent_id === resolvedAgentId) ?? null,
     [agents, resolvedAgentId],
@@ -345,6 +350,7 @@ function ChatPageInner() {
     historyLoadingMore,
     historyRefreshing,
     historyHydrated,
+    runUsage,
     contextUsage,
     pendingPlanPath,
     liveSpeakers,
@@ -609,17 +615,29 @@ function ChatPageInner() {
       if (typeof u.total_tokens === "number") {
         acc.total_tokens = (acc.total_tokens || 0) + u.total_tokens;
       }
+      if (typeof u.decision_saved === "number") {
+        acc.decision_saved = (acc.decision_saved || 0) + u.decision_saved;
+      }
     }
-    if (!acc.input_tokens && !acc.output_tokens && !acc.total_tokens) {
+    if (
+      !acc.input_tokens &&
+      !acc.output_tokens &&
+      !acc.total_tokens &&
+      !acc.decision_saved
+    ) {
       return null;
     }
     return acc;
   }, [messages]);
+  const decisionSaved =
+    (sessionUsage?.decision_saved ?? 0) +
+    (isStreaming ? runUsage?.decision_saved ?? 0 : 0);
   const sessionUsageLabel = formatRunUsage(sessionUsage, {
     input: t("chatUsage.input"),
     output: t("chatUsage.output"),
     total: t("chatUsage.total"),
     cacheHit: t("chatUsage.cacheHit"),
+    decisionSaved: t("chatUsage.decisionSaved"),
   });
 
   const { resetNavForAgentSwitch, markInitialNavDone } = useChatNavigation({
@@ -1366,6 +1384,7 @@ function ChatPageInner() {
                       {activeSessionTitle}
                     </span>
                     <TeamChatBadge show={isTeamChat} />
+                    <RemoteExpertHint agent={activeAgent} />
                   </div>
                 )}
                 {resolvedAgentId && !sharedExpertViewer && (
@@ -1431,6 +1450,7 @@ function ChatPageInner() {
                 forkDisabled={sessionForkDisabled}
                 forkDisabledHint={sessionForkDisabledHint}
                 isTeam={isTeamChat}
+                agent={activeAgent}
               />
             )}
 
@@ -1833,6 +1853,7 @@ function ChatPageInner() {
               defaultModel={activeAgent?.default_model ?? null}
               contextUsedTokens={contextUsedTokens}
               contextMaxTokens={contextMaxTokens}
+              decisionSaved={decisionSaved}
             />
           </div>
 

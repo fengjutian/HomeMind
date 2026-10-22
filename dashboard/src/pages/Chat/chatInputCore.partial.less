@@ -76,6 +76,7 @@
 }
 
 .inputWrapper {
+  position: relative;
   max-width: var(--chat-column-max, 960px);
   min-width: 280px;
   margin: 0 auto;
@@ -198,6 +199,7 @@
 
 @media (max-width: 767px) {
   .actionsRow {
+    flex-wrap: wrap;
     gap: 4px;
   }
 
@@ -210,7 +212,7 @@
   }
   .secondaryActions {
     gap: 4px;
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
     overflow-x: auto;
     overflow-y: visible;
@@ -346,6 +348,8 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  order: 3;
+  margin-left: auto;
 }
 
 .secondaryBtn {
@@ -1023,6 +1027,30 @@
   }
 }
 
+.dropOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-radius: inherit;
+  border: 1.5px dashed var(--fn-color-brand);
+  background: color-mix(
+    in srgb,
+    var(--fn-bg-primary) 82%,
+    var(--fn-color-brand)
+  );
+  color: var(--fn-color-brand);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* A right-docked workspace can narrow the chat without narrowing the viewport.
    Respond to the chat column itself so composer controls remain usable. */
 @container chat-main (max-width: 560px) {
@@ -1040,6 +1068,7 @@
   }
 
   .actionsRow {
+    flex-wrap: wrap;
     gap: 4px;
   }
 
@@ -1051,7 +1080,7 @@
     padding-bottom: 2px;
   }
   .secondaryActions {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     padding-right: 0;
     overflow-x: auto;
     scrollbar-width: none;

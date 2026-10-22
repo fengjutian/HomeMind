@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent, ClipboardEvent, DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { uploadFile } from "../../../api/modules/upload";
@@ -13,6 +13,18 @@ import { message as antMessage } from "@/utils/antdMessage";
 import { apiErrorMessage } from "../../../utils/apiError";
 
 import { inferAttachmentKind } from "../utils/chatAttachments";
+import {
+  DESKTOP_FILE_DROP_EVENT,
+  filesFromDesktopDrop,
+  type DesktopFileDropDetail,
+} from "../../../utils/desktopFileDrop";
+import {
+  dragHasFiles,
+  filesFromSnapshot,
+  MAX_CHAT_UPLOAD_FILES,
+  snapshotDroppedEntries,
+  type CollectedDrop,
+} from "../utils/droppedFiles";
 import { useServerUploadLimit } from "../../../hooks/useServerUploadLimit";
 
 interface ChatUploadResult {
@@ -59,10 +71,25 @@ export function useChatAttachments(agentId: string | null | undefined) {
   );
   const activeUploadRef = useRef<ResumableUpload | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const processFiles = useCallback(
     async (files: FileList | File[]) => {
-      const fileArr = Array.from(files).filter((f) => {
+      const incoming = Array.from(files);
+      const capped =
+        incoming.length > MAX_CHAT_UPLOAD_FILES
+          ? incoming.slice(0, MAX_CHAT_UPLOAD_FILES)
+          : incoming;
+      if (incoming.length > MAX_CHAT_UPLOAD_FILES) {
+        antMessage.warning(
+          t(
+            "upload.tooMany",
+            "Only the first {{max}} files can be uploaded at once",
+            { max: MAX_CHAT_UPLOAD_FILES },
+          ),
+        );
+      }
+      const fileArr = capped.filter((f) => {
         if (f.size > maxUploadBytes) {
           antMessage.error(
             t("upload.tooLarge", "File too large (max {{maxMb}}MB): {{name}}", {
@@ -143,6 +170,13 @@ export function useChatAttachments(agentId: string | null | undefined) {
     fileInputRef.current?.click();
   }, []);
 
+  const handleFolderSelect = useCallback(() => {
+    const input = folderInputRef.current;
+    if (!input) return;
+    input.setAttribute("webkitdirectory", "");
+    input.click();
+  }, []);
+
   const handleFileChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files.length > 0) {
@@ -186,32 +220,60 @@ export function useChatAttachments(agentId: string | null | undefined) {
   );
 
   const handleDragEnter = useCallback((e: DragEvent) => {
+    if (!dragHasFiles(e.dataTransfer)) return;
     e.preventDefault();
     e.stopPropagation();
     setDragOver(true);
   }, []);
 
-  const handleDragLeave = useCallback((e: DragEvent) => {
+  const handleDragLeave = useCallback((e: DragEvent<HTMLElement>) => {
+    const next = e.relatedTarget;
+    if (next instanceof Node && e.currentTarget.contains(next)) return;
     e.preventDefault();
     e.stopPropagation();
     setDragOver(false);
   }, []);
 
   const handleDragOver = useCallback((e: DragEvent) => {
+    if (!dragHasFiles(e.dataTransfer)) return;
     e.preventDefault();
     e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+    setDragOver(true);
   }, []);
 
   const handleDrop = useCallback(
     (e: DragEvent) => {
+      const snapshot = snapshotDroppedEntries(e.dataTransfer);
+      if (!snapshot.hadFileItems) return;
       e.preventDefault();
       e.stopPropagation();
       setDragOver(false);
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        void processFiles(e.dataTransfer.files);
-      }
+      return (async () => {
+        let collected: CollectedDrop;
+        try {
+          collected = await filesFromSnapshot(snapshot);
+        } catch {
+          antMessage.error(t("upload.failed", "Upload failed"));
+          return;
+        }
+        if (collected.truncated) {
+          antMessage.warning(
+            t(
+              "upload.tooMany",
+              "Only the first {{max}} files can be uploaded at once",
+              { max: MAX_CHAT_UPLOAD_FILES },
+            ),
+          );
+        }
+        if (collected.files.length === 0) {
+          antMessage.warning(t("upload.emptyDrop", "No files to upload"));
+          return;
+        }
+        await processFiles(collected.files);
+      })();
     },
-    [processFiles],
+    [processFiles, t],
   );
 
   const cancelUpload = useCallback(() => {
@@ -225,8 +287,10 @@ export function useChatAttachments(agentId: string | null | undefined) {
     cancelUpload,
     dragOver,
     fileInputRef,
+    folderInputRef,
     processFiles,
     handleFileSelect,
+    handleFolderSelect,
     handleFileChange,
     removeAttachment,
     clearAttachments,

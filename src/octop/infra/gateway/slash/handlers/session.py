@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from octop_harness.slash import SlashCommand, SlashSink
 
+from octop.i18n import error_message
 from octop.i18n.domains.slash import tr
 from octop.infra.db.repos.threads import clip_thread_title
 from octop.infra.errors import OctopError

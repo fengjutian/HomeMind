@@ -33,9 +33,11 @@ import {
   setOnnxDownloadProgressHandler,
   watchOnnxDownload,
 } from "../../../../../api/modules/onnxDownloadWatcher";
-import { isOllamaProviderRow, isOnnxProviderRow } from "../../presetUtils";
+import { looksLikeOllamaProvider, isOnnxProviderRow } from "../../presetUtils";
 import { expandOllamaDownloadedIds } from "../../ollamaNames";
 import { ModelListEditor } from "./ModelListEditor";
+import { StreamUsageAdvanced } from "../StreamUsageAdvanced";
+import { TestStreamHint } from "../TestStreamHint";
 import styles from "../../index.module.less";
 
 const POLL_INTERVAL_MS = 3000;
@@ -61,6 +63,7 @@ interface ProviderConfigForm {
   model?: string;
   note?: string;
   kind: string;
+  stream_usage?: boolean;
 }
 
 interface ProviderConfigModalProps {
@@ -96,7 +99,7 @@ export function ProviderConfigModal({
   const [draftModels, setDraftModels] = useState<ProviderModel[]>([]);
 
   const hasApiKey = !!provider.api_key && provider.api_key.length > 0;
-  const isOllama = isOllamaProviderRow(provider);
+  const isOllama = looksLikeOllamaProvider(provider);
   const isOnnx = isOnnxProviderRow(provider);
   const [downloadedIds, setDownloadedIds] = useState<string[]>([]);
   const [downloadingIds, setDownloadingIds] = useState<string[]>([]);
@@ -663,6 +666,7 @@ export function ProviderConfigModal({
       api_key: undefined,
       model: currentDefaultModel,
       note: provider.note ?? "",
+      stream_usage: provider.stream_usage !== false,
     });
     setDraftModels(
       (provider.models ?? []).map((m) => ({
@@ -691,6 +695,13 @@ export function ProviderConfigModal({
         payload.api_key = values.api_key.trim();
       if ((values.note ?? "") !== (provider.note ?? ""))
         payload.note = values.note?.trim() || null;
+      if (
+        !isOnnx &&
+        provider.kind === "openai" &&
+        Boolean(values.stream_usage) !== (provider.stream_usage !== false)
+      ) {
+        payload.stream_usage = Boolean(values.stream_usage);
+      }
       // default model
       const existingDefault = provider.models?.length
         ? provider.models[0].id
@@ -816,6 +827,9 @@ export function ProviderConfigModal({
       const embedding = isEmbeddingModel(
         draftModels.find((m) => m.id === modelId),
       );
+      const apiMode = draftModels.find((m) => m.id === modelId)?.api_mode;
+      const apiFallback = draftModels.find((m) => m.id === modelId)
+        ?.api_fallback;
       const result =
         useDraft || !hasApiKey
           ? await testProviderDraft({
@@ -824,28 +838,41 @@ export function ProviderConfigModal({
               api_key: draftApiKey || provider.api_key || undefined,
               base_url: draftBaseUrl || provider.base_url,
               model_id: modelId,
+              api_mode: apiMode,
+              api_fallback: apiFallback,
               embedding,
             })
           : await request<{
               ok: boolean;
               latency_ms?: number;
               error?: string;
+              fallback_used?: boolean;
+              api_mode_used?: ProviderModel["api_mode"];
             }>(`${apiPrefix}/${provider.id}/test`, {
               method: "POST",
-              body: JSON.stringify({ model_id: modelId, embedding }),
+              body: JSON.stringify({
+                model_id: modelId,
+                api_mode: apiMode,
+                api_fallback: apiFallback,
+                embedding,
+              }),
             });
 
       if (result.ok) {
-        const latency =
-          result.latency_ms != null
-            ? t("models.testConnectionLatency", { time: result.latency_ms })
-            : "";
-        message.success(
-          t("models.testConnectionSuccess", {
-            name: provider.name,
-            latency,
-          }),
-        );
+        if (result.fallback_used) {
+          message.warning(t("models.apiFallbackTestUsed"));
+        } else {
+          const latency =
+            result.latency_ms != null
+              ? t("models.testConnectionLatency", { time: result.latency_ms })
+              : "";
+          message.success(
+            t("models.testConnectionSuccess", {
+              name: provider.name,
+              latency,
+            }),
+          );
+        }
       } else {
         message.error(
           t("models.testConnectionFailed", {
@@ -1070,6 +1097,8 @@ export function ProviderConfigModal({
         <Form.Item name="note" label={t("models.noteLabel")}>
           <Input.TextArea rows={2} placeholder={t("models.notePlaceholder")} />
         </Form.Item>
+
+        {!isOnnx && provider.kind === "openai" ? <StreamUsageAdvanced /> : null}
       </Form>
 
       <div style={{ marginBottom: 16 }}>
@@ -1090,6 +1119,7 @@ export function ProviderConfigModal({
         >
           {t("models.fetchModels")}
         </Button>
+        {!isOnnx && provider.kind === "openai" ? <TestStreamHint /> : null}
       </div>
 
       {/* ===== Models section ===== */}

@@ -8,6 +8,7 @@ from octop.infra.connectors.gateway.adapters import (
     agently_cli,
     baidu_map,
     ctrip_wendao,
+    dingtalk_cli,
     feishu_cli,
     fliggy,
     meituan_travel,

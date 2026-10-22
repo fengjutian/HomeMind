@@ -49,7 +49,7 @@ from octop.infra.errors import ErrorCode, OctopError
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_permission("memory"))])
 
 # Defaults mirror ``HarnessAgentConfig`` (octop_harness.config). Kept in sync
 # manually — the dashboard writes these into the agent's ``config_json`` under

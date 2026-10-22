@@ -6,6 +6,8 @@ import {
   Square,
   MessageSquarePlus,
   Paperclip,
+  FileUp,
+  FolderUp,
   Zap,
   Link2,
   Sparkles,
@@ -144,6 +146,7 @@ interface ChatInputActionsRowProps {
   threadId?: string | null;
   contextUsedTokens?: number | null;
   contextMaxTokens?: number;
+  decisionSaved?: number;
   availableModels?: ResolvedModel[];
   selectedModel?: string | null;
   defaultModel?: string | null;
@@ -178,6 +181,7 @@ interface ChatInputActionsRowProps {
   slashMenuItems: SlashMenuItem[];
   onSlashShortcutSelect: (command: string) => void;
   onFileSelect: () => void;
+  onFolderSelect: () => void;
   onNewChat: () => void;
   onPolish: () => void;
   onToggleVoice: () => void;
@@ -208,6 +212,7 @@ export default function ChatInputActionsRow({
   agentId,
   threadId,
   contextUsedTokens = null,
+  decisionSaved = 0,
   contextMaxTokens = 128_000,
   availableModels,
   selectedModel,
@@ -235,6 +240,7 @@ export default function ChatInputActionsRow({
   slashMenuItems,
   onSlashShortcutSelect,
   onFileSelect,
+  onFolderSelect,
   onNewChat,
   onPolish,
   onToggleVoice,
@@ -1051,9 +1057,44 @@ export default function ChatInputActionsRow({
             </button>
           </Tooltip>
         </Popover>
-        <Tooltip
-          title={t("upload.fileTooltip", "Upload attachment")}
-          mouseEnterDelay={0.4}
+        <Popover
+          trigger="click"
+          placement="topLeft"
+          open={uploadOpen}
+          onOpenChange={setUploadOpen}
+          overlayClassName={styles.skillPickerPopover}
+          content={
+            <div className={styles.mobileOverflowMenu} role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                className={styles.mobileOverflowItem}
+                onClick={() => {
+                  setUploadOpen(false);
+                  onFileSelect();
+                }}
+              >
+                <span className={styles.mobileOverflowItemMain}>
+                  <FileUp size={16} />
+                  <span>{t("upload.files", "Files")}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={styles.mobileOverflowItem}
+                onClick={() => {
+                  setUploadOpen(false);
+                  onFolderSelect();
+                }}
+              >
+                <span className={styles.mobileOverflowItemMain}>
+                  <FolderUp size={16} />
+                  <span>{t("upload.folder", "Folder")}</span>
+                </span>
+              </button>
+            </div>
+          }
         >
           <button
             className={styles.secondaryBtn}
@@ -1092,16 +1133,29 @@ export default function ChatInputActionsRow({
   };
 
   return (
-    <div ref={actionsRowRef} className={styles.actionsRow}>
+    <div
+      ref={actionsRowRef}
+      className={`${styles.actionsRow}${
+        isMobile ? ` ${styles.actionsRowCompact}` : ""
+      }`}
+    >
       <div className={styles.secondaryActions}>{renderSecondaryActions()}</div>
+      {conversationMode !== "craft" ? (
+        <p className={styles.modeHint} data-testid="conversation-mode-hint">
+          <ModeIcon size={14} aria-hidden />
+          <span>{t(`chat.conversationMode.${conversationMode}Reminder`)}</span>
+        </p>
+      ) : null}
       <div className={styles.inputActions}>
         <ContextWindowRing
           usedTokens={contextUsedTokens}
+          usageEstimated={contextUsedTokens == null}
           maxTokens={contextMaxTokens}
           agentId={agentId}
           threadId={threadId}
           selectedConnectors={selectedConnectors}
           isMobile={isMobile}
+          decisionSaved={decisionSaved}
         />
         {/* Desktop: dedicated newChatBtn; mobile: replace polish with new-chat */}
         {useCompactControls ? (
@@ -1283,7 +1337,7 @@ export default function ChatInputActionsRow({
               mouseEnterDelay={0.4}
             >
               <button
-                className={`${styles.sendBtn} ${styles.cancelBtn}`}
+                className={styles.sendBtn}
                 onClick={onCancel}
                 title={
                   isTeam

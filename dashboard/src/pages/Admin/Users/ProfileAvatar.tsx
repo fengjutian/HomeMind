@@ -1,20 +1,3 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Button } from "antd";
-import {
-  Code2,
-  Cog,
-  Crown,
-  Feather,
-  ImagePlus,
-  Landmark,
-  Megaphone,
-  PieChart,
-  UserRound,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { message } from "@/utils/antdMessage";
 import { request, requestUpload } from "../../../api/request";
 import adminPortrait from "../../../assets/avatars/admin.png";
 import bossPortrait from "../../../assets/avatars/boss.png";
@@ -31,168 +14,14 @@ import { validateAvatarFile } from "../../Experts/components/ExpertAvatarPicker"
 import DiceBearAvatarPresets from "../../../components/DiceBearAvatarPresets";
 import styles from "./index.module.less";
 
-const AVATAR_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
-
 export type AvatarKind = "user" | "role";
 
-interface AvatarPreset {
-  id: string;
-  labelKey: string;
-  bg: string;
-  fg: string;
-  Icon?: LucideIcon;
-  src?: string;
+function presetsFor(kind: AvatarKind): AvatarPresetCatalog {
+  return kind === "role" ? ROLE_AVATAR_PRESETS : USER_AVATAR_PRESETS;
 }
 
-const USER_PRESETS: AvatarPreset[] = [
-  {
-    id: "user",
-    labelKey: "adminUsers.avatarIconUser",
-    bg: "#e8f1ff",
-    fg: "#175cd3",
-    Icon: UserRound,
-  },
-  {
-    id: "admin",
-    labelKey: "adminUsers.avatarIconAdmin",
-    bg: "",
-    fg: "",
-    src: adminPortrait,
-  },
-  {
-    id: "staff",
-    labelKey: "adminUsers.avatarIconStaff",
-    bg: "",
-    fg: "",
-    src: staffPortrait,
-  },
-  {
-    id: "doctor",
-    labelKey: "adminUsers.avatarIconDoctor",
-    bg: "",
-    fg: "",
-    src: doctorPortrait,
-  },
-  {
-    id: "nurse",
-    labelKey: "adminUsers.avatarIconNurse",
-    bg: "",
-    fg: "",
-    src: nursePortrait,
-  },
-  {
-    id: "student",
-    labelKey: "adminUsers.avatarIconStudent",
-    bg: "",
-    fg: "",
-    src: studentPortrait,
-  },
-  {
-    id: "teacher",
-    labelKey: "adminUsers.avatarIconTeacher",
-    bg: "",
-    fg: "",
-    src: teacherPortrait,
-  },
-  {
-    id: "support",
-    labelKey: "adminUsers.avatarIconSupport",
-    bg: "",
-    fg: "",
-    src: supportPortrait,
-  },
-  {
-    id: "ops",
-    labelKey: "adminUsers.avatarIconOps",
-    bg: "",
-    fg: "",
-    src: opsPortrait,
-  },
-  {
-    id: "finance",
-    labelKey: "adminUsers.avatarIconFinance",
-    bg: "",
-    fg: "",
-    src: financePortrait,
-  },
-  {
-    id: "boss",
-    labelKey: "adminUsers.avatarIconBoss",
-    bg: "",
-    fg: "",
-    src: bossPortrait,
-  },
-];
-
-const ROLE_PRESETS: AvatarPreset[] = [
-  {
-    id: "member",
-    labelKey: "adminUsers.avatarIconMember",
-    bg: "",
-    fg: "",
-    Icon: Users,
-  },
-  {
-    id: "award",
-    labelKey: "adminUsers.avatarIconAward",
-    bg: "",
-    fg: "",
-    Icon: Crown,
-  },
-  {
-    id: "terminal",
-    labelKey: "adminUsers.avatarIconTerminal",
-    bg: "",
-    fg: "",
-    Icon: Code2,
-  },
-  {
-    id: "pen",
-    labelKey: "adminUsers.avatarIconPen",
-    bg: "",
-    fg: "",
-    Icon: Feather,
-  },
-  {
-    id: "chart",
-    labelKey: "adminUsers.avatarIconChart",
-    bg: "",
-    fg: "",
-    Icon: PieChart,
-  },
-  {
-    id: "headset",
-    labelKey: "adminUsers.avatarIconHeadset",
-    bg: "",
-    fg: "",
-    Icon: Megaphone,
-  },
-  {
-    id: "wrench",
-    labelKey: "adminUsers.avatarIconWrench",
-    bg: "",
-    fg: "",
-    Icon: Cog,
-  },
-  {
-    id: "scale",
-    labelKey: "adminUsers.avatarIconScale",
-    bg: "",
-    fg: "",
-    Icon: Landmark,
-  },
-];
-
-function presetsFor(kind: AvatarKind): AvatarPreset[] {
-  return kind === "role" ? ROLE_PRESETS : USER_PRESETS;
-}
-
-export function resolveAvatarPreset(
-  kind: AvatarKind,
-  icon?: string | null,
-): AvatarPreset {
-  const presets = presetsFor(kind);
-  return (icon && presets.find((item) => item.id === icon)) || presets[0];
+export function resolveAvatarPreset(kind: AvatarKind, icon?: string | null) {
+  return resolveCatalogPreset(presetsFor(kind), icon);
 }
 
 export function uploadUserAvatar(userId: number, file: File) {
@@ -208,18 +37,6 @@ export function deleteUserAvatar(userId: number) {
   return request<void>(`/users/${userId}/avatar`, { method: "DELETE" });
 }
 
-function pickImageFile(): Promise<File | null> {
-  return new Promise((resolve) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = AVATAR_ACCEPT;
-    input.addEventListener("change", () => resolve(input.files?.[0] ?? null), {
-      once: true,
-    });
-    input.click();
-  });
-}
-
 export function ProfileAvatar({
   url,
   icon,
@@ -233,31 +50,14 @@ export function ProfileAvatar({
   kind?: AvatarKind;
   className?: string;
 }) {
-  const trimmed = url?.trim() || "";
-  const { src, loadState } = useAuthImageSrc(trimmed);
-  const photo = Boolean(trimmed) && loadState === "ready" && Boolean(src);
-  const preset = resolveAvatarPreset(kind, icon ?? defaultIcon);
-  const portrait = !photo && Boolean(preset.src);
-  const tinted = !photo && !portrait && kind !== "role";
-  const style: CSSProperties | undefined = tinted
-    ? { background: preset.bg, color: preset.fg }
-    : undefined;
-  const PresetIcon = preset.Icon;
   return (
-    <span
-      className={[className, portrait ? styles.presetPortrait : ""]
-        .filter(Boolean)
-        .join(" ")}
-      style={style}
-    >
-      {photo ? (
-        <img src={src} alt="" />
-      ) : portrait ? (
-        <img src={preset.src} alt="" className={styles.presetPortraitImg} />
-      ) : PresetIcon ? (
-        <PresetIcon />
-      ) : null}
-    </span>
+    <ResourceAvatar
+      url={url}
+      icon={icon}
+      defaultIcon={defaultIcon}
+      presets={presetsFor(kind)}
+      className={className}
+    />
   );
 }
 
@@ -302,25 +102,6 @@ export function ProfileAvatarPicker({
   onSelectIcon?: (icon: string | null) => void | Promise<void>;
   onRemove?: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation();
-  const [localPreview, setLocalPreview] = useState<string | null>(null);
-  const localPreviewRef = useRef<string | null>(null);
-  const displayUrl = localPreview ?? avatarUrl;
-  const hasPhoto = Boolean(displayUrl?.trim());
-  const presets = presetsFor(kind);
-
-  useEffect(() => {
-    return () => {
-      if (localPreviewRef.current) URL.revokeObjectURL(localPreviewRef.current);
-    };
-  }, []);
-
-  const replaceLocalPreview = (next: string | null) => {
-    if (localPreviewRef.current) URL.revokeObjectURL(localPreviewRef.current);
-    localPreviewRef.current = next;
-    setLocalPreview(next);
-  };
-
   return (
     <div className={styles.profileAvatarPicker}>
       <div className={styles.profileAvatarPickerHead}>

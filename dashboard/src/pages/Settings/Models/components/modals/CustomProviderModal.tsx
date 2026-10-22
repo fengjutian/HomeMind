@@ -12,6 +12,8 @@ import type { ProviderModel, ProviderRow } from "../../useProviders";
 import { isEmbeddingModel } from "../../useProviders";
 import { fetchProviderModels, testProviderDraft } from "../../providerApi";
 import { ModelListEditor } from "./ModelListEditor";
+import { StreamUsageAdvanced } from "../StreamUsageAdvanced";
+import { TestStreamHint } from "../TestStreamHint";
 import styles from "../../index.module.less";
 
 interface CustomProviderModalProps {
@@ -44,6 +46,7 @@ export function CustomProviderModal({
     base_url?: string;
     api_key?: string;
     note?: string;
+    stream_usage?: boolean;
   }>();
   const name = Form.useWatch("name", form) as string | undefined;
   const kind = Form.useWatch("kind", form) as string | undefined;
@@ -69,12 +72,16 @@ export function CustomProviderModal({
   useEffect(() => {
     if (open) {
       form.resetFields();
-      form.setFieldsValue({ kind: "openai" });
+      form.setFieldsValue({ kind: "openai", stream_usage: false });
       setModels([]);
     }
   }, [open, form]);
 
-  const testDraftModel = async (modelId: string) => {
+  const testDraftModel = async (
+    modelId: string,
+    apiMode?: ProviderModel["api_mode"],
+    apiFallback?: ProviderModel["api_fallback"],
+  ) => {
     const values = await form.validateFields([
       "name",
       "kind",
@@ -91,6 +98,8 @@ export function CustomProviderModal({
       api_key: key,
       base_url: values.base_url?.trim() || null,
       model_id: modelId,
+      api_mode: apiMode,
+      api_fallback: apiFallback,
       embedding: isEmbeddingModel(models.find((m) => m.id === modelId)),
     });
   };
@@ -184,6 +193,9 @@ export function CustomProviderModal({
           api_key: (values.api_key as string | undefined)?.trim() || null,
           models: modelEntries.length > 0 ? modelEntries : [],
           note: (values.note as string | undefined)?.trim() || null,
+          ...((values.kind as string) === "openai"
+            ? { stream_usage: values.stream_usage === true }
+            : {}),
         }),
       });
       message.success(
@@ -283,6 +295,8 @@ export function CustomProviderModal({
         <Form.Item name="note" label={t("models.noteLabel")}>
           <Input.TextArea rows={2} placeholder={t("models.notePlaceholder")} />
         </Form.Item>
+
+        {kind === "openai" ? <StreamUsageAdvanced /> : null}
       </Form>
 
       <div style={{ marginBottom: 16 }}>
@@ -299,20 +313,28 @@ export function CustomProviderModal({
                 message.warning(t("models.testDraftNeedModel"));
                 return;
               }
-              const result = await testDraftModel(modelId);
+              const result = await testDraftModel(
+                modelId,
+                models.find((m) => m.id === modelId)?.api_mode,
+                models.find((m) => m.id === modelId)?.api_fallback,
+              );
               if (result.ok) {
-                const latency =
-                  result.latency_ms != null
-                    ? t("models.testConnectionLatency", {
-                        time: result.latency_ms,
-                      })
-                    : "";
-                message.success(
-                  t("models.testConnectionSuccess", {
-                    name: name || "draft",
-                    latency,
-                  }),
-                );
+                if (result.fallback_used) {
+                  message.warning(t("models.apiFallbackTestUsed"));
+                } else {
+                  const latency =
+                    result.latency_ms != null
+                      ? t("models.testConnectionLatency", {
+                          time: result.latency_ms,
+                        })
+                      : "";
+                  message.success(
+                    t("models.testConnectionSuccess", {
+                      name: name || "draft",
+                      latency,
+                    }),
+                  );
+                }
               } else {
                 message.error(
                   t("models.testConnectionFailed", {
@@ -338,6 +360,7 @@ export function CustomProviderModal({
             {t("models.fetchModels")}
           </Button>
         )}
+        {kind === "openai" ? <TestStreamHint /> : null}
       </div>
 
       <Divider orientation="left" style={{ fontSize: 13 }}>
@@ -349,7 +372,9 @@ export function CustomProviderModal({
         onModelsChange={setModels}
         apiPrefix={apiPrefix}
         canTest={canTest}
-        onTestModel={(modelId) => testDraftModel(modelId)}
+        onTestModel={(modelId, _modelName, apiMode, apiFallback) =>
+          testDraftModel(modelId, apiMode, apiFallback)
+        }
       />
     </Drawer>
   );
