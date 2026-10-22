@@ -21,6 +21,7 @@ from octop.infra.gateway.process.response_mode import (
     processor_for_response_mode,
     qq_channel_response_mode,
     withhold_weixin_stream_preamble,
+    wrap_weixin_stream_processor,
 )
 
 

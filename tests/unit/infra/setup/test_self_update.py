@@ -466,9 +466,9 @@ def test_get_version_in_dir_does_not_use_other_installs(tmp_path: Path, has_meta
     from octop.infra.setup import self_update
 
     if has_metadata:
-        metadata = tmp_path / "octop-1.0.2b4.dist-info" / "METADATA"
+        metadata = tmp_path / "homemind-1.0.2b4.dist-info" / "METADATA"
         metadata.parent.mkdir()
-        metadata.write_text("Name: octop\nVersion: 1.0.2b4\n", encoding="utf-8")
+        metadata.write_text("Name: homemind\nVersion: 1.0.2b4\n", encoding="utf-8")
 
     assert self_update.get_version_in_dir(sys.executable, str(tmp_path)) is None
 
@@ -492,36 +492,36 @@ def test_target_versions_load_package_despite_stale_metadata(
     monkeypatch.delenv("OCTOP_FPK_SITE_PACKAGES", raising=False)
     monkeypatch.setenv(target_env, str(tmp_path))
     for version in versions:
-        _write_octop_metadata(tmp_path, version)
+        _write_homemind_metadata(tmp_path, version)
     expected = max(versions, key=parse_version)
-    _write_octop_package(tmp_path, expected)
+    _write_homemind_package(tmp_path, expected)
     assert self_update.get_version_in_dir(sys.executable, str(tmp_path)) == expected
     assert self_update.get_local_version() == expected
 
 
-def _write_octop_metadata(target: Path, version: str) -> None:
-    metadata = target / f"octop-{version}.dist-info" / "METADATA"
+def _write_homemind_metadata(target: Path, version: str) -> None:
+    metadata = target / f"homemind-{version}.dist-info" / "METADATA"
     metadata.parent.mkdir(parents=True)
-    metadata.write_text(f"Name: octop\nVersion: {version}\n", encoding="utf-8")
+    metadata.write_text(f"Name: homemind\nVersion: {version}\n", encoding="utf-8")
 
 
-def _write_octop_package(target: Path, version: str) -> None:
-    package = target / "octop" / "__init__.py"
+def _write_homemind_package(target: Path, version: str) -> None:
+    package = target / "homemind" / "__init__.py"
     package.parent.mkdir(exist_ok=True)
     package.write_text(f"__version__ = {version!r}\n", encoding="utf-8")
     (package.parent / "__main__.py").write_text(
         "import sys\nfrom . import __version__\n"
         "assert sys.argv[1:] == ['--version']\n"
-        "print('octop v' + __version__)\nraise SystemExit(0)\n",
+        "print('homemind v' + __version__)\nraise SystemExit(0)\n",
         encoding="utf-8",
     )
 
 
 def _write_upgrade_wheel(directory: Path, metadata: str | None = None) -> Path:
-    wheel = directory / "octop-1.0.2b5-py3-none-any.whl"
+    wheel = directory / "homemind-1.0.2b5-py3-none-any.whl"
     with zipfile.ZipFile(wheel, "w") as archive:
         archive.writestr(
-            "octop-1.0.2b5.dist-info/METADATA", metadata or "Name: octop\nVersion: 1.0.2b5\n"
+            "homemind-1.0.2b5.dist-info/METADATA", metadata or "Name: homemind\nVersion: 1.0.2b5\n"
         )
     return wheel
 
@@ -530,9 +530,9 @@ def _write_upgrade_wheel(directory: Path, metadata: str | None = None) -> Path:
 def test_target_probe_ignores_import_and_pth_output(tmp_path: Path, check_cli: bool) -> None:
     from octop.infra.setup import self_update
 
-    _write_octop_package(tmp_path, "1.0.2b5")
+    _write_homemind_package(tmp_path, "1.0.2b5")
     (tmp_path / "noise.pth").write_text("import sys; print('pth output')\n", encoding="utf-8")
-    with (tmp_path / "octop" / "__init__.py").open("a", encoding="utf-8") as output:
+    with (tmp_path / "homemind" / "__init__.py").open("a", encoding="utf-8") as output:
         output.write("print('import output', end='')\n")
     assert (
         self_update.get_version_in_dir(sys.executable, str(tmp_path), check_cli=check_cli)
@@ -548,10 +548,10 @@ def test_new_metadata_cannot_hide_old_or_broken_package(
 
     monkeypatch.setenv("OCTOP_GREEN_PACKAGES", str(tmp_path))
     monkeypatch.setattr(self_update.time, "sleep", lambda _: None)
-    _write_octop_metadata(tmp_path, "1.0.2b5")
-    _write_octop_package(tmp_path, "1.0.2b4")
+    _write_homemind_metadata(tmp_path, "1.0.2b5")
+    _write_homemind_package(tmp_path, "1.0.2b4")
     if broken_import:
-        (tmp_path / "octop" / "__init__.py").write_text(
+        (tmp_path / "homemind" / "__init__.py").write_text(
             "raise ImportError('missing dependency')\n", encoding="utf-8"
         )
     result = self_update._verify_upgrade("1.0.2b4", sys.executable, [], version="1.0.2b5")
@@ -566,8 +566,8 @@ def test_target_version_loads_pth_dependencies(tmp_path: Path) -> None:
     dependency.mkdir()
     (dependency / "upgrade_fixture_dep.py").write_text("VERSION = '1.0.2b5'\n", encoding="utf-8")
     (tmp_path / "dependencies.pth").write_text("dependencies\n", encoding="utf-8")
-    _write_octop_package(tmp_path, "1.0.2b4")
-    (tmp_path / "octop" / "__init__.py").write_text(
+    _write_homemind_package(tmp_path, "1.0.2b4")
+    (tmp_path / "homemind" / "__init__.py").write_text(
         "from upgrade_fixture_dep import VERSION as __version__\n", encoding="utf-8"
     )
     assert self_update.get_version_in_dir(sys.executable, str(tmp_path)) == "1.0.2b5"
@@ -576,12 +576,12 @@ def test_target_version_loads_pth_dependencies(tmp_path: Path) -> None:
 def test_target_version_prevents_downgrade_before_service_restart(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import octop
+    import homemind
     from octop.infra.setup import self_update
 
-    monkeypatch.setattr(octop, "__version__", "1.0.2b4")
+    monkeypatch.setattr(homemind, "__version__", "1.0.2b4")
     monkeypatch.setenv("OCTOP_GREEN_PACKAGES", str(tmp_path))
-    _write_octop_package(tmp_path, "1.0.2b6")
+    _write_homemind_package(tmp_path, "1.0.2b6")
     assert self_update.get_local_version() == "1.0.2b6"
     result = run_upgrade(version="1.0.2b5", locale="en")
     assert not result.success
@@ -595,8 +595,8 @@ def test_target_verification_exercises_cli_instead_of_accepting_import_alone(
 
     monkeypatch.setenv("OCTOP_GREEN_PACKAGES", str(tmp_path))
     monkeypatch.setattr(self_update.time, "sleep", lambda _: None)
-    _write_octop_package(tmp_path, "1.0.2b5")
-    (tmp_path / "octop" / "__main__.py").write_text(
+    _write_homemind_package(tmp_path, "1.0.2b5")
+    (tmp_path / "homemind" / "__main__.py").write_text(
         "raise ImportError('CLI dependency unavailable')\n", encoding="utf-8"
     )
     assert self_update.get_version_in_dir(sys.executable, str(tmp_path)) == "1.0.2b5"
@@ -639,8 +639,8 @@ def test_application_only_checks_target_dependency_closure(
         requirement = "absent>=1; python_version < '0'"
     elif scenario == "direct-url":
         requirement = "upgrade-dep @ https://example.com/dep.whl"
-    release = f"Name: octop\nVersion: 1.0.2b5\nRequires-Dist: {requirement}\n"
-    metadata("octop", "1.0.2b4", ["old-absent-dep>=1"])
+    release = f"Name: homemind\nVersion: 1.0.2b5\nRequires-Dist: {requirement}\n"
+    metadata("homemind", "1.0.2b4", ["old-absent-dep>=1"])
     if scenario != "missing":
         metadata(
             "upgrade_dep",
@@ -667,10 +667,10 @@ def test_application_only_checks_target_dependency_closure(
     "metadata",
     [
         "Name: other\nVersion: 1.0.2b5\n",
-        "Name: octop\nVersion: 1.0.2b6\n",
-        "Name: octop\nVersion: broken\n",
-        "Name: octop\n",
-        "Name: octop\nVersion: 1.0.2b5\nVersion: 1.0.2b4\n",
+        "Name: homemind\nVersion: 1.0.2b6\n",
+        "Name: homemind\nVersion: broken\n",
+        "Name: homemind\n",
+        "Name: homemind\nVersion: 1.0.2b5\nVersion: 1.0.2b4\n",
     ],
 )
 def test_preflight_rejects_wrong_or_ambiguous_release(tmp_path: Path, metadata: str) -> None:
@@ -692,7 +692,7 @@ def test_preflight_rejects_unreadable_wheel(tmp_path: Path, broken: str) -> None
             pass
     else:
         with zipfile.ZipFile(wheel, "a") as archive:
-            archive.writestr("other.dist-info/METADATA", "Name: octop\nVersion: 1.0.2b5\n")
+            archive.writestr("other.dist-info/METADATA", "Name: homemind\nVersion: 1.0.2b5\n")
     assert not self_update._target_dependencies_satisfied(tmp_path, wheel)
 
 
@@ -715,9 +715,9 @@ def test_legacy_pip_fast_path_falls_back_and_verifies_full_install(
     monkeypatch.setattr(
         self_update, "rank_install_indexes", lambda _: ([("https://one.example", "one")], [])
     )
-    _write_octop_package(tmp_path, "1.0.2b4")
-    _write_octop_metadata(tmp_path, "1.0.2b4")
-    original = (tmp_path / "octop" / "__init__.py").read_bytes()
+    _write_homemind_package(tmp_path, "1.0.2b4")
+    _write_homemind_metadata(tmp_path, "1.0.2b4")
+    original = (tmp_path / "homemind" / "__init__.py").read_bytes()
     calls: list[tuple[str, float]] = []
     downloads: list[Path] = []
 
@@ -726,7 +726,7 @@ def test_legacy_pip_fast_path_falls_back_and_verifies_full_install(
             calls.append(("download", timeout))
             directory = Path(cmd[cmd.index("--dest") + 1])
             downloads.append(directory)
-            release = "Name: octop\nVersion: 1.0.2b5\n"
+            release = "Name: homemind\nVersion: 1.0.2b5\n"
             if failure == "dependency":
                 release += "Requires-Dist: missing-upgrade-dependency>=1\n"
             _write_upgrade_wheel(directory, release)
@@ -735,15 +735,15 @@ def test_legacy_pip_fast_path_falls_back_and_verifies_full_install(
         calls.append(("fast" if fast else "full", timeout))
         if failure == "dependency":
             assert not fast
-            assert (tmp_path / "octop" / "__init__.py").read_bytes() == original
+            assert (tmp_path / "homemind" / "__init__.py").read_bytes() == original
         if fast and failure == "install":
             return 1, "local wheel install failed"
         if not fast and not full_install_success:
             return 1, "dependency install failed"
         version = "1.0.2b4" if fast and failure == "version" else "1.0.2b5"
-        _write_octop_package(tmp_path, version)
+        _write_homemind_package(tmp_path, version)
         if fast and failure == "cli":
-            (tmp_path / "octop" / "__main__.py").write_text(
+            (tmp_path / "homemind" / "__main__.py").write_text(
                 "raise ImportError('missing CLI dependency')\n", encoding="utf-8"
             )
         return 0, ""
@@ -758,7 +758,7 @@ def test_legacy_pip_fast_path_falls_back_and_verifies_full_install(
     assert result.success is full_install_success
     assert all(not directory.exists() for directory in downloads)
     if failure == "dependency" and not full_install_success:
-        assert (tmp_path / "octop" / "__init__.py").read_bytes() == original
+        assert (tmp_path / "homemind" / "__init__.py").read_bytes() == original
         assert (
             self_update.get_version_in_dir(sys.executable, str(tmp_path), check_cli=True)
             == "1.0.2b4"
@@ -818,18 +818,18 @@ def test_verify_green_upgrade_reads_only_target(
     assert not missing.success
     assert missing.error == tr("update.version_unavailable", locale)
 
-    _write_octop_metadata(tmp_path, "1.0.2b4")
-    _write_octop_package(tmp_path, "1.0.2b4")
+    _write_homemind_metadata(tmp_path, "1.0.2b4")
+    _write_homemind_package(tmp_path, "1.0.2b4")
     unchanged = self_update._verify_upgrade(
         "1.0.2b4", sys.executable, [], version="1.0.2b5", locale=locale
     )
     assert not unchanged.success
     assert unchanged.installed_version == "1.0.2b4"
 
-    metadata = tmp_path / "octop-1.0.2b5.dist-info" / "METADATA"
+    metadata = tmp_path / "homemind-1.0.2b5.dist-info" / "METADATA"
     metadata.parent.mkdir()
-    metadata.write_text("Name: octop\nVersion: 1.0.2b5\n", encoding="utf-8")
-    _write_octop_package(tmp_path, "1.0.2b5")
+    metadata.write_text("Name: homemind\nVersion: 1.0.2b5\n", encoding="utf-8")
+    _write_homemind_package(tmp_path, "1.0.2b5")
     installed = self_update._verify_upgrade("1.0.2b4", sys.executable, [], version="1.0.2b5")
     assert installed.success
     assert installed.installed_version == "1.0.2b5"
@@ -842,8 +842,8 @@ def test_pip_target_upgrade_with_stale_metadata_succeeds_without_retry(
 
     monkeypatch.setenv("OCTOP_GREEN_PACKAGES", str(tmp_path))
     monkeypatch.delenv("OCTOP_FPK_SITE_PACKAGES", raising=False)
-    _write_octop_metadata(tmp_path, "1.0.2b4")
-    _write_octop_package(tmp_path, "1.0.2b4")
+    _write_homemind_metadata(tmp_path, "1.0.2b4")
+    _write_homemind_package(tmp_path, "1.0.2b4")
     monkeypatch.setattr(self_update, "detect_installer", lambda: "pip")
     monkeypatch.setattr(self_update, "has_pip", lambda _: True)
     monkeypatch.setattr(self_update, "stash_console_scripts", lambda _: [])
@@ -862,7 +862,7 @@ def test_pip_target_upgrade_with_stale_metadata_succeeds_without_retry(
         if "download" in cmd:
             assert kwargs["timeout"] == 90
             assert "--no-deps" in cmd and "--only-binary=:all:" in cmd
-            assert "--pre" in cmd and cmd[-1] == "octop==1.0.2b5"
+            assert "--pre" in cmd and cmd[-1] == "homemind==1.0.2b5"
             assert self_update.get_local_version() == "1.0.2b4"
             directory = Path(cmd[cmd.index("--dest") + 1])
             downloads.append(directory)
@@ -873,10 +873,10 @@ def test_pip_target_upgrade_with_stale_metadata_succeeds_without_retry(
         assert cmd[:4] == [sys.executable, "-m", "pip", "install"]
         assert cmd[cmd.index("--target") + 1] == str(tmp_path)
         assert "--no-index" in cmd and "--no-deps" in cmd
-        assert Path(cmd[-1]) == downloads[0] / "octop-1.0.2b5-py3-none-any.whl"
+        assert Path(cmd[-1]) == downloads[0] / "homemind-1.0.2b5-py3-none-any.whl"
         calls.append(label)
-        _write_octop_metadata(tmp_path, "1.0.2b5")
-        _write_octop_package(tmp_path, "1.0.2b5")
+        _write_homemind_metadata(tmp_path, "1.0.2b5")
+        _write_homemind_package(tmp_path, "1.0.2b5")
         return 0, ""
 
     monkeypatch.setattr(self_update, "_run_install_cmd", install)
@@ -896,7 +896,7 @@ def test_application_download_failure_retries_without_modifying_target(
     monkeypatch.setenv("OCTOP_GREEN_PACKAGES", str(tmp_path))
     monkeypatch.setattr(self_update, "detect_installer", lambda: "pip")
     monkeypatch.setattr(self_update, "has_pip", lambda _: True)
-    _write_octop_package(tmp_path, "1.0.2b4")
+    _write_homemind_package(tmp_path, "1.0.2b4")
     monkeypatch.setattr(
         self_update,
         "rank_install_indexes",
@@ -930,8 +930,8 @@ def test_legacy_pip_fallback_window_is_shared_across_mirrors(
     monkeypatch.setenv("OCTOP_GREEN_PACKAGES", str(tmp_path))
     monkeypatch.setattr(self_update, "detect_installer", lambda: "pip")
     monkeypatch.setattr(self_update, "has_pip", lambda _: True)
-    _write_octop_package(tmp_path, "1.0.2b4")
-    original = (tmp_path / "octop" / "__init__.py").read_bytes()
+    _write_homemind_package(tmp_path, "1.0.2b4")
+    original = (tmp_path / "homemind" / "__init__.py").read_bytes()
     monkeypatch.setattr(
         self_update,
         "rank_install_indexes",
@@ -955,7 +955,7 @@ def test_legacy_pip_fallback_window_is_shared_across_mirrors(
             elapsed += 80
             _write_upgrade_wheel(
                 Path(cmd[cmd.index("--dest") + 1]),
-                "Name: octop\nVersion: 1.0.2b5\nRequires-Dist: missing-upgrade-dependency>=1\n",
+                "Name: homemind\nVersion: 1.0.2b5\nRequires-Dist: missing-upgrade-dependency>=1\n",
             )
             return 0, ""
         assert "--no-deps" not in cmd
@@ -976,7 +976,7 @@ def test_legacy_pip_fallback_window_is_shared_across_mirrors(
         ]
     )
     assert elapsed == 980  # The first download precedes the single 900-second window.
-    assert (tmp_path / "octop" / "__init__.py").read_bytes() == original
+    assert (tmp_path / "homemind" / "__init__.py").read_bytes() == original
     assert (
         self_update.get_version_in_dir(sys.executable, str(tmp_path), check_cli=True) == "1.0.2b4"
     )
@@ -992,10 +992,10 @@ def test_fpk_verification_uses_target_and_rejects_missing_or_wrong_versions(
 
     monkeypatch.setattr(self_update.time, "sleep", lambda _: None)
     if actual:
-        _write_octop_metadata(tmp_path, actual)
-        _write_octop_package(tmp_path, actual)
+        _write_homemind_metadata(tmp_path, actual)
+        _write_homemind_package(tmp_path, actual)
     if actual == "1.0.2b5":
-        _write_octop_metadata(tmp_path, "1.0.2b4")
+        _write_homemind_metadata(tmp_path, "1.0.2b4")
     result = self_update._verify_fpk_upgrade(
         "1.0.2b4", str(tmp_path), sys.executable, [], version="1.0.2b5", locale=locale
     )
@@ -1157,7 +1157,7 @@ def test_cold_target_install_budget_preserves_regular_timeout(
         if "download" in cmd:
             _write_upgrade_wheel(
                 Path(cmd[cmd.index("--dest") + 1]),
-                "Name: octop\nVersion: 1.0.2b5\nRequires-Dist: absent>=1\n",
+                "Name: homemind\nVersion: 1.0.2b5\nRequires-Dist: absent>=1\n",
             )
         return (
             (0, "")
