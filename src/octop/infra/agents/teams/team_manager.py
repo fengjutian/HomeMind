@@ -17,7 +17,7 @@ import inspect
 import json
 import logging
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import fields
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
@@ -34,6 +34,7 @@ from octop_harness.teams.util import (
 )
 
 from octop.i18n import tr
+from octop.i18n.domains.stream import format_stream_error
 from octop.infra.agents.teams.service import _user_may_use_member, is_team_agent
 from octop.infra.agents.threads.artifact import artifact_path_allowed, extract_artifact_paths
 from octop.infra.db.repos.agents import AgentRow
@@ -152,6 +153,10 @@ class TeamManager:
         self._hitl_waiters: dict[str, asyncio.Future[list[dict[str, Any]]]] = {}
         self._peer_prompts: dict[tuple[str, str], tuple[str, str]] = {}
         self._live_host_replies: set[str] = set()
+        # Room text a member has already pushed and not yet persisted.
+        # A refresh mid-answer has no history row; the new subscriber gets this.
+        self._live_member_text: dict[str, dict[str, str]] = {}
+        self._member_wall_lock = asyncio.Lock()
         self._member_activity: dict[str, dict[str, dict[str, Any]]] = {}
 
     def replace_thread_message_repo(self, repo: Any) -> None:
@@ -467,6 +472,7 @@ class TeamManager:
         text_parts: list[str] = []
         reasoning_parts: list[str] = []
         relayed_visible = False
+        decision_payload: dict[str, Any] | None = None
         hold_room = self._defer_member_wall(speaker_id, member_tid, room_thread_id)
         host_id = self._room_agent_id(room_thread_id) if hold_room else ""
         room_open = True
@@ -557,9 +563,18 @@ class TeamManager:
                         pause = chunk
                         resume_pending = None
                         break
-                    if kind in _RELAY_CHUNK_TYPES:
+                    # Host wrap-up runs the decision model. Member streams stay
+                    # off the room wall, including their custom events.
+                    decision_custom = (
+                        kind == "custom" and _is_decision_custom(chunk) and not hold_room
+                    )
+                    if decision_custom:
+                        data = chunk.get("data")
+                        if isinstance(data, dict):
+                            decision_payload = dict(data)
+                    if kind in _RELAY_CHUNK_TYPES or decision_custom:
                         relay = chunk
-                        if extra_stamp and kind in {"token", "reasoning"}:
+                        if extra_stamp and (kind in {"token", "reasoning"} or decision_custom):
                             relay = {**chunk, **extra_stamp}
                         await emit(relay)
                 if pause is None:

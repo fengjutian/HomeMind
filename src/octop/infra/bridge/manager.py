@@ -61,6 +61,7 @@ from octop.infra.bridge.transport import (
     BRIDGE_TUNNEL_MAX_BODY_BYTES,
     BRIDGE_WS_MAX_BYTES,
     FEATURE_BODY_CHUNKS,
+    FEATURE_TURN_CONTROL,
     BridgeSession,
     peer_feature_set,
 )
@@ -271,6 +272,38 @@ def _close_code_of(exc: BaseException) -> int | None:
         if isinstance(code, int):
             return code
     return None
+
+
+def _handshake_http_status(exc: BaseException) -> int | None:
+    """HTTP status from a WebSocket client handshake rejection, if any."""
+    response = getattr(exc, "response", None)
+    status = getattr(response, "status_code", None)
+    return status if isinstance(status, int) else None
+
+
+def _should_refresh_peer_token(exc: BaseException) -> bool:
+    """True when the peer refused the socket before hello — usually a bad token.
+
+    Uvicorn turns ``websocket.close()`` before ``accept()`` into HTTP 403 with
+    an empty body. That is not evidence the ``/api/bridge/ws`` route is missing.
+    """
+    if _handshake_http_status(exc) in {401, 403}:
+        return True
+    return _close_code_of(exc) == 4001
+
+
+def _annotate_bridge_dial_error(exc: BaseException) -> str:
+    """Explain a failed peer handshake so the log names the likely cause."""
+    detail = str(exc)
+    status = _handshake_http_status(exc)
+    if status == 404:
+        return f"{detail}; peer may not support Bridge yet (needs Octop with /api/bridge/ws)"
+    if status == 403:
+        return (
+            f"{detail}; the peer refused the WebSocket handshake. "
+            "That is a rejected token or a proxy, not a missing /api/bridge/ws route."
+        )
+    return detail
 
 
 def is_auth_rejection(exc: BaseException) -> bool:

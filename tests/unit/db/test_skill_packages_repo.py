@@ -28,7 +28,7 @@ def test_skill_packages_table_exists(db: SqlitePool) -> None:
         v = conn.execute("SELECT version FROM _schema_version").fetchone()[0]
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(skill_packages)").fetchall()}
     assert "skill_packages" in names
-    assert v == 24
+    assert v == 28
     assert "skill_package_id" in cols
 
 
@@ -82,8 +82,8 @@ def test_skill_package_repo_list_visible(db: SqlitePool) -> None:
 def test_legacy_text_pk_skill_packages_keep_public_id(tmp_path: Path) -> None:
     pool = SqlitePool(tmp_path / "octop.db")
     with pool.connect() as conn:
-        conn.executescript((_MIGRATIONS / "001_initial.sql").read_text())
-        conn.executescript((_MIGRATIONS / "002_cron_mcp_and_skill_packages.sql").read_text())
+        conn.executescript((_MIGRATIONS / "001_initial.sql").read_text(encoding="utf-8"))
+        conn.executescript((_MIGRATIONS / "002_cron_mcp_and_skill_packages.sql").read_text(encoding="utf-8"))
         conn.execute(
             "INSERT INTO skill_packages("
             "id, name, description, created_by, skill_count, icon_name, icon_url, "

@@ -43,7 +43,7 @@ from pydantic import BaseModel, Field
 
 from octop.api.common.agent import assert_agent_owner, require_agent_owner_row
 from octop.api.common.memory_client import call_memory_rpc
-from octop.api.deps import current_user, get_server
+from octop.api.deps import current_user, get_server, require_permission
 from octop.infra.agents.manager import memory_extract_supported_options
 from octop.infra.errors import ErrorCode, OctopError
 

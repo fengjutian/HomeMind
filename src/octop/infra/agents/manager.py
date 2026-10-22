@@ -39,6 +39,7 @@ from octop.infra.agents.security.hitl_session import (
 )
 from octop.infra.agents.settings.acp import ACPSettingsStore
 from octop.infra.agents.settings.decision import DecisionSettings, DecisionSettingsStore
+from octop.infra.utils.turn_failure import turn_model_scope
 from octop.infra.agents.settings.langfuse import LangfuseSettings, LangfuseSettingsStore
 from octop.infra.agents.settings.media_generation import (
     MediaGenerationSettings,
@@ -124,10 +125,18 @@ def _stream_chunk_has_side_effect(chunk: Any) -> bool:
     return chunk_type in {"tool_call_chunk", "tool_result", "hitl_required"}
 
 
-def _model_retry_on_failure(exc: Exception) -> str:
+def _model_retry_on_failure(
+    exc: Exception,
+    *,
+    agent_id: str = "",
+    manager: AgentManager | None = None,
+) -> str:
     # Feed a specific, model-visible prompt instead of raising. Inbox jobs still
     # mark failed when the reply carries MODEL_RETRY_FAILURE_MARK.
-    from octop.i18n.domains.stream import model_retry_failure_prompt
+    from octop.i18n.domains.stream import exception_display_message, model_retry_failure_prompt
+    from octop.infra.agents.security.hitl_session import current_hitl_thread_id
+    from octop.infra.metrics import METRICS
+    from octop.infra.utils.turn_failure import current_turn_model, log_turn_failure
 
     thread_id = current_hitl_thread_id() or ""
     model = current_turn_model()

@@ -76,6 +76,9 @@ class RepoBundle:
     care_push_repo: CarePushRepo
     proactive_care_config_repo: ProactiveCareConfigRepo
     sso_repo: SsoRepo
+    user_group_repo: UserGroupRepo
+    user_group_member_repo: UserGroupMemberRepo
+    resource_group_grant_repo: ResourceGroupGrantRepo
     workspace_change_repo: WorkspaceChangeRepo
 
     @classmethod
@@ -110,6 +113,9 @@ class RepoBundle:
             care_push_repo=CarePushRepo(db),
             proactive_care_config_repo=ProactiveCareConfigRepo(db),
             sso_repo=SsoRepo(db),
+            user_group_repo=UserGroupRepo(db),
+            user_group_member_repo=UserGroupMemberRepo(db),
+            resource_group_grant_repo=ResourceGroupGrantRepo(db),
             workspace_change_repo=WorkspaceChangeRepo(db),
         )
 

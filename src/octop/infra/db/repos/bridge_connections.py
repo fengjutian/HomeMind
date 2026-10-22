@@ -41,6 +41,8 @@ class BridgeConnectionRow:
     created_at: int = 0
     updated_at: int = 0
     peer_client_host: str | None = None
+    #: Migration 28: optional uploaded/remote portrait URL.
+    icon_url: str = ""
 
     @classmethod
     def from_row(cls, r: DbRow) -> BridgeConnectionRow:
