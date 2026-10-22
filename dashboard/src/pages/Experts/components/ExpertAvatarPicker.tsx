@@ -7,7 +7,6 @@ import {
 } from "../../../components/AvatarPicker";
 import ExpertAgentAvatar from "../../Chat/components/ExpertAgentAvatar";
 import DiceBearAvatarPresets from "../../../components/DiceBearAvatarPresets";
-import styles from "../index.module.less";
 
 export { validateAvatarFile };
 
@@ -38,66 +37,48 @@ export default function ExpertAvatarPicker({
   const presetId = rawPresetId === "default" ? null : rawPresetId;
 
   return (
-    <ResourceAvatarPicker
-      imageUrl={imageUrl}
-      presetId={presetId}
-      presets={EXPERT_AVATAR_PRESETS}
-      disabled={disabled}
-      onPick={onPick}
-      onSelectPreset={onSelectPreset}
-      onRemove={onRemove}
-      renderPreview={({ displayUrl, presetId: selectedPreset, hasPhoto }) => {
-        const previewUrl = hasPhoto
-          ? displayUrl
-          : selectedPreset && selectedPreset !== "default"
-          ? expertPresetSrc(selectedPreset)
-          : null;
-        return (
-          <ExpertAgentAvatar
-            iconUrl={previewUrl}
-            iconName={iconName}
-            color={color}
-            size={56}
-          />
-        </div>
-      </Modal>
-      <div className={styles.avatarPickerActions}>
-        <Button
-          size="small"
-          icon={<ImagePlus size={14} />}
-          disabled={disabled}
-          onClick={handlePick}
-        >
-          {hasPhoto ? t("experts.avatarChange") : t("experts.avatarUpload")}
-        </Button>
-        {hasPhoto && onRemove ? (
-          <Button
-            size="small"
-            disabled={disabled}
-            onClick={() => {
-              replaceLocalPreview(null);
-              void Promise.resolve(onRemove()).catch(() => undefined);
-            }}
-          >
-            {t("experts.avatarRemove")}
-          </Button>
-        ) : null}
-        <span className={styles.avatarPickerHint}>
-          {t("experts.avatarHint")}
-        </span>
-      </div>
+    <>
+      <ResourceAvatarPicker
+        imageUrl={imageUrl}
+        presetId={presetId}
+        presets={EXPERT_AVATAR_PRESETS}
+        disabled={disabled}
+        onPick={onPick}
+        onSelectPreset={onSelectPreset}
+        onRemove={onRemove}
+        renderPreview={({ displayUrl, presetId: selectedPreset, hasPhoto }) => {
+          const previewUrl = hasPhoto
+            ? displayUrl
+            : selectedPreset && selectedPreset !== "default"
+            ? expertPresetSrc(selectedPreset)
+            : null;
+          return (
+            <ExpertAgentAvatar
+              iconUrl={previewUrl}
+              iconName={iconName}
+              color={color}
+              size={56}
+            />
+          );
+        }}
+        renderPreset={({ preset, index }) => {
+          if (index === 0) {
+            return (
+              <ExpertAgentAvatar iconName={iconName} color={color} size={36} />
+            );
+          }
+          if (preset.src) {
+            return <img src={preset.src} alt="" />;
+          }
+          const PresetIcon = preset.Icon;
+          return PresetIcon ? <PresetIcon size={22} /> : null;
+        }}
+      />
       <DiceBearAvatarPresets
         seed={avatarSeed}
         disabled={disabled}
-        onPick={async (file) => {
-          replaceLocalPreview(URL.createObjectURL(file));
-          try {
-            await onPick(file);
-          } catch {
-            replaceLocalPreview(null);
-          }
-        }}
+        onPick={onPick}
       />
-    </div>
+    </>
   );
 }
