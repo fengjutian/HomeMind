@@ -19,6 +19,8 @@ import { isEmbeddingModel } from "../../useProviders";
 import { CodexOAuthConnect } from "../CodexOAuthConnect";
 import { fetchProviderModels, testProviderDraft } from "../../providerApi";
 import { ModelListEditor } from "./ModelListEditor";
+import { StreamUsageAdvanced } from "../StreamUsageAdvanced";
+import { TestStreamHint } from "../TestStreamHint";
 import styles from "../../index.module.less";
 
 interface PresetProviderModalProps {
@@ -33,6 +35,7 @@ interface PresetForm {
   base_url: string;
   api_key?: string;
   kind: string;
+  stream_usage?: boolean;
 }
 
 export function PresetProviderModal({
@@ -91,6 +94,7 @@ export function PresetProviderModal({
         name: preset.name,
         base_url: preset.base_url,
         kind: preset.protocol,
+        stream_usage: preset.protocol === "openai",
       });
     }
   }, [open, preset, form, t]);
@@ -152,7 +156,11 @@ export function PresetProviderModal({
     }
   };
 
-  const testDraftModel = async (modelId: string) => {
+  const testDraftModel = async (
+    modelId: string,
+    apiMode?: ProviderModel["api_mode"],
+    apiFallback?: ProviderModel["api_fallback"],
+  ) => {
     const values = await form.validateFields(["name", "base_url", "api_key"]);
     const key = values.api_key?.trim();
     if (!key) {
@@ -164,6 +172,8 @@ export function PresetProviderModal({
       api_key: key,
       base_url: values.base_url?.trim() || preset.base_url,
       model_id: modelId,
+      api_mode: apiMode,
+      api_fallback: apiFallback,
       embedding: isEmbeddingModel(draftModels.find((m) => m.id === modelId)),
     });
   };
@@ -184,14 +194,22 @@ export function PresetProviderModal({
         return;
       }
       setTesting(true);
-      const result = await testDraftModel(modelId);
+      const result = await testDraftModel(
+        modelId,
+        draftModels.find((m) => m.id === modelId)?.api_mode,
+        draftModels.find((m) => m.id === modelId)?.api_fallback,
+      );
       if (result.ok) {
-        message.success(
-          t("models.testSuccess", {
-            name: values.name,
-            time: result.latency_ms ?? 0,
-          }),
-        );
+        if (result.fallback_used) {
+          message.warning(t("models.apiFallbackTestUsed"));
+        } else {
+          message.success(
+            t("models.testSuccess", {
+              name: values.name,
+              time: result.latency_ms ?? 0,
+            }),
+          );
+        }
       } else {
         message.error(
           t("models.testConnectionFailed", {
@@ -223,6 +241,9 @@ export function PresetProviderModal({
           base_url: values.base_url?.trim() || null,
           api_key: values.api_key?.trim() || null,
           models: draftModels,
+          ...(preset.protocol === "openai"
+            ? { stream_usage: values.stream_usage !== false }
+            : {}),
         }),
       });
       message.success(
@@ -321,6 +342,8 @@ export function PresetProviderModal({
                 visibilityToggle
               />
             </Form.Item>
+
+            {preset.protocol === "openai" ? <StreamUsageAdvanced /> : null}
           </Form>
 
           <div style={{ marginBottom: 16 }}>
@@ -339,6 +362,7 @@ export function PresetProviderModal({
             >
               {t("models.fetchModels")}
             </Button>
+            {preset.protocol === "openai" ? <TestStreamHint /> : null}
           </div>
 
           <Divider orientation="left" style={{ fontSize: 13 }}>
@@ -350,7 +374,9 @@ export function PresetProviderModal({
             onModelsChange={setDraftModels}
             apiPrefix="/admin/providers"
             canTest={canTest}
-            onTestModel={(modelId) => testDraftModel(modelId)}
+            onTestModel={(modelId, _modelName, apiMode, apiFallback) =>
+              testDraftModel(modelId, apiMode, apiFallback)
+            }
           />
         </>
       )}

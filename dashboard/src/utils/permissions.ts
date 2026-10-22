@@ -9,12 +9,28 @@ export type PermissionHolder = {
 export type PermissionKeys = readonly string[] | "admin";
 
 export const PERM = {
+  skills: ["skills"],
+  subagents: ["subagents"],
+  tools: ["tools"],
+  agentPlugins: ["agent_plugins"],
+  mbti: ["mbti"],
+  memory: ["memory"],
+  /** Personalization tabs other than channels, which has its own nav item. */
+  personalization: [
+    "skills",
+    "subagents",
+    "tools",
+    "agent_plugins",
+    "mbti",
+    "memory",
+  ],
   channels: ["channels"],
   connectors: ["connectors"],
   skillPackages: ["skill_packages"],
   knowledgeBases: ["knowledge_bases"],
   knowledgeSettings: ["knowledge_settings"],
   knowledgeBasesPage: ["knowledge_bases", "knowledge_settings"],
+  bridge: ["bridge"],
   workbench: ["browser", "terminal"],
   browser: ["browser"],
   terminal: ["terminal"],
@@ -26,14 +42,32 @@ export const PERM = {
   plugins: ["plugins"],
   securityPage: ["security", "admin_console"],
   advancedPage: ["update", "envs", "tls", "observability", "backup", "captcha"],
+  experts: ["experts"],
+  tasks: ["tasks"],
+  tokenUsage: ["token_usage"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** Sidebar item key → permission keys. Shared with path guards. */
+export const PERSONALIZATION_TAB_PERMISSIONS = {
+  skills: "skills",
+  subagents: "subagents",
+  tools: "tools",
+  plugins: "agent_plugins",
+  mbti: "mbti",
+  memory: "memory",
+  channels: "channels",
+} as const;
+
 export const NAV_PERMISSIONS = {
+  experts: PERM.experts,
+  tasks: PERM.tasks,
+  "token-usage": PERM.tokenUsage,
+  personalization: PERM.personalization,
   channels: PERM.channels,
   connectors: PERM.connectors,
   "skill-packages": PERM.skillPackages,
   "knowledge-bases": PERM.knowledgeBasesPage,
+  bridge: PERM.bridge,
   workbench: PERM.workbench,
   "remote-desktop": ["desktop", "mobile"],
   "remote-phone": PERM.mobile,
@@ -51,6 +85,7 @@ export type NavPermissionKey = keyof typeof NAV_PERMISSIONS;
 export const USERS_TAB_PERMISSIONS = {
   local: "users",
   roles: "users",
+  groups: "users",
   feishu: "sso",
   wecom: "sso",
   dingtalk: "sso",
@@ -160,12 +195,34 @@ export function pathPermissionKeys(pathname: string): PermissionKeys | null {
   if (pathname.startsWith("/admin/")) {
     return "admin";
   }
-  if (
-    pathname === "/personalization/channels" ||
-    pathname === "/channels" ||
-    pathname.startsWith("/personalization/channels/")
-  ) {
+  if (pathname === "/channels" || pathname.startsWith("/channels/")) {
     return PERM.channels;
+  }
+  if (
+    pathname === "/personalization" ||
+    pathname.startsWith("/personalization/") ||
+    pathname === "/skills" ||
+    pathname === "/subagents" ||
+    pathname === "/mbti" ||
+    pathname === "/memory"
+  ) {
+    const tab =
+      pathname === "/skills"
+        ? "skills"
+        : pathname === "/subagents"
+        ? "subagents"
+        : pathname === "/mbti"
+        ? "mbti"
+        : pathname === "/memory"
+        ? "memory"
+        : pathname.split("/")[2] ?? "";
+    const key =
+      PERSONALIZATION_TAB_PERMISSIONS[
+        tab as keyof typeof PERSONALIZATION_TAB_PERMISSIONS
+      ];
+    if (key) return [key];
+    if (tab) return null;
+    return [...PERM.personalization, ...PERM.channels];
   }
   if (pathname === "/connectors" || pathname.startsWith("/connectors/")) {
     return PERM.connectors;
@@ -183,7 +240,7 @@ export function pathPermissionKeys(pathname: string): PermissionKeys | null {
     return PERM.knowledgeBasesPage;
   }
   if (pathname === "/bridge" || pathname.startsWith("/bridge/")) {
-    return null;
+    return PERM.bridge;
   }
   if (pathname === "/remote-desktop/desktop") {
     return PERM.desktop;
@@ -215,6 +272,15 @@ export function pathPermissionKeys(pathname: string): PermissionKeys | null {
   // ACP: no module key this round — admin role only.
   if (pathname === "/acp" || pathname.startsWith("/acp/")) {
     return "admin";
+  }
+  if (pathname === "/experts" || pathname.startsWith("/experts/")) {
+    return PERM.experts;
+  }
+  if (pathname === "/tasks" || pathname.startsWith("/tasks/")) {
+    return PERM.tasks;
+  }
+  if (pathname === "/token-usage" || pathname.startsWith("/token-usage/")) {
+    return PERM.tokenUsage;
   }
   return null;
 }

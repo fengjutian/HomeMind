@@ -89,7 +89,9 @@ export default function RolesPanel() {
   const baselinePermissions = useMemo(
     () =>
       permCatalog
-        .filter((item) => item.category === "settings")
+        .filter(
+          (item) => item.category === "settings" || item.category === "nav",
+        )
         .map((item) => item.key),
     [permCatalog],
   );

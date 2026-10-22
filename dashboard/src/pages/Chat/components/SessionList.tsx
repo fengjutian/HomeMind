@@ -5,14 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { Dropdown } from "antd";
 import type { MenuProps } from "antd";
 import {
-  Pencil,
-  MoreHorizontal,
-  Trash2,
-  Pin,
-  PinOff,
-  MessageSquarePlus,
-  Search,
-  GitFork,
   Eye,
   EyeOff,
   GripVertical,
@@ -272,10 +264,12 @@ interface AgentCardProps {
   onDelete: (id: string, compact: boolean) => void | Promise<boolean | void>;
   onRename: (id: string, name: string) => void;
   onPin: (id: string, pinned: boolean) => void;
-  onFork: (id: string) => void;
+  onFork: (id: string, agentId?: string | null) => void;
   activeForkDisabled?: boolean;
   activeForkDisabledHint?: string;
   onHide?: () => void;
+  pinned?: boolean;
+  onTogglePin?: () => void;
   liveWorkingIds: ReadonlySet<string>;
   dragHandle?: ReactNode;
   workStatus?: ExpertWorkStatus;
@@ -299,6 +293,8 @@ function ActiveAgentCard({
   activeForkDisabled,
   activeForkDisabledHint,
   onHide,
+  pinned = false,
+  onTogglePin,
   liveWorkingIds,
   dragHandle,
   workStatus,
@@ -361,18 +357,14 @@ function ActiveAgentCard({
               <RemoteExpertHint agent={agent} />
             </div>
             <AgentUnreadBadge count={agent.unread_count ?? 0} />
-            <button
-              type="button"
-              className={styles.agentNewChatBtn}
-              aria-label={t("chatWelcome.newChat")}
-              title={t("chatWelcome.newChat")}
-              onClick={(e) => {
-                e.stopPropagation();
-                onNewChat(agent.agent_id);
-              }}
-            >
-              <MessageSquarePlus size={14} strokeWidth={1.75} aria-hidden />
-            </button>
+            {onTogglePin ? (
+              <ExpertNavActions
+                variant="classic"
+                pinned={pinned}
+                onTogglePin={onTogglePin}
+                onNewChat={() => onNewChat(agent.agent_id)}
+              />
+            ) : null}
             {onHide ? (
               <button
                 type="button"
@@ -423,7 +415,7 @@ function ActiveAgentCard({
                 onDelete={onDelete}
                 onRename={onRename}
                 onPin={onPin}
-                onFork={onFork}
+                onFork={(id) => onFork(id, agent.agent_id)}
                 forkDisabled={
                   activeId === s.id ? activeForkDisabled : undefined
                 }
@@ -508,19 +500,13 @@ function InactiveAgentRow({
               <RemoteExpertHint agent={agent} />
             </div>
             <AgentUnreadBadge count={agent.unread_count ?? 0} />
-            {onNewChat ? (
-              <button
-                type="button"
-                className={styles.agentNewChatBtn}
-                aria-label={t("chatWelcome.newChat")}
-                title={t("chatWelcome.newChat")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onNewChat();
-                }}
-              >
-                <MessageSquarePlus size={14} strokeWidth={1.75} aria-hidden />
-              </button>
+            {onNewChat && onTogglePin ? (
+              <ExpertNavActions
+                variant="classic"
+                pinned={pinned}
+                onTogglePin={onTogglePin}
+                onNewChat={onNewChat}
+              />
             ) : null}
           </div>
           <div className={styles.agentRowDesc}>{agent.description || "—"}</div>
@@ -567,7 +553,7 @@ interface SessionListProps {
   onDelete: (id: string, compact: boolean) => void | Promise<boolean | void>;
   onRename: (id: string, name: string) => void;
   onPin: (id: string, pinned: boolean) => void;
-  onFork: (id: string) => void;
+  onFork: (id: string, agentId?: string | null) => void;
   activeForkDisabled?: boolean;
   activeForkDisabledHint?: string;
 }
@@ -604,6 +590,7 @@ export default function SessionList({
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const { filterVisible, pickHidden, hide, unhide, canHide } =
     useHiddenSharedExperts();
+  const { pinnedIds, isPinned, togglePin } = usePinnedExperts();
 
   const hiddenAgents = useMemo(() => {
     const hidden = [...pickHidden(agents)].sort((a, b) => b.id - a.id);
@@ -681,20 +668,101 @@ export default function SessionList({
   const viewingHidden = showingHidden && hiddenAgents.length > 0;
   const agentsToRender = viewingHidden ? hiddenAgents : sortedAgents;
 
-  const expandedAgentId = useMemo(
-    () =>
-      viewingHidden ? null : activeAgentId ?? sortedAgents[0]?.agent_id ?? null,
-    [activeAgentId, sortedAgents, viewingHidden],
+  const expandedAgentId = useMemo(() => {
+    if (viewingHidden) return null;
+    const activeInScope = sortedAgents.some(
+      (agent) => agent.agent_id === activeAgentId,
+    );
+    if (activeInScope) return activeAgentId;
+    // Browsing another tab keeps the open chat; don't expand a stranger.
+    if (activeAgentId) return null;
+    return sortedAgents[0]?.agent_id ?? null;
+  }, [activeAgentId, sortedAgents, viewingHidden]);
+  const searching = searchQuery.trim().length > 0;
+  const fetchAllRequestedRef = useRef(false);
+  useEffect(() => {
+    if (!searching) {
+      fetchAllRequestedRef.current = false;
+      return;
+    }
+    if (fetchAllRequestedRef.current) return;
+    fetchAllRequestedRef.current = true;
+    onFetchAllSessions();
+  }, [onFetchAllSessions, searching]);
+  const catalog = useExpertSessionCatalog(
+    viewingHidden ? hiddenAgents : sortedAgents,
+    searching && !viewingHidden,
   );
-  const activeAgent = useMemo(
-    () => sortedAgents.find((a) => a.agent_id === expandedAgentId) ?? null,
-    [sortedAgents, expandedAgentId],
+  const sessionsFor = useCallback(
+    (agentId: string): Session[] => {
+      const catalogList = catalog.byAgent[agentId] ?? [];
+      if (agentId === activeAgentId && sessions.length >= catalogList.length) {
+        return sessions;
+      }
+      return catalogList.length > 0
+        ? catalogList
+        : agentId === activeAgentId
+        ? sessions
+        : [];
+    },
+    [activeAgentId, catalog.byAgent, sessions],
   );
-  const showSessions = isAgentChatReady(activeAgent?.state);
+  const listedAgents = useMemo(() => {
+    if (viewingHidden) {
+      if (!searching) return agentsToRender;
+      return agentsToRender.filter((agent) =>
+        matchesNavQuery(agent.name, searchQuery),
+      );
+    }
+    if (!searching) return agentsToRender;
+    return agentsToRender.filter((agent) =>
+      expertVisibleInNavSearch(
+        agent.name,
+        sessionsFor(agent.agent_id).map((session) => session.name),
+        searchQuery,
+      ),
+    );
+  }, [agentsToRender, searchQuery, searching, sessionsFor, viewingHidden]);
+
+  const deleteOther = useCallback(
+    async (agentId: string, id: string, compact: boolean) => {
+      const deleted = await deleteConversation(agentId, id, compact, t);
+      if (deleted !== true) return deleted;
+      catalog.patch(agentId, (prev) =>
+        prev.filter((session) => session.id !== id),
+      );
+      return true;
+    },
+    [catalog, t],
+  );
+  const renameOther = useCallback(
+    (agentId: string, id: string, name: string) => {
+      const next = formatThreadTitle(name) || name.trim();
+      if (!next) return;
+      void octopThreadsApi.rename(agentId, id, next).catch(() => {});
+      catalog.patch(agentId, (prev) =>
+        prev.map((session) =>
+          session.id === id ? { ...session, name: next } : session,
+        ),
+      );
+    },
+    [catalog],
+  );
+  const pinOther = useCallback(
+    (agentId: string, id: string, pinned: boolean) => {
+      void octopThreadsApi.patch(agentId, id, { pinned }).catch(() => {});
+      catalog.patch(agentId, (prev) =>
+        prev.map((session) =>
+          session.id === id ? { ...session, pinned } : session,
+        ),
+      );
+    },
+    [catalog],
+  );
 
   return (
     <div className={styles.sessionList}>
-      {showSessions ? (
+      {agents.length > 0 ? (
         <div className={styles.sessionSearchWrap}>
           <Search
             size={14}
@@ -710,6 +778,10 @@ export default function SessionList({
             aria-label={t("chat.searchSessions", "搜索会话")}
           />
         </div>
+      ) : null}
+
+      {agents.length > 0 ? (
+        <ChatNavScopeTabs value={navScope} onChange={setNavScope} />
       ) : null}
 
       {agents.length === 0 ? (
@@ -771,8 +843,36 @@ export default function SessionList({
                 ) : (
                   <InactiveAgentRow
                     agent={agent}
-                    onSelect={() => onAgentSelect(agent.agent_id)}
-                    onNewChat={() => onNewChat(agent.agent_id)}
+                    sessions={isActive ? sessions : hits}
+                    activeId={activeId}
+                    searchQuery={isActive ? searchQuery : ""}
+                    hasMore={isActive ? hasMore : false}
+                    loadingMore={isActive ? loadingMore : false}
+                    onLoadMore={isActive ? onLoadMore : () => undefined}
+                    onFetchAllSessions={
+                      isActive ? onFetchAllSessions : () => undefined
+                    }
+                    onSelect={onSelect}
+                    onNewChat={onNewChat}
+                    onDelete={
+                      isActive
+                        ? onDelete
+                        : (id, compact) =>
+                            deleteOther(agent.agent_id, id, compact)
+                    }
+                    onRename={
+                      isActive
+                        ? onRename
+                        : (id, name) => renameOther(agent.agent_id, id, name)
+                    }
+                    onPin={
+                      isActive
+                        ? onPin
+                        : (id, pinned) => pinOther(agent.agent_id, id, pinned)
+                    }
+                    onFork={onFork}
+                    activeForkDisabled={activeForkDisabled}
+                    activeForkDisabledHint={activeForkDisabledHint}
                     onHide={
                       canHide(agent) ? () => hide(agent.agent_id) : undefined
                     }

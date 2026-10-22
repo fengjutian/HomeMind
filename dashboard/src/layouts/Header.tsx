@@ -5,6 +5,7 @@ import AppVersionBadge from "../components/AppVersionBadge";
 import CurrentVersionBadge from "../components/CurrentVersionBadge";
 import BrandLogo from "../components/BrandLogo";
 import { typeSize } from "../utils/mobileTypeScale";
+import { publicUrl } from "../utils/publicUrl";
 
 const { Header: AntHeader } = Layout;
 

@@ -19,6 +19,11 @@ import {
 import { MoreHorizontal } from "lucide-react";
 import { request } from "../../../api/request";
 import { AgentAdvancedConfigFields } from "../../../components/AgentAdvancedConfigFields";
+import { TextAssistBar } from "../../../components/TextAssistBar";
+import {
+  expertPresetSrc,
+  isUploadedAvatarUrl,
+} from "../../../components/AvatarPicker";
 import ExpertColorPicker from "../../../components/ExpertColorPicker";
 import AgentTrajectoryField from "./AgentTrajectoryField";
 import { workspaceApi } from "../../../api/modules/workspace";
@@ -729,31 +734,6 @@ function EditAgentDrawerBody({
               {t("experts.basicInfo")}
             </div>
             <Form form={form} layout="vertical" size="middle">
-              <Form.Item
-                name="name"
-                label={t("experts.agentName")}
-                rules={[
-                  { required: true, message: t("experts.pleaseEnterName") },
-                ]}
-              >
-                <Input />
-              </Form.Item>
-              <Form.Item
-                name="description"
-                label={t("experts.agentDescription")}
-              >
-                <Input.TextArea rows={2} />
-              </Form.Item>
-              <Form.Item
-                name="welcome_message"
-                label={t("experts.welcomeMessageTitle")}
-                extra={t("experts.editWelcomeHint")}
-              >
-                <Input.TextArea
-                  rows={2}
-                  placeholder={t("experts.welcomeMessagePlaceholder")}
-                />
-              </Form.Item>
               <Form.Item label={t("experts.avatar")}>
                 <ExpertAvatarPicker
                   avatarSeed={agent.agent_id}
@@ -784,6 +764,35 @@ function EditAgentDrawerBody({
                           ),
                         );
                         throw err;
+                      } finally {
+                        setAvatarBusy(false);
+                      }
+                    })();
+                  }}
+                  onSelectPreset={(presetId) => {
+                    void (async () => {
+                      setAvatarBusy(true);
+                      try {
+                        if (isUploadedAvatarUrl(iconUrl)) {
+                          await octopAgentsApi.deleteAvatar(agent.agent_id);
+                        }
+                        const nextUrl = presetId
+                          ? expertPresetSrc(presetId)
+                          : null;
+                        await request(`/agents/${agent.agent_id}`, {
+                          method: "PATCH",
+                          body: JSON.stringify({ icon_url: nextUrl }),
+                        });
+                        setIconUrl(nextUrl);
+                        await refresh({ silent: true });
+                      } catch (err) {
+                        message.error(
+                          apiErrorMessage(
+                            err,
+                            t("experts.avatarUploadFailed"),
+                            t,
+                          ),
+                        );
                       } finally {
                         setAvatarBusy(false);
                       }
@@ -820,6 +829,47 @@ function EditAgentDrawerBody({
                   onChange={setColorPalette}
                 />
               </Form.Item>
+              <Form.Item
+                name="name"
+                label={t("experts.agentName")}
+                rules={[
+                  { required: true, message: t("experts.pleaseEnterName") },
+                ]}
+              >
+                <Input />
+              </Form.Item>
+              <Form.Item
+                name="description"
+                label={t("experts.agentDescription")}
+              >
+                <Input.TextArea rows={2} />
+              </Form.Item>
+              <TextAssistBar
+                kind="expert.description"
+                getName={() => String(form.getFieldValue("name") ?? "")}
+                getText={() => String(form.getFieldValue("description") ?? "")}
+                onApply={(text) => form.setFieldsValue({ description: text })}
+              />
+              <Form.Item
+                name="welcome_message"
+                label={t("experts.welcomeMessageTitle")}
+                extra={t("experts.editWelcomeHint")}
+              >
+                <Input.TextArea
+                  rows={2}
+                  placeholder={t("experts.welcomeMessagePlaceholder")}
+                />
+              </Form.Item>
+              <TextAssistBar
+                kind="expert.welcome_message"
+                getName={() => String(form.getFieldValue("name") ?? "")}
+                getText={() =>
+                  String(form.getFieldValue("welcome_message") ?? "")
+                }
+                onApply={(text) =>
+                  form.setFieldsValue({ welcome_message: text })
+                }
+              />
               <Form.Item
                 name="is_shared"
                 label={t("experts.share.toggle")}

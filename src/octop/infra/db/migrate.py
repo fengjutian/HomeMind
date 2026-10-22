@@ -1876,6 +1876,10 @@ def _reconcile_pre_squash_schema_version(db: DatabasePool) -> None:
         _ensure_thread_conversation_mode_schema(db)
     if max_version >= 18:
         _ensure_user_role_schema(db)
+    if max_version >= 21:
+        _ensure_skill_package_download_schema(db)
+    if max_version >= 22:
+        _ensure_skill_package_shared_schema(db)
     with db.connect() as conn:
         conn.execute("UPDATE _schema_version SET version = ?", (max_version,))
 
@@ -2051,6 +2055,122 @@ def _apply_sqlite_migration(db: DatabasePool, version: int, path: Path) -> None:
     sql = path.read_text(encoding="utf-8")
     with db.connect() as conn:
         conn.executescript(sql)
+
+
+_NAV_PAGE_PERMISSIONS = ("experts", "tasks", "token_usage")
+_NAV_PAGE_PERMISSIONS_FLAG = "granted_nav_page_permissions"
+_PERSONALIZATION_TAB_PERMISSIONS = (
+    "skills",
+    "subagents",
+    "tools",
+    "agent_plugins",
+    "mbti",
+    "memory",
+)
+_PERSONALIZATION_TAB_PERMISSIONS_FLAG = "granted_personalization_tab_permissions"
+_BRIDGE_PERMISSIONS = ("bridge",)
+_BRIDGE_PERMISSIONS_FLAG = "granted_bridge_permission"
+
+
+def _parse_perm_list(raw: Any) -> list[str] | None:
+    if isinstance(raw, list):
+        return [str(item) for item in raw]
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return []
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(parsed, list):
+            return [str(item) for item in parsed]
+    return None
+
+
+def _grant_permission_keys_once(
+    db: DatabasePool,
+    keys: tuple[str, ...],
+    flag: str,
+) -> None:
+    """Grant ``keys`` once to accounts that already had those pages open.
+
+    Later removals stick: the settings flag stops this from running again.
+    Admins are skipped; an empty permission list means "all" for that role.
+    """
+    if not _table_exists(db, "settings"):
+        return
+    with db.connect() as conn:
+        existing = conn.execute(
+            "SELECT value FROM settings WHERE key = ?",
+            (flag,),
+        ).fetchone()
+    if existing is not None:
+        return
+
+    def grant(table: str, id_col: str, skip_where: str) -> None:
+        if not _table_exists(db, table):
+            return
+        with db.connect() as conn:
+            rows = conn.execute(
+                f"SELECT {id_col}, permissions FROM {table} WHERE {skip_where}"
+            ).fetchall()
+        updates: list[tuple[str, object]] = []
+        for row in rows:
+            current = _parse_perm_list(row[1])
+            if current is None:
+                continue
+            merged = list(current)
+            changed = False
+            for key in keys:
+                if key not in merged:
+                    merged.append(key)
+                    changed = True
+            if changed:
+                updates.append((json.dumps(merged, ensure_ascii=False), row[0]))
+        if not updates:
+            return
+        with db.transaction() as conn:
+            for payload, pk in updates:
+                conn.execute(
+                    f"UPDATE {table} SET permissions = ? WHERE {id_col} = ?",
+                    (payload, pk),
+                )
+
+    grant("users", "id", "role <> 'admin'")
+    grant("user_role", "id", "user_role_id <> 'admin'")
+    with db.transaction() as conn:
+        if db.dialect == "postgresql":
+            conn.execute(
+                "INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING",
+                (flag, "1"),
+            )
+        else:
+            conn.execute(
+                "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)",
+                (flag, "1"),
+            )
+
+
+def _grant_default_nav_permissions(db: DatabasePool) -> None:
+    """Grant experts/tasks/token usage once to accounts that already had them open."""
+    _grant_permission_keys_once(db, _NAV_PAGE_PERMISSIONS, _NAV_PAGE_PERMISSIONS_FLAG)
+
+
+def _grant_personalization_tab_permissions(db: DatabasePool) -> None:
+    """Grant personalization tab keys once; those pages used to be open to everyone."""
+    _grant_permission_keys_once(
+        db,
+        _PERSONALIZATION_TAB_PERMISSIONS,
+        _PERSONALIZATION_TAB_PERMISSIONS_FLAG,
+    )
+
+
+def _grant_bridge_permission(db: DatabasePool) -> None:
+    """Grant cloud-collab once; /bridge used to be ungated for every signed-in user."""
+    _grant_permission_keys_once(db, _BRIDGE_PERMISSIONS, _BRIDGE_PERMISSIONS_FLAG)
 
 
 def run_migrations(db: DatabasePool) -> None:
