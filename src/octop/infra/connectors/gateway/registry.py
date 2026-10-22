@@ -46,6 +46,7 @@ _ADAPTERS: dict[str, GatewayAdapter] = {
     "wechat-reading": wechat_reading,
     "feishu-cli": feishu_cli,
     "wecom-cli": wecom_cli,
+    "dingtalk-cli": dingtalk_cli,
     "obsidian-cli": obsidian_cli,
     "weknora": weknora,
 }

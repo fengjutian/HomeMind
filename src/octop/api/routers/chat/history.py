@@ -644,6 +644,11 @@ async def delete_thread(
     expert is idle. Omitting ``compact`` keeps the previous empty 204.
     """
     _require_thread(server, agent_id, thread_id, user, as_user)
+    if server.app_runtime.gateway.ws_hub.is_turn_active(thread_id):
+        raise OctopError(
+            ErrorCode.THREAD_TURN_ACTIVE,
+            error_message(ErrorCode.THREAD_TURN_ACTIVE.value, "en"),
+        )
     registry = server.app_runtime.agent_registry
     await registry.delete_thread_checkpoint(agent_id, thread_id)
     server.app_runtime.gateway.thread_registry.delete_thread(thread_id)

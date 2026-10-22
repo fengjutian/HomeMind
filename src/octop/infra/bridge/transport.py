@@ -185,6 +185,7 @@ class BridgeSession:
             self.close_reason = reason
         self._closed.set()
         self._body_parts.clear()
+        self._send_queue.close()
         pending = list(self._pending.items())
         self._pending.clear()
         for _rid, fut in pending:

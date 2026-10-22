@@ -431,7 +431,17 @@ _embedding_instance: tuple[str, str, Any] | None = None
 def _build_text_embedding(model: str) -> Any:
     from fastembed import TextEmbedding
 
-    return TextEmbedding(model_name=model, cache_dir=str(embedding_models_dir()), threads=2)
+    cache = embedding_models_dir()
+    local_snapshot = _local_model_snapshot(model)
+    if local_snapshot is not None:
+        return TextEmbedding(
+            model_name=model,
+            cache_dir=str(cache),
+            threads=2,
+            specific_model_path=str(local_snapshot),
+            local_files_only=True,
+        )
+    return TextEmbedding(model_name=model, cache_dir=str(cache), threads=2)
 
 
 def embed_texts(model: str, texts: Sequence[str]) -> list[list[float]]:

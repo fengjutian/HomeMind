@@ -101,13 +101,19 @@ class PrioritySendQueue:
         self._dumps = dumps or (
             lambda payload: json.dumps(payload, ensure_ascii=False, default=str)
         )
-        self._queues: dict[Lane, deque[tuple[str, int]]] = {lane: deque() for lane in _PRIORITY}
+        self._queues: dict[Lane, deque[tuple[str, int, asyncio.Event | None]]] = {
+            lane: deque() for lane in _PRIORITY
+        }
         self._queued_bytes: dict[Lane, int] = dict.fromkeys(_PRIORITY, 0)
         self._space = {lane: asyncio.Event() for lane in _PRIORITY}
         for event in self._space.values():
             event.set()
         self._pumping = False
         self.shed = 0
+        #: Control frames are answered synchronously: the caller waits until the
+        #: frame is on the wire, so a pong is never "sent" while it is still
+        #: sitting in a queue behind bulk traffic.
+        self._control_waiters: set[asyncio.Event] = set()
 
     @property
     def queued_bytes(self) -> dict[Lane, int]:
@@ -138,9 +144,29 @@ class PrioritySendQueue:
             raise LaneBudgetExceeded(lane, size, self._budgets[lane])
 
         await self._acquire(lane, size)
-        self._queues[lane].append((text, size))
+        written: asyncio.Event | None = asyncio.Event() if lane is Lane.CONTROL else None
+        self._queues[lane].append((text, size, written))
         self._queued_bytes[lane] += size
+        if written is not None:
+            self._control_waiters.add(written)
         self._ensure_pump()
+        if written is None:
+            return
+        try:
+            await written.wait()
+        finally:
+            self._control_waiters.discard(written)
+
+    def close(self) -> None:
+        """Release everyone waiting for a control frame that will never be written."""
+        for event in list(self._control_waiters):
+            event.set()
+        self._control_waiters.clear()
+        for queue in self._queues.values():
+            queue.clear()
+        for lane in _PRIORITY:
+            self._queued_bytes[lane] = 0
+            self._space[lane].set()
 
     async def _acquire(self, lane: Lane, size: int) -> None:
         while self._queued_bytes[lane] + size > self._budgets[lane]:
@@ -157,12 +183,12 @@ class PrioritySendQueue:
         self._pumping = True
         asyncio.get_running_loop().create_task(self._pump())
 
-    def _next_frame(self) -> tuple[Lane, str, int] | None:
+    def _next_frame(self) -> tuple[Lane, str, int, asyncio.Event | None] | None:
         for lane in _PRIORITY:
             queue = self._queues[lane]
             if queue:
-                text, size = queue[0]
-                return lane, text, size
+                text, size, written = queue[0]
+                return lane, text, size, written
         return None
 
     async def _pump(self) -> None:
@@ -171,7 +197,7 @@ class PrioritySendQueue:
                 item = self._next_frame()
                 if item is None:
                     return
-                lane, text, size = item
+                lane, text, size, written = item
                 self._queues[lane].popleft()
                 # Release the slot before the write: the frame is already out of
                 # our hands, and holding the budget across a slow write would
@@ -179,12 +205,17 @@ class PrioritySendQueue:
                 self._queued_bytes[lane] = max(0, self._queued_bytes[lane] - size)
                 self._space[lane].set()
                 await self._sink(text)
+                if written is not None:
+                    written.set()
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("bridge send pump failed")
         finally:
             self._pumping = False
+            # A pump that died mid-flight must not strand a control sender.
+            for event in list(self._control_waiters):
+                event.set()
 
 
 class LaneBudgetExceeded(Exception):

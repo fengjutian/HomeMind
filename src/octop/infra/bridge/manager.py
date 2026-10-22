@@ -1546,7 +1546,15 @@ class BridgeManager:
             await sess.close()
 
     async def _finalize_inbound(self, connection_id: str, session: BridgeSession | None) -> None:
-        await self._unregister_session(connection_id, expected=session)
+        """Drop this socket only. A replacement for the same id must stay up."""
+        current = self._sessions.get(connection_id)
+        replaced = current is not None and session is not None and current is not session
+        if not replaced:
+            await self._unregister_session(connection_id, expected=session)
+        if replaced:
+            # A newer socket already took this id over: tearing the old one down
+            # must not mark the live link as disconnected.
+            return
         if session is not None and session.close_reason == "deleted":
             self._repo.delete(connection_id)
             return

@@ -136,6 +136,10 @@ async def cmd_delete(d: SlashDispatcher, cmd: SlashCommand, ctx: SlashCtx, sink:
     if active and target.thread_id == active:
         await sink.text(tr("delete.active", lang))
         return
+    hub = ctx.ws_hub
+    if hub is not None and hub.is_turn_active(target.thread_id):
+        await sink.text(error_message("THREAD_TURN_ACTIVE", lang))
+        return
     if ctx.agent_manager is None:
         await sink.text(tr("delete.failed", lang))
         return
