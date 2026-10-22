@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo, useState, useRef, useEffect } from "react";
+import type { DragEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { Dropdown } from "antd";
@@ -7,6 +8,7 @@ import {
   Eye,
   EyeOff,
   GitFork,
+  GripVertical,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -31,7 +33,11 @@ import RemoteExpertHint from "./RemoteExpertHint";
 import TeamChatBadge from "./TeamChatBadge";
 import { useExpertSessionCatalog } from "../hooks/useExpertSessionCatalog";
 import { usePinnedExperts } from "../hooks/usePinnedExperts";
-import { useSessionWorkIds } from "../hooks/useSessionWorkIds";
+import {
+  useExpertWorkStatuses,
+  useSessionWorkIds,
+  type ExpertWorkStatus,
+} from "../hooks/useSessionWorkIds";
 import { octopThreadsApi } from "../../../api/modules/octopThreads";
 import { formatThreadTitle } from "../utils/threadTitle";
 import {
@@ -39,6 +45,12 @@ import {
   matchesNavQuery,
 } from "../utils/navSessionSearch";
 import { sortExpertsByPin } from "../utils/pinnedExpertsPrefs";
+import {
+  mergeExpertOrder,
+  moveExpert,
+  readExpertOrder,
+  writeExpertOrder,
+} from "../utils/expertOrder";
 import {
   initialChatNavScope,
   matchesChatNavScope,
@@ -63,6 +75,30 @@ function AgentUnreadBadge({ count }: { count: number }) {
     >
       {count > 99 ? "99+" : count}
     </span>
+  );
+}
+
+function ExpertTaskIndicator({ status }: { status?: ExpertWorkStatus }) {
+  const { t } = useTranslation();
+  if (!status) return null;
+  const label =
+    status === "waiting"
+      ? t("chat.expertTaskWaiting", "任务需要确认")
+      : status === "interrupted"
+      ? t("chat.expertTaskInterrupted", "任务已中断")
+      : t("chat.expertTaskWorking", "任务正常运行");
+  return (
+    <span
+      className={`${styles.agentTaskPulse} ${
+        status === "waiting"
+          ? styles.agentTaskPulseWaiting
+          : status === "interrupted"
+          ? styles.agentTaskPulseInterrupted
+          : ""
+      }`}
+      aria-label={label}
+      title={label}
+    />
   );
 }
 
@@ -268,6 +304,8 @@ interface AgentCardProps {
   pinned?: boolean;
   onTogglePin?: () => void;
   liveWorkingIds: ReadonlySet<string>;
+  workStatus?: ExpertWorkStatus;
+  dragHandle?: ReactNode;
 }
 
 function ActiveAgentCard({
@@ -291,6 +329,8 @@ function ActiveAgentCard({
   pinned = false,
   onTogglePin,
   liveWorkingIds,
+  workStatus,
+  dragHandle,
 }: AgentCardProps) {
   const { t } = useTranslation();
   const accent = agent.color || "#6366f1";
@@ -341,11 +381,13 @@ function ActiveAgentCard({
         </div>
         <div className={styles.agentCardInfo}>
           <div className={styles.agentCardNameRow}>
+            {dragHandle}
             <div className={styles.agentNameCluster}>
               <ExpertNameLabel
                 name={agent.name}
                 className={styles.agentCardName}
               />
+              <ExpertTaskIndicator status={workStatus} />
               <TeamChatBadge agent={agent} />
               <SharedExpertHint agent={agent} />
               <RemoteExpertHint agent={agent} />
@@ -445,6 +487,8 @@ interface AgentRowProps {
   onUnhide?: () => void;
   pinned?: boolean;
   onTogglePin?: () => void;
+  workStatus?: ExpertWorkStatus;
+  dragHandle?: ReactNode;
 }
 
 function InactiveAgentRow({
@@ -455,6 +499,8 @@ function InactiveAgentRow({
   onUnhide,
   pinned = false,
   onTogglePin,
+  workStatus,
+  dragHandle,
 }: AgentRowProps) {
   const { t } = useTranslation();
   const accent = agent.color || "#6366f1";
@@ -485,11 +531,13 @@ function InactiveAgentRow({
         </div>
         <div className={styles.agentRowInfo}>
           <div className={styles.agentRowNameRow}>
+            {dragHandle}
             <div className={styles.agentNameCluster}>
               <ExpertNameLabel
                 name={agent.name}
                 className={styles.agentRowName}
               />
+              <ExpertTaskIndicator status={workStatus} />
               <TeamChatBadge agent={agent} />
               <SharedExpertHint agent={agent} />
               <RemoteExpertHint agent={agent} />
@@ -578,8 +626,14 @@ export default function SessionList({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const liveWorkingIds = useSessionWorkIds();
+  const expertWorkStatuses = useExpertWorkStatuses(activeAgentId, sessions);
   const [searchQuery, setSearchQuery] = useState("");
   const [showingHidden, setShowingHidden] = useState(false);
+  const [expertOrder, setExpertOrder] = useState<string[]>(() =>
+    readExpertOrder(window.localStorage),
+  );
+  const [draggedAgentId, setDraggedAgentId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [navScope, setNavScope] = useState<ChatNavScope>(() =>
     initialChatNavScope(
       agents.find((agent) => agent.agent_id === activeAgentId),
@@ -601,10 +655,61 @@ export default function SessionList({
     const visible = filterVisible(agents, {
       keepAgentIds: activeAgentId ? [activeAgentId] : [],
     });
-    return sortExpertsByPin(visible, pinnedIds).filter((agent) =>
+    const scoped = sortExpertsByPin(visible, pinnedIds).filter((agent) =>
       matchesChatNavScope(agent, navScope),
     );
-  }, [agents, filterVisible, activeAgentId, pinnedIds, navScope]);
+    const order = mergeExpertOrder(
+      expertOrder,
+      scoped.map((agent) => agent.agent_id),
+    );
+    const index = new Map(order.map((id, position) => [id, position]));
+    return [...scoped].sort(
+      (a, b) =>
+        (index.get(a.agent_id) ?? Number.MAX_SAFE_INTEGER) -
+        (index.get(b.agent_id) ?? Number.MAX_SAFE_INTEGER),
+    );
+  }, [agents, filterVisible, activeAgentId, pinnedIds, navScope, expertOrder]);
+
+  const handleDrop = useCallback(
+    (targetId: string) => {
+      if (!draggedAgentId) return;
+      const current = mergeExpertOrder(
+        expertOrder,
+        sortedAgents.map((agent) => agent.agent_id),
+      );
+      const next = moveExpert(current, draggedAgentId, targetId);
+      setExpertOrder(next);
+      writeExpertOrder(window.localStorage, next);
+      setDraggedAgentId(null);
+      setDropTargetId(null);
+    },
+    [draggedAgentId, expertOrder, sortedAgents],
+  );
+
+  const dragHandle = useCallback(
+    (agentId: string) => (
+      <span
+        className={styles.agentDragHandle}
+        draggable
+        role="button"
+        tabIndex={0}
+        aria-label={t("chat.reorderExpert", "拖拽排序专家")}
+        title={t("chat.reorderExpert", "拖拽排序专家")}
+        onDragStart={(event: DragEvent<HTMLSpanElement>) => {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", agentId);
+          setDraggedAgentId(agentId);
+        }}
+        onDragEnd={() => {
+          setDraggedAgentId(null);
+          setDropTargetId(null);
+        }}
+      >
+        <GripVertical size={13} aria-hidden />
+      </span>
+    ),
+    [t],
+  );
 
   // Leave the hidden-only view once nothing remains hidden.
   const viewingHidden = showingHidden && hiddenAgents.length > 0;
@@ -775,53 +880,50 @@ export default function SessionList({
               const expanded = searching
                 ? hits.length > 0
                 : agent.agent_id === expandedAgentId;
-              if (expanded) {
-                return (
-                  <ActiveAgentCard
-                    key={agent.agent_id}
-                    agent={agent}
-                    sessions={isActive ? sessions : hits}
-                    activeId={activeId}
-                    searchQuery={isActive ? searchQuery : ""}
-                    hasMore={isActive ? hasMore : false}
-                    loadingMore={isActive ? loadingMore : false}
-                    onLoadMore={isActive ? onLoadMore : () => undefined}
-                    onFetchAllSessions={
-                      isActive ? onFetchAllSessions : () => undefined
-                    }
-                    onSelect={onSelect}
-                    onNewChat={onNewChat}
-                    onDelete={
-                      isActive
-                        ? onDelete
-                        : (id, compact) =>
-                            deleteOther(agent.agent_id, id, compact)
-                    }
-                    onRename={
-                      isActive
-                        ? onRename
-                        : (id, name) => renameOther(agent.agent_id, id, name)
-                    }
-                    onPin={
-                      isActive
-                        ? onPin
-                        : (id, pinned) => pinOther(agent.agent_id, id, pinned)
-                    }
-                    onFork={onFork}
-                    activeForkDisabled={activeForkDisabled}
-                    activeForkDisabledHint={activeForkDisabledHint}
-                    onHide={
-                      canHide(agent) ? () => hide(agent.agent_id) : undefined
-                    }
-                    pinned={isPinned(agent.agent_id)}
-                    onTogglePin={() => togglePin(agent.agent_id)}
-                    liveWorkingIds={liveWorkingIds}
-                  />
-                );
-              }
-              return (
+              const content = expanded ? (
+                <ActiveAgentCard
+                  agent={agent}
+                  sessions={isActive ? sessions : hits}
+                  activeId={activeId}
+                  searchQuery={isActive ? searchQuery : ""}
+                  hasMore={isActive ? hasMore : false}
+                  loadingMore={isActive ? loadingMore : false}
+                  onLoadMore={isActive ? onLoadMore : () => undefined}
+                  onFetchAllSessions={
+                    isActive ? onFetchAllSessions : () => undefined
+                  }
+                  onSelect={onSelect}
+                  onNewChat={onNewChat}
+                  onDelete={
+                    isActive
+                      ? onDelete
+                      : (id, compact) =>
+                          deleteOther(agent.agent_id, id, compact)
+                  }
+                  onRename={
+                    isActive
+                      ? onRename
+                      : (id, name) => renameOther(agent.agent_id, id, name)
+                  }
+                  onPin={
+                    isActive
+                      ? onPin
+                      : (id, pinned) => pinOther(agent.agent_id, id, pinned)
+                  }
+                  onFork={onFork}
+                  activeForkDisabled={activeForkDisabled}
+                  activeForkDisabledHint={activeForkDisabledHint}
+                  onHide={
+                    canHide(agent) ? () => hide(agent.agent_id) : undefined
+                  }
+                  pinned={isPinned(agent.agent_id)}
+                  onTogglePin={() => togglePin(agent.agent_id)}
+                  liveWorkingIds={liveWorkingIds}
+                  workStatus={expertWorkStatuses.get(agent.agent_id)}
+                  dragHandle={dragHandle(agent.agent_id)}
+                />
+              ) : (
                 <InactiveAgentRow
-                  key={agent.agent_id}
                   agent={agent}
                   onSelect={() => onAgentSelect(agent.agent_id)}
                   onNewChat={() => onNewChat(agent.agent_id)}
@@ -830,7 +932,45 @@ export default function SessionList({
                   }
                   pinned={isPinned(agent.agent_id)}
                   onTogglePin={() => togglePin(agent.agent_id)}
+                  workStatus={expertWorkStatuses.get(agent.agent_id)}
+                  dragHandle={dragHandle(agent.agent_id)}
                 />
+              );
+              return (
+                <div
+                  key={agent.agent_id}
+                  className={`${styles.draggableAgentItem} ${
+                    draggedAgentId === agent.agent_id
+                      ? styles.draggableAgentItemDragging
+                      : ""
+                  } ${
+                    dropTargetId === agent.agent_id
+                      ? styles.draggableAgentItemTarget
+                      : ""
+                  }`}
+                  onDragOver={(event) => {
+                    if (!draggedAgentId || draggedAgentId === agent.agent_id)
+                      return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setDropTargetId(agent.agent_id);
+                  }}
+                  onDragLeave={(event) => {
+                    if (
+                      !event.currentTarget.contains(event.relatedTarget as Node)
+                    ) {
+                      setDropTargetId((current) =>
+                        current === agent.agent_id ? null : current,
+                      );
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    handleDrop(agent.agent_id);
+                  }}
+                >
+                  {content}
+                </div>
               );
             })
           )}

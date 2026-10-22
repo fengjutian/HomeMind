@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, vi } from "vitest";
@@ -70,6 +70,7 @@ function renderList() {
 
 describe("MinimalAgentSessionNav nav scopes", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.spyOn(octopThreadsApi, "list").mockResolvedValue([]);
   });
 
@@ -178,5 +179,68 @@ describe("SessionList nav scopes", () => {
     await user.click(screen.getByRole("tab", { name: "团队" }));
     await user.click(screen.getByRole("button", { name: "创建第一个团队" }));
     expect(screen.getByText("/experts?tab=teams")).toBeInTheDocument();
+  });
+
+  it("persists expert order after dragging a handle onto another expert", async () => {
+    renderList();
+    const handles = screen.getAllByRole("button", {
+      name: /chat\.reorderExpert|Drag to reorder expert|拖拽排序专家/,
+    });
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      setData: vi.fn(),
+    };
+
+    fireEvent.dragStart(handles[1], { dataTransfer });
+    const target = handles[0].closest('[class*="draggableAgentItem"]');
+    expect(target).not.toBeNull();
+    fireEvent.dragOver(target as Element, { dataTransfer });
+    fireEvent.drop(target as Element, { dataTransfer });
+
+    await waitFor(() =>
+      expect(localStorage.getItem("octop:chat-expert-order")).toContain(
+        "bridge:c1:expert",
+      ),
+    );
+  });
+
+  it("shows a breathing status indicator for an expert with active work", async () => {
+    render(
+      <MemoryRouter>
+        <SessionList
+          agents={[agent({ agent_id: "local-expert", name: "Active expert" })]}
+          sessions={[
+            {
+              id: "thread-1",
+              threadId: "thread-1",
+              name: "Running task",
+              updatedAt: null,
+              channelType: "dashboard",
+              turnActive: true,
+            },
+          ]}
+          activeId="thread-1"
+          activeAgentId="local-expert"
+          hasMore={false}
+          loadingMore={false}
+          onLoadMore={() => undefined}
+          onFetchAllSessions={() => undefined}
+          onSelect={() => undefined}
+          onAgentSelect={() => undefined}
+          onNewChat={() => undefined}
+          onDelete={() => undefined}
+          onRename={() => undefined}
+          onPin={() => undefined}
+          onFork={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByLabelText(
+        /chat\.expertTaskWorking|Task is running normally|任务正常运行/,
+      ),
+    ).toBeInTheDocument();
   });
 });
