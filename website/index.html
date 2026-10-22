@@ -15,6 +15,7 @@
     <meta name="author" content="HomeMind Contributors" />
     <meta name="theme-color" content="#f8f5ee" />
     <link rel="canonical" href="https://home-mind.netlify.app/" />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="HomeMind for language models" />
     <meta property="og:title" content="HomeMind — 懂每一位家人的 AI" />
     <meta
       property="og:description"
@@ -41,17 +42,78 @@
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "HomeMind",
-        "url": "https://home-mind.netlify.app/",
-        "description": "运行在自有设备上的开源、自托管家庭 AI 助手，支持家庭记忆、多 Agent 协作、自动化与智能家居连接。",
-        "applicationCategory": "LifestyleApplication",
-        "operatingSystem": "Windows, macOS, Linux, Docker",
-        "isAccessibleForFree": true,
-        "license": "https://opensource.org/license/mit",
-        "codeRepository": "https://github.com/fengjutian/HomeMind",
-        "sameAs": ["https://github.com/fengjutian/HomeMind"],
-        "inLanguage": ["zh-CN", "en"]
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://home-mind.netlify.app/#organization",
+            "name": "HomeMind Contributors",
+            "url": "https://home-mind.netlify.app/",
+            "sameAs": ["https://github.com/fengjutian/HomeMind"]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://home-mind.netlify.app/#website",
+            "name": "HomeMind",
+            "url": "https://home-mind.netlify.app/",
+            "description": "HomeMind 开源家庭 AI 助手官方网站",
+            "inLanguage": ["zh-CN", "en"],
+            "publisher": { "@id": "https://home-mind.netlify.app/#organization" }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://home-mind.netlify.app/#software",
+            "name": "HomeMind",
+            "url": "https://home-mind.netlify.app/",
+            "description": "运行在自有设备上的开源、自托管家庭 AI 助手，支持家庭记忆、多 Agent 协作、自动化与智能家居连接。",
+            "applicationCategory": "LifestyleApplication",
+            "operatingSystem": "Windows, macOS, Linux, Docker",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "license": "https://opensource.org/license/mit",
+            "codeRepository": "https://github.com/fengjutian/HomeMind",
+            "publisher": { "@id": "https://home-mind.netlify.app/#organization" },
+            "sameAs": ["https://github.com/fengjutian/HomeMind"],
+            "inLanguage": ["zh-CN", "en"]
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://home-mind.netlify.app/#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "HomeMind 需要购买专用硬件吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不需要。HomeMind 可以部署在 Windows、macOS 或 Linux 设备上，也可以使用桌面客户端。具体资源需求取决于所选模型和功能。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "HomeMind 一定要在本地运行大模型吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "不一定。HomeMind 支持接入主流 LLM 服务，也可以连接本地 Ollama，可按隐私、效果和成本选择组合。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "家人之间的内容会互相看到吗？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "每位成员拥有独立账号、助手和权限边界；需要共同使用的知识与能力可以在实例内按规则共享。"
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "HomeMind 可以连接哪些设备和服务？",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "HomeMind 可通过 Home Assistant 连接智能家居，通过 Connector、插件和 MCP 扩展外部服务，并支持网页、桌面端、CLI 和消息平台。"
+                }
+              }
+            ]
+          }
+        ]
       }
     </script>
     <link rel="stylesheet" href="/styles.css?v=20261012" />

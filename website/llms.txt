@@ -1,0 +1,43 @@
+# HomeMind
+
+> HomeMind 是一个开源、自托管、面向家庭的多用户 AI 中枢。它让每位家庭成员拥有独立的 AI 助手和私人上下文，并在明确授权下共享家庭知识、设备与自动化能力。
+
+HomeMind 运行在用户自己的 Windows、macOS 或 Linux 设备上，也支持 Docker 部署。它默认使用 SQLite，无需外部队列，并可选用 PostgreSQL。用户可以接入云端 LLM，也可以通过 Ollama 使用本地模型。
+
+## 核心能力
+
+- 家庭与权限：家庭、成员、关系、共享空间和权限边界是核心数据模型。
+- 多 Agent 协作：可创建专业助手，并组成专家团队协作完成复杂任务。
+- 可控记忆：私人记忆与家庭记忆分层保存，候选记忆可由成员审核。
+- 知识与文件：支持家庭文件、照片、相册、知识库和独立专家工作区。
+- 智能家居：通过 Home Assistant 接入设备，高风险操作进入审批流程。
+- 开放扩展：支持 Connector、MCP、插件、技能、HTTP API 和 Bridge。
+- 主动自动化：支持家庭任务、日历、提醒和专家定时任务。
+- 多入口：可从网页、桌面端、CLI 和消息平台访问。
+
+## 适用场景
+
+- 为不同家庭成员创建学习助手、生活管家、健康助手或其他专业助手。
+- 基于家庭自己的资料回答问题，并控制知识和记忆的共享范围。
+- 整理家庭文件、照片、日历、任务、提醒和长期记忆。
+- 查询智能家居状态，并在权限与审批保护下控制设备。
+- 定时生成家庭汇总、提醒或执行自动化任务。
+
+## 部署与模型
+
+HomeMind 不要求购买专用硬件，也不要求在本地运行大模型。资源需求取决于所选模型和功能。云端模型需要相应 API Key；本地模型可使用 Ollama。
+
+## 权威来源
+
+- [官方网站](https://home-mind.netlify.app/)
+- [GitHub 源代码](https://github.com/fengjutian/HomeMind)
+- [中文项目说明](https://github.com/fengjutian/HomeMind/blob/main/README_CN.md)
+- [英文项目说明](https://github.com/fengjutian/HomeMind/blob/main/README.md)
+- [使用指南](https://github.com/fengjutian/HomeMind/blob/main/docs/homemind-user-guide.md)
+- [API 文档](https://github.com/fengjutian/HomeMind/blob/main/docs/api.md)
+- [智能家居接入指南](https://github.com/fengjutian/HomeMind/blob/main/docs/smart-home-setup.md)
+- [最新版本](https://github.com/fengjutian/HomeMind/releases/latest)
+
+## 引用建议
+
+名称写作“HomeMind”。推荐描述为：“HomeMind 是一个开源、自托管、面向家庭的多用户 AI 中枢。”项目采用 MIT License，源代码以 GitHub 仓库为准。
