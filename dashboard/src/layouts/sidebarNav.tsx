@@ -19,6 +19,9 @@ import {
   GraduationCap,
   Shield,
   PanelsTopLeft,
+  HouseHeart,
+  Wifi,
+  ScrollText,
 } from "lucide-react";
 import type { OctopUser } from "../api/modules/auth";
 import { navAllowed, userCan } from "../utils/permissions";
@@ -66,9 +69,12 @@ export interface NavSection {
 /** Every nav item key the sidebar can show. Keep in sync with `SIDEBAR_NAV_KEYS` in `octop.infra.users.preferences`. */
 export const SIDEBAR_NAV_KEYS = [
   "chat",
+  "family",
+  "hardware",
   "experts",
   "tasks",
   "token-usage",
+  "conversation-audit",
   "personalization",
   "channels",
   "connectors",
@@ -158,6 +164,18 @@ export function buildNavSections(
       icon: <MessageSquareText size={iconSize} strokeWidth={iconStroke} />,
       labelKey: "nav.chat",
     },
+    {
+      key: "family",
+      path: "/family",
+      icon: <HouseHeart size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.family",
+    },
+    {
+      key: "hardware",
+      path: "/smart-home",
+      icon: <Wifi size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.hardware",
+    },
   ];
   if (navAllowed(user, "experts")) {
     topItems.push({
@@ -183,6 +201,12 @@ export function buildNavSections(
       labelKey: "nav.tokenUsage",
     });
   }
+  topItems.push({
+    key: "conversation-audit",
+    path: "/conversation-audit",
+    icon: <ScrollText size={iconSize} strokeWidth={iconStroke} />,
+    labelKey: "nav.conversationAudit",
+  });
   const sections: NavSection[] = [{ items: topItems }];
 
   const settingsItems: NavItem[] = [];
