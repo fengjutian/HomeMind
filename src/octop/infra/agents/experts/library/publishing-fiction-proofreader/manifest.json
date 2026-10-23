@@ -5,8 +5,8 @@
     "en": "Fiction Proofreading Expert"
   },
   "description": {
-    "zh": "面向出版小说的分层校阅专家，审查错别字、标点与格式、语言表述、人物和情节逻辑、时间线及设定连续性，并提供可追溯的最小修改建议。",
-    "en": "A layered proofreading expert for publication-ready fiction, auditing typos, punctuation, formatting, prose, character and plot logic, timelines, and continuity with traceable minimal edits."
+    "zh": "面向出版小说的分层校阅专家，审查文字、语言、情节逻辑与连续性，评估 AI 腔和原创性风险，并对疑似雷同或复制内容提供可核验的文本对照。",
+    "en": "A layered fiction editor that audits mechanics, prose, plot logic, and continuity, assesses AI-like prose and originality risks, and provides verifiable comparisons for suspected overlap or copying."
   },
   "welcome_message": {
     "zh": "请提供小说文本和必要设定；我会先说明校阅范围，再按严重程度列出错别字、表达与逻辑问题",
@@ -21,7 +21,7 @@
     {
       "title": {"zh": "执行出版级校阅", "en": "Run a publication audit"},
       "description": {"zh": "综合检查文字、表达和故事逻辑", "en": "Audit language, mechanics, and story logic"},
-      "prompt": {"zh": "请对以下小说文本执行出版级校阅。分别检查错别字与标点、语言表述、人物行为、情节因果、时间线和设定连续性。逐条引用定位，标注严重程度，解释依据并给出最小修改建议；不要无依据改写作者风格：\n\n", "en": "Perform a publication-level review of the fiction below. Separately check typos and punctuation, prose, character behavior, plot causality, timeline, and canon continuity. Quote enough text to locate each issue, assign severity, explain the basis, and suggest the smallest fix without rewriting the author's voice without cause:\n\n"},
+      "prompt": {"zh": "请对以下小说文本执行出版级综合校阅。分别检查错别字与标点、语言表述、AI 腔风险、人物行为、情节因果、时间线、设定连续性和原创性风险。逐条引用定位，标注严重程度与证据等级，解释依据并给出最小修改建议。不得仅凭文风断言由 AI 创作；如怀疑雷同或复制，必须区分类型套路、情节相似、近似改写和逐字复制，并提供可核验来源：\n\n", "en": "Perform a publication-level review of the fiction below. Separately check mechanics, prose, AI-like writing signals, character behavior, plot causality, timeline, canon continuity, and originality risks. Locate each finding, assign severity and evidence strength, explain the basis, and suggest the smallest fix. Never infer AI authorship from style alone. For suspected overlap, distinguish genre convention, plot similarity, close paraphrase, and verbatim copying, and provide a verifiable source:\n\n"},
       "color": "#EDE9FE",
       "icon_name": "file-text"
     },
@@ -34,8 +34,8 @@
     },
     {
       "title": {"zh": "审校语言表述", "en": "Edit the prose"},
-      "description": {"zh": "诊断病句、歧义、重复与语体偏差", "en": "Find ambiguity, repetition, and register issues"},
-      "prompt": {"zh": "请审校以下小说的语言表述，重点检查病句、搭配不当、指代不清、语义重复、视角漂移、语体不一致和对话失真。保留人物声音与叙事节奏，每项给出必要性、最小修改和可选润色：\n\n", "en": "Edit the prose below for faulty syntax, poor collocation, unclear reference, semantic repetition, point-of-view drift, register inconsistency, and inauthentic dialogue. Preserve character voice and narrative rhythm; give the necessity, minimal fix, and optional polish for each finding:\n\n"},
+      "description": {"zh": "诊断语言问题及模板化 AI 腔风险", "en": "Find prose issues and formulaic AI-like signals"},
+      "prompt": {"zh": "请审校以下小说的语言表述，并评估是否存在明显的模板化 AI 腔。检查病句、指代、重复、视角漂移、语体与对话，同时观察空泛总结、均质句式、过度排比、机械转折、解释过量和人物声音趋同。只评价文本特征，不推断作者身份或断言使用了 AI；逐项给出证据、可信度和保留作者声音的修改建议：\n\n", "en": "Edit the prose below and assess conspicuous formulaic AI-like qualities. Check syntax, reference, repetition, viewpoint, register, and dialogue, while looking for vague summaries, uniform sentence patterns, excessive parallelism, mechanical transitions, over-explanation, and converging character voices. Evaluate only textual features—do not infer author identity or assert AI use. Give evidence, confidence, and a voice-preserving revision for each finding:\n\n"},
       "color": "#DCFCE7",
       "icon_name": "pen-tool"
     },
@@ -54,11 +54,11 @@
       "icon_name": "activity"
     },
     {
-      "title": {"zh": "复核修订稿", "en": "Verify a revision"},
-      "description": {"zh": "确认问题已修复且未引入新错误", "en": "Confirm fixes without new regressions"},
-      "prompt": {"zh": "请复核以下修订前后文本。逐项判断原问题是否解决，检查修改是否引入新的语病、事实冲突、人物失真或连续性问题；只报告仍需处理的项目，并说明通过项数量：\n\n", "en": "Verify the before-and-after revision below. Determine whether each original issue is resolved and whether the edit introduced new prose, factual, characterization, or continuity problems. Report only remaining actions and provide a count of passed items:\n\n"},
+      "title": {"zh": "筛查雷同与复制", "en": "Screen for textual overlap"},
+      "description": {"zh": "区分类型套路、情节雷同与文本复制", "en": "Separate tropes, plot similarity, and copying"},
+      "prompt": {"zh": "请对以下小说执行原创性风险筛查。检查是否存在与已知作品高度雷同的角色组合、情节链、关键场景、独特设定、表达顺序或连续文本。区分公共母题、类型套路、一般相似、实质性情节雷同、近似改写和逐字复制。每项必须列出本稿片段、候选来源、来源定位、相似点、关键差异和证据强度；无法检索或没有可靠来源时明确说明，不得凭印象指控抄袭：\n\n", "en": "Screen the following fiction for originality risks. Look for unusually similar character combinations, event sequences, signature scenes, distinctive premises, expression order, or continuous wording. Distinguish common motifs, genre conventions, general similarity, substantial plot overlap, close paraphrase, and verbatim copying. For every finding, show the manuscript passage, candidate source and location, similarities, material differences, and evidence strength. State clearly when search or reliable sources are unavailable; never allege plagiarism from impression alone:\n\n"},
       "color": "#CCFBF1",
-      "icon_name": "refresh-cw"
+      "icon_name": "fingerprint"
     }
   ],
   "task_examples": {
@@ -68,7 +68,7 @@
       "每周三「19:30」核对新增章节的人物动机与信息边界",
       "每周五「20:00」审计全稿时间线、地点和物品连续性",
       "每周日「16:00」复核本周修订项是否关闭且未引入新错误",
-      "每月 1 日「10:00」生成出版校阅问题统计与优先修订清单"
+      "每月 1 日「10:00」汇总 AI 腔与原创性风险，并生成优先修订清单"
     ],
     "en": [
       "Every day at 20:00, proofread the day's new chapter for typos, punctuation, and faulty sentences",
@@ -76,7 +76,7 @@
       "Every Wednesday at 19:30, check character motivation and knowledge boundaries in new chapters",
       "Every Friday at 20:00, audit the manuscript timeline, locations, and object continuity",
       "Every Sunday at 16:00, verify that this week's revisions are resolved without new errors",
-      "On the 1st of every month at 10:00, produce proofreading metrics and a prioritized revision list"
+      "On the 1st of every month at 10:00, summarize AI-like prose and originality risks and produce a prioritized revision list"
     ]
   }
 }

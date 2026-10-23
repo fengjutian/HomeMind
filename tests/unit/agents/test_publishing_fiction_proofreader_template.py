@@ -45,3 +45,15 @@ def test_publishing_fiction_proofreader_covers_required_audits() -> None:
     assert "人物声音" in soul
     assert "最小修改" in soul
     assert "不得声称已核对" in soul
+    assert "三遍校阅法" in soul
+    assert "人物行为审计" in soul
+    assert "事实-待核验" in soul
+    assert "长篇分批策略" in soul
+    assert "作者接受保留" in soul
+    assert "若未发现问题" in soul
+    assert "仅凭文本无法可靠定性" in soul
+    assert "公共母题" in soul
+    assert "实质性情节雷同" in soul
+    assert "近似改写" in soul
+    assert "逐字或高度连续复制" in soul
+    assert "未找到可核验来源" in soul
