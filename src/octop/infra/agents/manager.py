@@ -4287,6 +4287,9 @@ class AgentManager:
         from octop.infra.agents.middleware.reasoning import ReasoningRequestMiddleware
         from octop.infra.agents.middleware.thread_artifacts import ThreadArtifactsMiddleware
         from octop.infra.agents.middleware.token_quota import TokenQuotaMiddleware
+        from octop.infra.agents.middleware.tool_name_compat import (
+            ToolNameCompatibilityMiddleware,
+        )
         from octop.infra.agents.middleware.workspace_audit import WorkspaceAuditMiddleware
         from octop.infra.agents.middleware.workspace_image import (
             WorkspaceImageMaterializeMiddleware,
@@ -4308,6 +4311,7 @@ class AgentManager:
                 usage_repo=self._repos.usage_repo,
             ),
             ReasoningRequestMiddleware(),
+            ToolNameCompatibilityMiddleware(),
             KnowledgeSearchHintMiddleware(),
             BrowserProfileMiddleware(),
             BinaryReadGuardMiddleware(),
