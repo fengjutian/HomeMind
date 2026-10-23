@@ -2591,6 +2591,11 @@ class AgentManager:
         if is_team_agent(self.get_row(agent_id)):
             return []
         agent = self.get_agent(agent_id)
+        # Some OpenAI-compatible providers (including DeepSeek) reject the
+        # entire request when any function name falls outside
+        # ``^[a-zA-Z0-9_-]+$``.  Re-check already-bound tools here because
+        # connectors can be attached to a running agent after startup.
+        _sanitize_bound_mcp_tools(agent)
         row = self.get_row(agent_id)
         uid = self._connector_uid_for(row, connector_user_id=connector_user_id) if row else None
         if uid is None and connector_user_id is not None:
@@ -2742,6 +2747,7 @@ class AgentManager:
                     tool_set = getattr(agent, "_mcp_tool_name_set", frozenset())
 
         agent = self.get_agent(agent_id)
+        _sanitize_bound_mcp_tools(agent)
         tool_set = getattr(agent, "_mcp_tool_name_set", frozenset())
         still_missing = sorted(n for n in names if not any(t.startswith(f"{n}_") for t in tool_set))
         if still_missing:
@@ -4328,6 +4334,11 @@ class AgentManager:
         merged_tools.extend(plugin_tools)
         if self._extra_tools_factory is not None and not team_host:
             merged_tools.extend(self._extra_tools_factory())
+        # Sanitize the complete pre-bind tool set, not only plugin tools.
+        # HomeMind extensions can contribute tools through ``_extra_tools_factory``;
+        # doing this before HarnessAgent construction keeps model schemas and
+        # ToolNode routing on the same final names.
+        sanitize_plugin_tool_names(merged_tools)
         # agent_list / ask_agent: PeerAgentMiddleware (team_enabled=True), not config.tools.
 
         acp_section = cfg.get("acp")

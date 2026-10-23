@@ -250,6 +250,41 @@ async def test_prepare_chat_mcp_attaches_gateway_tools_without_reload() -> None:
     mgr._connector_svc.ensure_fresh_credentials.assert_awaited_once_with(instance_id, "qq-mail")
 
 
+@pytest.mark.asyncio
+async def test_prepare_chat_mcp_sanitizes_tools_already_bound_to_running_agent() -> None:
+    """Strict providers must not receive stale dotted or non-ASCII tool names."""
+    from octop.infra.agents.manager import AgentManager
+
+    tool = MagicMock()
+    tool.name = "novel.audit"
+    tool.description = "audit a manuscript"
+
+    agent = MagicMock()
+    agent._mcp_tools = [tool]
+    agent._mcp_tool_name_set = frozenset({"novel.audit"})
+    agent.config.mcp_server_configs = {"novel": {}}
+
+    def _replace(tools: list[Any]) -> None:
+        agent._mcp_tools = tools
+        agent._mcp_tool_name_set = frozenset(str(getattr(item, "name", "")) for item in tools)
+
+    agent.replace_mcp_tools = MagicMock(side_effect=_replace)
+
+    mgr = object.__new__(AgentManager)
+    mgr.get_agent = MagicMock(return_value=agent)
+    mgr.get_row = MagicMock(return_value=MagicMock())
+    mgr._connector_uid_for = MagicMock(return_value=None)
+    mgr.reload_connectors = AsyncMock()
+
+    failed = await mgr.prepare_chat_mcp("A1", ["novel"])
+
+    assert failed == []
+    assert agent._mcp_tool_name_set == frozenset({"novel_audit"})
+    assert tool.description.startswith("[原名: novel.audit]")
+    agent.replace_mcp_tools.assert_called_once()
+    mgr.reload_connectors.assert_not_awaited()
+
+
 def test_wrap_tools_for_shared_use() -> None:
     lock = asyncio.Lock()
     inner = MagicMock()
