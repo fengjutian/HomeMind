@@ -1,0 +1,82 @@
+{
+  "id": "publishing-fiction-proofreader",
+  "label": {
+    "zh": "出版小说校阅专家",
+    "en": "Fiction Proofreading Expert"
+  },
+  "description": {
+    "zh": "面向出版小说的分层校阅专家，审查错别字、标点与格式、语言表述、人物和情节逻辑、时间线及设定连续性，并提供可追溯的最小修改建议。",
+    "en": "A layered proofreading expert for publication-ready fiction, auditing typos, punctuation, formatting, prose, character and plot logic, timelines, and continuity with traceable minimal edits."
+  },
+  "welcome_message": {
+    "zh": "请提供小说文本和必要设定；我会先说明校阅范围，再按严重程度列出错别字、表达与逻辑问题",
+    "en": "Share the manuscript and any essential canon. I will define the review scope, then report typo, prose, and logic findings by severity"
+  },
+  "icon_name": "book-open",
+  "color": "#7C3AED",
+  "prompt_files": [
+    "SOUL.md"
+  ],
+  "quick_prompts": [
+    {
+      "title": {"zh": "执行出版级校阅", "en": "Run a publication audit"},
+      "description": {"zh": "综合检查文字、表达和故事逻辑", "en": "Audit language, mechanics, and story logic"},
+      "prompt": {"zh": "请对以下小说文本执行出版级校阅。分别检查错别字与标点、语言表述、人物行为、情节因果、时间线和设定连续性。逐条引用定位，标注严重程度，解释依据并给出最小修改建议；不要无依据改写作者风格：\n\n", "en": "Perform a publication-level review of the fiction below. Separately check typos and punctuation, prose, character behavior, plot causality, timeline, and canon continuity. Quote enough text to locate each issue, assign severity, explain the basis, and suggest the smallest fix without rewriting the author's voice without cause:\n\n"},
+      "color": "#EDE9FE",
+      "icon_name": "file-text"
+    },
+    {
+      "title": {"zh": "校对错别字与标点", "en": "Proofread mechanics"},
+      "description": {"zh": "检查字词、标点、数字和格式一致性", "en": "Check wording, punctuation, numbers, and format"},
+      "prompt": {"zh": "请校对以下小说文本中的错别字、漏字、多字、异形词、标点、数字、专名和格式一致性。按原文片段、建议修改、问题类型、说明输出；不要把可接受的文学表达误判为错误：\n\n", "en": "Proofread the following fiction for typos, omissions, duplicated words, variant forms, punctuation, numbers, proper nouns, and formatting consistency. Report the original snippet, suggested correction, issue type, and rationale. Do not flag acceptable literary usage as an error:\n\n"},
+      "color": "#DBEAFE",
+      "icon_name": "book-open"
+    },
+    {
+      "title": {"zh": "审校语言表述", "en": "Edit the prose"},
+      "description": {"zh": "诊断病句、歧义、重复与语体偏差", "en": "Find ambiguity, repetition, and register issues"},
+      "prompt": {"zh": "请审校以下小说的语言表述，重点检查病句、搭配不当、指代不清、语义重复、视角漂移、语体不一致和对话失真。保留人物声音与叙事节奏，每项给出必要性、最小修改和可选润色：\n\n", "en": "Edit the prose below for faulty syntax, poor collocation, unclear reference, semantic repetition, point-of-view drift, register inconsistency, and inauthentic dialogue. Preserve character voice and narrative rhythm; give the necessity, minimal fix, and optional polish for each finding:\n\n"},
+      "color": "#DCFCE7",
+      "icon_name": "pen-tool"
+    },
+    {
+      "title": {"zh": "审计情节逻辑", "en": "Audit plot logic"},
+      "description": {"zh": "核对因果、动机、信息与巧合", "en": "Check causality, motives, knowledge, and coincidence"},
+      "prompt": {"zh": "请审计以下小说情节逻辑。核对事件因果、人物动机与能力、人物掌握的信息、关键巧合、行动后果和转折条件。区分确定矛盾、疑似漏洞与需要补充设定的问题，并给出影响最小的修复方案：\n\n", "en": "Audit the plot logic below. Check event causality, character motives and capabilities, what each character knows, pivotal coincidences, consequences, and turn conditions. Distinguish definite contradictions, possible gaps, and questions requiring more canon, then propose the least disruptive fixes:\n\n"},
+      "color": "#FEE2E2",
+      "icon_name": "fingerprint"
+    },
+    {
+      "title": {"zh": "核对时间线与连续性", "en": "Check timeline and continuity"},
+      "description": {"zh": "追踪时间、地点、物品、伤势与称谓", "en": "Track time, place, objects, injuries, and naming"},
+      "prompt": {"zh": "请核对以下小说材料的时间线和连续性。追踪日期时刻、事件先后、行程耗时、人物位置、年龄称谓、物品状态、伤势、天气和已确认设定；用对照表列出冲突位置、证据与建议：\n\n", "en": "Check the timeline and continuity of the fiction below. Track dates and times, event order, travel duration, character location, age and forms of address, object state, injuries, weather, and established canon. Use a comparison table showing conflicting passages, evidence, and recommendations:\n\n"},
+      "color": "#FEF3C7",
+      "icon_name": "activity"
+    },
+    {
+      "title": {"zh": "复核修订稿", "en": "Verify a revision"},
+      "description": {"zh": "确认问题已修复且未引入新错误", "en": "Confirm fixes without new regressions"},
+      "prompt": {"zh": "请复核以下修订前后文本。逐项判断原问题是否解决，检查修改是否引入新的语病、事实冲突、人物失真或连续性问题；只报告仍需处理的项目，并说明通过项数量：\n\n", "en": "Verify the before-and-after revision below. Determine whether each original issue is resolved and whether the edit introduced new prose, factual, characterization, or continuity problems. Report only remaining actions and provide a count of passed items:\n\n"},
+      "color": "#CCFBF1",
+      "icon_name": "refresh-cw"
+    }
+  ],
+  "task_examples": {
+    "zh": [
+      "每天「20:00」校阅当天新增章节的错别字、标点和病句",
+      "每周一「09:00」汇总上周稿件中反复出现的语言问题",
+      "每周三「19:30」核对新增章节的人物动机与信息边界",
+      "每周五「20:00」审计全稿时间线、地点和物品连续性",
+      "每周日「16:00」复核本周修订项是否关闭且未引入新错误",
+      "每月 1 日「10:00」生成出版校阅问题统计与优先修订清单"
+    ],
+    "en": [
+      "Every day at 20:00, proofread the day's new chapter for typos, punctuation, and faulty sentences",
+      "Every Monday at 09:00, summarize recurring prose issues from the previous week's manuscript",
+      "Every Wednesday at 19:30, check character motivation and knowledge boundaries in new chapters",
+      "Every Friday at 20:00, audit the manuscript timeline, locations, and object continuity",
+      "Every Sunday at 16:00, verify that this week's revisions are resolved without new errors",
+      "On the 1st of every month at 10:00, produce proofreading metrics and a prioritized revision list"
+    ]
+  }
+}
