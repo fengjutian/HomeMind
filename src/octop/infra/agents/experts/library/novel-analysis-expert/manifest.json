@@ -1,0 +1,71 @@
+{
+  "id": "novel-analysis-expert",
+  "label": { "zh": "小说分析专家", "en": "Novel Analysis Expert" },
+  "description": {
+    "zh": "解析 EPUB、PDF、TXT 小说，追踪人物关系与事件因果，梳理情节推动、时间线和伏笔，并建立可溯源的知识图谱。",
+    "en": "Analyzes EPUB, PDF, and TXT fiction, tracing character relationships, event causality, plot progression, timelines, and foreshadowing into a source-grounded knowledge graph."
+  },
+  "welcome_message": {
+    "zh": "上传 EPUB、PDF 或 TXT 小说；我会先确认解析范围，再建立人物、事件与关系知识图谱",
+    "en": "Upload an EPUB, PDF, or TXT novel; I will confirm the analysis scope, then build a character, event, and relationship knowledge graph"
+  },
+  "icon_name": "network",
+  "color": "#7C3AED",
+  "prompt_files": ["SOUL.md"],
+  "quick_prompts": [
+    {
+      "title": { "zh": "全书综合分析", "en": "Analyze the full novel" },
+      "description": { "zh": "人物、事件、情节和图谱一体分析", "en": "Characters, events, plot, and graph" },
+      "prompt": { "zh": "请解析我上传的 EPUB、PDF 或 TXT 小说，按章节分批分析，建立人物档案、人物关系、关键事件链、情节推动因素、时间线、伏笔回收表和知识图谱。所有结论附章节、页码或段落定位，并区分事实、推断与待确认项。", "en": "Parse the uploaded EPUB, PDF, or TXT novel in chapter-sized batches. Build character profiles, relationships, key event chains, plot drivers, a timeline, a foreshadowing/payoff table, and a knowledge graph. Cite chapter, page, or paragraph locations and distinguish facts, inferences, and unknowns." },
+      "color": "#EDE9FE",
+      "icon_name": "book-open"
+    },
+    {
+      "title": { "zh": "分析人物关系", "en": "Map character relationships" },
+      "description": { "zh": "追踪关系、立场与变化", "en": "Track ties, positions, and changes" },
+      "prompt": { "zh": "请分析小说人物关系。识别人物别名与身份，列出关系类型、方向、强度、起止阶段、变化原因和证据位置；重点说明冲突、联盟、亲属、情感、权力与隐瞒关系，并生成 Mermaid 关系图。", "en": "Analyze the novel's character relationships. Resolve aliases and identities; record relationship type, direction, strength, active period, cause of change, and source location. Highlight conflict, alliance, kinship, affection, power, and concealment, then generate a Mermaid relationship graph." },
+      "color": "#DBEAFE",
+      "icon_name": "users"
+    },
+    {
+      "title": { "zh": "梳理事件推动", "en": "Trace plot-driving events" },
+      "description": { "zh": "还原因果链与转折机制", "en": "Reconstruct causality and turning points" },
+      "prompt": { "zh": "请梳理关键事件及其对情节的推动。对每个事件记录触发条件、参与者、动机、行动、直接结果、后续影响、冲突变化和证据位置；区分时间先后与真正因果，标出转折点、高潮和缺失的因果环节。", "en": "Trace the key events that drive the plot. For each event record triggers, participants, motives, actions, immediate outcomes, downstream effects, conflict changes, and source locations. Separate chronology from causality and identify turning points, climax, and missing causal links." },
+      "color": "#FEF3C7",
+      "icon_name": "git-branch"
+    },
+    {
+      "title": { "zh": "建立知识图谱", "en": "Build a knowledge graph" },
+      "description": { "zh": "输出可读图与结构化节点边", "en": "Produce readable and structured graphs" },
+      "prompt": { "zh": "请把当前分析整理为知识图谱。节点至少覆盖人物、事件、地点、组织、物品和概念；边包含人物关系、参与、发生于、持有、隶属、导致、阻碍、揭示与伏笔回收。输出 Mermaid 图和 JSON nodes/edges，并为每条边附来源定位、置信度和有效阶段。", "en": "Convert the current analysis into a knowledge graph. Include character, event, place, organization, object, and concept nodes; include relationship, participation, location, possession, membership, causation, obstruction, revelation, and foreshadowing/payoff edges. Output Mermaid plus JSON nodes/edges, with source location, confidence, and active period on every edge." },
+      "color": "#DCFCE7",
+      "icon_name": "network"
+    },
+    {
+      "title": { "zh": "分析叙事与主题", "en": "Analyze narrative and themes" },
+      "description": { "zh": "拆解视角、结构、主题与意象", "en": "Examine viewpoint, structure, themes, and motifs" },
+      "prompt": { "zh": "请分析小说的叙事结构与主题表达。说明叙事视角、时间组织、信息披露顺序、章节功能、人物弧光、核心主题、反复意象和象征系统；用具体情节证据解释形式如何服务主题，区分文本明确表达、可支持的解读和证据不足的联想，不把唯一解读强加给作品。", "en": "Analyze the novel's narrative structure and thematic expression. Examine viewpoint, temporal organization, disclosure order, chapter functions, character arcs, central themes, recurring motifs, and symbolism. Use specific plot evidence to explain how form serves theme; distinguish explicit meaning, supported interpretation, and speculation without imposing a single reading." },
+      "color": "#FCE7F3",
+      "icon_name": "sparkles"
+    },
+    {
+      "title": { "zh": "检查时间线与伏笔", "en": "Audit timeline and foreshadowing" },
+      "description": { "zh": "发现冲突、断链与未回收线索", "en": "Find conflicts, broken links, and unresolved clues" },
+      "prompt": { "zh": "请检查小说的时间线、信息流和伏笔回收。建立绝对或相对时间表，追踪人物在各节点的位置、知识、物品与状态；列出伏笔的埋设、强化、误导和回收位置。区分确定矛盾、疑似断链、刻意留白与尚未读到后文，并给出最小解释或需要补充核对的章节。", "en": "Audit the novel's timeline, information flow, and foreshadowing/payoffs. Build an absolute or relative chronology and track each character's location, knowledge, possessions, and state. Record setup, reinforcement, misdirection, and payoff locations. Separate definite contradictions, possible gaps, intentional ambiguity, and material not yet covered, then identify the smallest explanation or chapters needing review." },
+      "color": "#FFEDD5",
+      "icon_name": "clock"
+    }
+  ],
+  "task_examples": {
+    "zh": [
+      "每完成一个章节，更新人物关系、事件链和知识图谱",
+      "每天「20:00」汇总当天新增章节中的关系变化与关键转折",
+      "每周日「18:00」检查全书时间线、伏笔和因果链是否一致"
+    ],
+    "en": [
+      "After each chapter, update character relationships, event chains, and the knowledge graph",
+      "Every day at 20:00, summarize relationship changes and turning points in newly added chapters",
+      "Every Sunday at 18:00, audit timeline, foreshadowing, and causal-chain consistency"
+    ]
+  }
+}
