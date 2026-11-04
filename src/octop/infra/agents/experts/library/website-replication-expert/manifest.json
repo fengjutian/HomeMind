@@ -1,0 +1,136 @@
+{
+  "id": "website-replication-expert",
+  "label": {
+    "zh": "网站复刻专家",
+    "en": "Website Replication Expert"
+  },
+  "description": {
+    "zh": "输入一个网站地址，即可自动浏览和拆解原网站，在工作区生成可运行的新网站，高保真还原页面、响应式布局与关键交互，并通过截图对比持续校准。",
+    "en": "Give it a website URL and it will browse and analyze the source, generate a runnable new site in the workspace, faithfully recreate its pages, responsive layouts, and key interactions, and calibrate the result with screenshot comparisons."
+  },
+  "welcome_message": {
+    "zh": "发我一个网站地址，我会自动分析并把它复刻成可运行的新网站",
+    "en": "Send me a website URL and I'll analyze it and recreate it as a runnable new site"
+  },
+  "icon_name": "panels-top-left",
+  "color": "#2563EB",
+  "prompt_files": [
+    "SOUL.md"
+  ],
+  "quick_prompts": [
+    {
+      "title": {
+        "zh": "复刻整个网站",
+        "en": "Recreate a website"
+      },
+      "description": {
+        "zh": "输入网址，自动分析并生成完整网站",
+        "en": "Enter a URL to analyze and generate the complete site"
+      },
+      "prompt": {
+        "zh": "复刻下面的网站，并在当前工作区交付一个可运行的新网站。收到网址后立即执行，不要先让我提供截图、设计稿或技术栈。\n\n执行要求：\n1. 主动浏览原站，通过导航、页脚和站内链接发现主要公开页面、路由、共享组件、断点和关键交互。\n2. 检查当前工作区：已有项目就遵循现有框架与规范；空工作区就选择成熟、简单的实现方案并创建项目。\n3. 按“公共设计系统与布局 → 首页 → 主要内页 → 关键交互 → 响应式”的顺序实现，不要只输出分析、方案或代码片段。\n4. 启动新网站，在相同视口下截取原站和新站，比较结构、尺寸、字体、颜色、间距、图片、状态与交互；优先修复高影响差异，至少完成一轮对比修正。\n5. 运行构建、类型检查和相关测试，最后提供启动方式、已复刻页面、验证证据及剩余差异。\n\n只有遇到登录、验证码、付费墙、授权限制或无法观察的关键行为时才向我提问；不得绕过访问控制。\n\n原网站：",
+        "en": "Recreate the website below and deliver a runnable new site in the current workspace. Start immediately after receiving the URL; do not first ask me for screenshots, designs, or a target stack.\n\nExecution requirements:\n1. Proactively browse the source and use its navigation, footer, and internal links to discover the primary public pages, routes, shared components, breakpoints, and key interactions.\n2. Inspect the current workspace: follow the existing framework and conventions when a project exists; otherwise choose a mature, simple implementation and create the project.\n3. Implement in this order: shared design system and layout, homepage, primary inner pages, key interactions, then responsiveness. Do not stop at analysis, a plan, or code snippets.\n4. Run the new site and capture the source and recreation at identical viewport sizes. Compare structure, dimensions, typography, colors, spacing, imagery, states, and interactions; fix the highest-impact differences and complete at least one comparison-and-correction pass.\n5. Run the build, type checks, and relevant tests. Finish with startup instructions, recreated pages, verification evidence, and remaining differences.\n\nAsk me a question only when blocked by authentication, CAPTCHA, a paywall, authorization limits, or key behavior that cannot be observed. Never bypass access controls.\n\nSource website: "
+      },
+      "color": "#DBEAFE",
+      "icon_name": "panels-top-left"
+    },
+    {
+      "title": {
+        "zh": "从截图复刻",
+        "en": "Recreate from screenshots"
+      },
+      "description": {
+        "zh": "根据桌面端和移动端截图还原页面",
+        "en": "Rebuild a page from desktop and mobile screenshots"
+      },
+      "prompt": {
+        "zh": "请根据我提供的截图高保真复刻这个页面。先识别布局、字体、颜色、间距、组件状态和断点，再在当前项目中实现并用截图对比校准。",
+        "en": "Recreate this page faithfully from the screenshots I provide. Identify its layout, typography, colors, spacing, component states, and breakpoints, then implement it in the current project and calibrate it with screenshot comparisons."
+      },
+      "color": "#E0E7FF",
+      "icon_name": "scan"
+    },
+    {
+      "title": {
+        "zh": "拆解网站设计",
+        "en": "Reverse-engineer a design"
+      },
+      "description": {
+        "zh": "提取页面结构、组件和设计令牌",
+        "en": "Extract page structure, components, and design tokens"
+      },
+      "prompt": {
+        "zh": "请分析下面的网站并输出可实施的复刻规范，包括站点地图、页面结构、复用组件、颜色、字体、间距、圆角、阴影、断点和交互状态：\n\n",
+        "en": "Analyze the following website and produce an implementation-ready replication spec covering its sitemap, page structure, reusable components, colors, typography, spacing, radii, shadows, breakpoints, and interaction states:\n\n"
+      },
+      "color": "#F3E8FF",
+      "icon_name": "ruler"
+    },
+    {
+      "title": {
+        "zh": "复刻关键交互",
+        "en": "Recreate interactions"
+      },
+      "description": {
+        "zh": "还原菜单、表单、弹窗和动效",
+        "en": "Rebuild menus, forms, dialogs, and motion"
+      },
+      "prompt": {
+        "zh": "请观察并复刻这个网站的关键交互，包括导航、菜单、表单、弹窗、滚动行为、悬停与过渡动效。说明状态机和边界情况，并补充必要测试：\n\n",
+        "en": "Observe and recreate this website's key interactions, including navigation, menus, forms, dialogs, scrolling, hover states, and transitions. Document the state model and edge cases, and add the necessary tests:\n\n"
+      },
+      "color": "#FCE7F3",
+      "icon_name": "mouse-pointer-click"
+    },
+    {
+      "title": {
+        "zh": "适配移动端",
+        "en": "Add mobile responsiveness"
+      },
+      "description": {
+        "zh": "补齐断点、触控和小屏布局",
+        "en": "Add breakpoints, touch behavior, and small-screen layouts"
+      },
+      "prompt": {
+        "zh": "请让当前复刻页面完整适配移动端和平板端。对照原网站确认断点、内容重排、导航变化、触控区域、横向溢出和不同视口下的视觉一致性。",
+        "en": "Make the current recreated page fully responsive on mobile and tablet. Compare it with the source site and verify breakpoints, content reflow, navigation changes, touch targets, horizontal overflow, and visual consistency across viewports."
+      },
+      "color": "#CCFBF1",
+      "icon_name": "smartphone"
+    },
+    {
+      "title": {
+        "zh": "视觉对比验收",
+        "en": "Run visual validation"
+      },
+      "description": {
+        "zh": "用截图和检查项定位视觉差异",
+        "en": "Find visual differences with screenshots and checks"
+      },
+      "prompt": {
+        "zh": "请对当前复刻结果进行视觉验收。在相同视口下分别截取原网站和新网站，逐项比较布局、尺寸、颜色、字体、间距、图像和状态，修复影响最大的差异并报告剩余偏差。",
+        "en": "Visually validate the current recreation. Capture the source and new sites at identical viewport sizes, compare layout, dimensions, colors, typography, spacing, imagery, and states, fix the highest-impact differences, and report any remaining deviations."
+      },
+      "color": "#FEF3C7",
+      "icon_name": "scan-eye"
+    }
+  ],
+  "task_examples": {
+    "zh": [
+      "每周一「09:00」检查原网站首页变化并生成复刻差异报告",
+      "每天「18:00」对桌面端和移动端关键页面执行截图对比",
+      "每周五「16:00」汇总复刻网站的可访问性、性能与交互偏差",
+      "每月 1 日「10:00」重新提取原网站的设计令牌并检查漂移",
+      "每两周周三「14:00」巡检所有页面的断点和横向溢出问题",
+      "每次发布后检查导航、表单、弹窗和主要用户路径是否与原站一致"
+    ],
+    "en": [
+      "Every Monday at 09:00, check the source homepage for changes and generate a replication diff report",
+      "Every day at 18:00, run screenshot comparisons for key desktop and mobile pages",
+      "Every Friday at 16:00, summarize accessibility, performance, and interaction differences",
+      "On the first day of each month at 10:00, re-extract source design tokens and check for drift",
+      "Every other Wednesday at 14:00, inspect all pages for breakpoint and horizontal-overflow issues",
+      "After every release, verify that navigation, forms, dialogs, and primary user journeys match the source"
+    ]
+  }
+}
