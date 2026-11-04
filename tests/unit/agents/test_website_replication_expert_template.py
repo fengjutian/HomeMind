@@ -33,5 +33,8 @@ def test_website_replication_expert_template_is_complete() -> None:
     assert "探索 → 实现 → 启动 → 对比 → 修正 → 验证" in soul
     assert "1440×900" in soul
     assert "P0" in soul
+    assert "最多创建 4 个待办" in soul
+    assert "不超过 90 秒" in soul
+    assert "不得以前台阻塞方式运行" in soul
     assert "截图对比" in soul
     assert "不绕过登录" in soul
